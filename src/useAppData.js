@@ -1,122 +1,34 @@
-// ─── useAppData.js ────────────────────────────────────────────────────────
-// Central persistence hook — ALL app data lives here.
-// Reads from localStorage on mount, writes on every change.
+// ─── useAppData.js — Central persistence hook ────────────────────────────
 // Save to: moneycoach-app/src/useAppData.js
-// ─────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect } from "react";
 
-const STORAGE_KEY = "moneyCoachData_v1";
+const STORAGE_KEY = "moneyCoachData_v2";
 
-// ─── Default empty state ──────────────────────────────────────────────────
 const DEFAULT_STATE = {
-  screen:       "onboarding",  // "onboarding" | "dashboard"
-  name:         "",            // user's name (optional)
+  screen:        "onboarding",
+  name:          "",
   monthlyIncome: 0,
-  // Multi-month expenses: { "2026-03": [{id, amount, label, note, date}] }
-  allExpenses:  {},
-  // Streak check-ins: [{ date: "2026-03-10", zeroDay: true, ts: 1234 }]
-  checkIns:     [],
+  allExpenses:   {},   // { "2026-03": [{id,amount,label,note,date},...] }
+  checkIns:      [],   // [{ date:"2026-03-10", zeroDay:bool, ts:number }]
 };
 
-// ─── Safe read from localStorage ─────────────────────────────────────────
 function loadFromStorage() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    // Basic validation — must have at least monthlyIncome
     if (typeof parsed !== "object" || parsed === null) return null;
     return parsed;
-  } catch (e) {
-    console.warn("Money Coach: failed to read localStorage", e);
-    return null;
-  }
+  } catch { return null; }
 }
 
-// ─── Safe write to localStorage ──────────────────────────────────────────
 function saveToStorage(data) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  } catch (e) {
-    console.warn("Money Coach: failed to write localStorage", e);
-  }
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+  catch (e) { console.warn("localStorage write failed", e); }
 }
 
-// ─── MAIN HOOK ────────────────────────────────────────────────────────────
-export function useAppData() {
-  // ── 1. Initialise state from localStorage (runs ONCE on mount) ─────────
-  const [data, setData] = useState(() => {
-    const saved = loadFromStorage();
-    if (saved) {
-      // Merge with defaults so new fields added later don't break old saves
-      return { ...DEFAULT_STATE, ...saved };
-    }
-    return { ...DEFAULT_STATE };
-  });
-
-  // ── 2. Write to localStorage whenever data changes ────────────────────
-  useEffect(() => {
-    saveToStorage(data);
-  }, [data]);
-
-  // ── 3. Convenience updaters ───────────────────────────────────────────
-
-  const completeOnboarding = ({ income, name }) => {
-    setData(prev => ({
-      ...prev,
-      screen:        "dashboard",
-      monthlyIncome: income,
-      name:          name || "",
-    }));
-  };
-
-  // Add expense to the correct month bucket
-  const addExpense = (expense) => {
-    const key = currentMonthKey();
-    setData(prev => ({
-      ...prev,
-      allExpenses: {
-        ...prev.allExpenses,
-        [key]: [...(prev.allExpenses[key] || []), expense],
-      },
-    }));
-  };
-
-  // Record a check-in (zero-spend or spend day)
-  const addCheckIn = (checkIn) => {
-    // Prevent duplicates for the same date
-    setData(prev => {
-      const already = prev.checkIns.some(c => c.date === checkIn.date);
-      if (already) return prev;
-      return { ...prev, checkIns: [...prev.checkIns, checkIn] };
-    });
-  };
-
-  // ── 4. Hard reset — ONLY called from Reset button ─────────────────────
-  const resetAll = () => {
-    localStorage.removeItem(STORAGE_KEY);
-    setData({ ...DEFAULT_STATE });
-  };
-
-  return {
-    // State
-    screen:        data.screen,
-    name:          data.name,
-    monthlyIncome: data.monthlyIncome,
-    allExpenses:   data.allExpenses,
-    checkIns:      data.checkIns,
-    // Actions
-    completeOnboarding,
-    addExpense,
-    addCheckIn,
-    resetAll,
-    // Direct setter for edge cases
-    setData,
-  };
-}
-
-// ─── HELPERS (used by App + hooks) ────────────────────────────────────────
+// ── HELPERS ───────────────────────────────────────────────────────────────
 export const currentMonthKey = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
@@ -128,12 +40,81 @@ export const monthKeyToLabel = (key) => {
     .toLocaleDateString("en-IN", { month: "long", year: "numeric" });
 };
 
-export const getMonthKeys = (n = 12) => {
-  const keys = [];
-  const d = new Date();
-  for (let i = 0; i < n; i++) {
-    keys.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`);
-    d.setMonth(d.getMonth()-1);
-  }
-  return keys;
+// Fix #5: Only return months that have data + always include current month
+export const getActiveMonthKeys = (allExpenses) => {
+  const current = currentMonthKey();
+  const withData = Object.keys(allExpenses).filter(k => (allExpenses[k]?.length || 0) > 0);
+  const all = Array.from(new Set([current, ...withData]));
+  // Sort descending (newest first)
+  return all.sort((a, b) => b.localeCompare(a));
 };
+
+// ── HOOK ──────────────────────────────────────────────────────────────────
+export function useAppData() {
+  const [data, setData] = useState(() => {
+    const saved = loadFromStorage();
+    return saved ? { ...DEFAULT_STATE, ...saved } : { ...DEFAULT_STATE };
+  });
+
+  useEffect(() => { saveToStorage(data); }, [data]);
+
+  const completeOnboarding = ({ income, name }) => {
+    setData(prev => ({ ...prev, screen: "dashboard", monthlyIncome: income, name: name || "" }));
+  };
+
+  // Fix #5: auto-creates month bucket when first expense is added
+  const addExpense = (expense) => {
+    const key = currentMonthKey();
+    setData(prev => ({
+      ...prev,
+      allExpenses: {
+        ...prev.allExpenses,
+        [key]: [...(prev.allExpenses[key] || []), expense],
+      },
+    }));
+  };
+
+  // Edit expense in any month
+  const editExpense = (monthKey, id, updates) => {
+    setData(prev => ({
+      ...prev,
+      allExpenses: {
+        ...prev.allExpenses,
+        [monthKey]: (prev.allExpenses[monthKey] || []).map(e =>
+          e.id === id ? { ...e, ...updates } : e
+        ),
+      },
+    }));
+  };
+
+  // Delete expense from any month
+  const deleteExpense = (monthKey, id) => {
+    setData(prev => ({
+      ...prev,
+      allExpenses: {
+        ...prev.allExpenses,
+        [monthKey]: (prev.allExpenses[monthKey] || []).filter(e => e.id !== id),
+      },
+    }));
+  };
+
+  const addCheckIn = (checkIn) => {
+    setData(prev => {
+      if (prev.checkIns.some(c => c.date === checkIn.date)) return prev;
+      return { ...prev, checkIns: [...prev.checkIns, checkIn] };
+    });
+  };
+
+  // Fix #3: only place localStorage is cleared
+  const resetAll = () => {
+    localStorage.removeItem(STORAGE_KEY);
+    setData({ ...DEFAULT_STATE });
+  };
+
+  return {
+    screen: data.screen, name: data.name,
+    monthlyIncome: data.monthlyIncome,
+    allExpenses: data.allExpenses, checkIns: data.checkIns,
+    completeOnboarding, addExpense, editExpense, deleteExpense, addCheckIn, resetAll,
+  };
+}
