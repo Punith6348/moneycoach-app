@@ -1,68 +1,381 @@
-:root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+/* ─── index.css ─────────────────────────────────────────────────────────────
+   Replace the contents of: moneycoach-app/src/index.css
+   ──────────────────────────────────────────────────────────────────────── */
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+/* ── Reset & base ── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
+html, body, #root {
+  height: 100%;
+  width: 100%;
 }
 
 body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
+  background-color: #F7F5F0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  color: #1C1917;
+}
+
+/* ── App shell ── */
+.app-shell {
   min-height: 100vh;
+  background: #F7F5F0;
+  display: flex;
+  flex-direction: column;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+/* ── Sticky top nav ── */
+.top-nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E7E5E0;
+  width: 100%;
 }
 
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
+.top-nav-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 14px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* ── Tab bar ── */
+.tab-bar {
+  background: #FFFFFF;
+  border-bottom: 1px solid #E7E5E0;
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.tab-bar::-webkit-scrollbar { display: none; }
+
+.tab-bar-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  padding: 0 16px;
+}
+
+.tab-btn {
+  flex: 0 0 auto;
+  padding: 13px 18px;
+  background: none;
+  border: none;
+  border-bottom: 2.5px solid transparent;
+  font-size: 13px;
   font-family: inherit;
-  background-color: #1a1a1a;
+  color: #78716C;
   cursor: pointer;
-  transition: border-color 0.25s;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s;
+  font-weight: 400;
 }
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+.tab-btn.active {
+  color: #1C1917;
+  border-bottom-color: #1C1917;
+  font-weight: 700;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
+/* ── Page content wrapper ── */
+.page-content {
+  flex: 1;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 24px 60px;
+}
+
+/* ── Responsive grid layouts ── */
+
+/* Single column (mobile default) */
+.grid-1 { display: grid; grid-template-columns: 1fr; gap: 14px; }
+
+/* 2-column grid */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+/* Desktop: sidebar + main content split */
+.grid-sidebar {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+/* On desktop: cards in a 2-col summary row */
+@media (min-width: 768px) {
+  .top-nav-inner { padding: 16px 32px; }
+  .page-content  { padding: 32px 40px 80px; }
+  .tab-btn       { padding: 14px 22px; font-size: 14px; }
+
+  .grid-sidebar {
+    grid-template-columns: 340px 1fr;
+    align-items: start;
   }
-  a:hover {
-    color: #747bff;
+
+  /* Summary stat cards in a 4-col row on desktop */
+  .grid-stats-desktop {
+    grid-template-columns: repeat(4, 1fr);
   }
-  button {
-    background-color: #f9f9f9;
+}
+
+@media (min-width: 1024px) {
+  .page-content { padding: 36px 48px 80px; }
+
+  .grid-sidebar {
+    grid-template-columns: 380px 1fr;
+    gap: 20px;
   }
+}
+
+/* ── Card base ── */
+.card {
+  background: #FFFFFF;
+  border-radius: 16px;
+  border: 1px solid #E7E5E0;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  padding: 20px;
+  transition: box-shadow 0.2s;
+}
+.card:hover {
+  box-shadow: 0 3px 10px rgba(0,0,0,0.09);
+}
+
+/* Card padding variants */
+.card-sm  { padding: 14px 16px; }
+.card-lg  { padding: 28px; }
+
+/* ── Onboarding screen ── */
+.onboarding-wrap {
+  min-height: 100vh;
+  background: #F7F5F0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.onboarding-box {
+  width: 100%;
+  max-width: 440px;
+}
+
+/* ── Chart containers — always fill their parent ── */
+.chart-wrap {
+  width: 100%;
+  min-height: 220px;
+}
+
+/* Recharts ResponsiveContainer fix */
+.recharts-responsive-container {
+  min-width: 0 !important;
+}
+
+/* ── Form inputs ── */
+.input-base {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1.5px solid #E7E5E0;
+  font-family: inherit;
+  outline: none;
+  background: #F7F5F0;
+  color: #1C1917;
+  transition: border-color 0.15s;
+}
+.input-base:focus {
+  border-color: #1C1917;
+}
+.input-number {
+  font-size: 22px;
+  font-family: Georgia, serif;
+}
+.input-text {
+  font-size: 14px;
+}
+
+/* ── Buttons ── */
+.btn-primary {
+  width: 100%;
+  padding: 14px;
+  border-radius: 12px;
+  background: #1C1917;
+  color: #fff;
+  border: none;
+  font-size: 15px;
+  font-family: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.btn-primary:hover { opacity: 0.88; }
+
+.btn-ghost {
+  background: #F7F5F0;
+  border: 1px solid #E7E5E0;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 12px;
+  color: #78716C;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s;
+}
+.btn-ghost:hover { background: #EDEAE5; }
+
+/* ── Toast ── */
+.toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1C1917;
+  color: #fff;
+  padding: 10px 22px;
+  border-radius: 99px;
+  font-size: 13px;
+  z-index: 999;
+  white-space: nowrap;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.18);
+  animation: fadeSlideIn 0.2s ease;
+}
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ── Labels ── */
+.label {
+  font-size: 11px;
+  color: #78716C;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  font-weight: 600;
+}
+
+/* ── Streak badge ── */
+.streak-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #FFF7ED;
+  border: 1px solid #FDBA74;
+  border-radius: 99px;
+  padding: 5px 12px;
+}
+
+/* ── Progress bar ── */
+.progress-track {
+  height: 6px;
+  border-radius: 99px;
+  background: #E7E5E0;
+  margin-top: 10px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.5s ease;
+}
+
+/* ── Category chips ── */
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+  margin-bottom: 14px;
+}
+.chip {
+  padding: 7px 14px;
+  border-radius: 99px;
+  border: 1.5px solid #E7E5E0;
+  background: #FFFFFF;
+  color: #1C1917;
+  font-size: 12px;
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.chip.active {
+  background: #1C1917;
+  color: #ffffff;
+  border-color: #1C1917;
+}
+
+/* ── Expense list row ── */
+.expense-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid #E7E5E0;
+}
+.expense-row:last-child { border-bottom: none; }
+
+.expense-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: #F7F5F0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+/* ── Pill stat ── */
+.pill-stat {
+  flex: 1;
+  text-align: center;
+  padding: 10px 8px;
+  background: #F7F5F0;
+  border-radius: 10px;
+  border: 1px solid #E7E5E0;
+}
+
+/* ── Insight / guide colored cards ── */
+.tinted-card {
+  border-radius: 14px;
+  border: 1.5px solid;
+  padding: 18px;
+  transition: all 0.3s ease;
+}
+
+/* ── Section title ── */
+.section-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1C1917;
+  font-family: inherit;
+  margin: 0 0 14px;
+}
+
+/* ── Spacer utilities ── */
+.mt-8  { margin-top: 8px;  }
+.mt-10 { margin-top: 10px; }
+.mt-12 { margin-top: 12px; }
+.mt-14 { margin-top: 14px; }
+.mb-10 { margin-bottom: 10px; }
+.mb-12 { margin-bottom: 12px; }
+.mb-14 { margin-bottom: 14px; }
+.gap-8  { gap: 8px;  }
+.gap-10 { gap: 10px; }
+.gap-12 { gap: 12px; }
+
+/* ── Page subtitle (tab description) ── */
+.page-subtitle {
+  font-size: 13px;
+  color: #78716C;
+  margin-bottom: 16px;
+  line-height: 1.6;
 }
