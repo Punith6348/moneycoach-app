@@ -71,53 +71,54 @@ export default function BudgetDashboard({
     <div>
       <style>{DASH_CSS}</style>
 
-      {/* ══ 1. HERO CARD — compact, ~25% shorter than before ══ */}
+      {/* ══ 1. HERO CARD — compact, left-aligned ══ */}
       <div style={{
-        background:"#1C1917", borderRadius:14, padding:"16px 20px",
-        marginBottom:12, position:"relative", overflow:"hidden",
+        background:"#1C1917", borderRadius:13, padding:"14px 16px",
+        marginBottom:12, display:"flex", justifyContent:"space-between", alignItems:"flex-end", gap:12,
       }}>
-        {/* Subtle background ring */}
-        <div style={{position:"absolute",top:-50,right:-50,width:160,height:160,borderRadius:"50%",background:"rgba(255,255,255,0.03)",pointerEvents:"none"}} />
-
-        {/* Row 1: Remaining Balance label */}
-        <p style={{margin:0,fontSize:10,color:"#A8A29E",textTransform:"uppercase",letterSpacing:"1.4px",fontWeight:600}}>
-          Remaining Balance
-        </p>
-
-        {/* Row 2: Big amount */}
-        <p style={{
-          margin:"4px 0 0", lineHeight:1,
-          fontSize: remaining >= 1000000 ? 32 : remaining >= 100000 ? 38 : 44,
-          fontWeight:700, fontFamily:"Georgia,serif",
-          color: remaining >= 0 ? "#fff" : "#F87171",
-        }}>
-          {remaining >= 0 ? fmt(remaining) : `−${fmt(remaining)}`}
-        </p>
-
-        {/* Thin separator */}
-        <div style={{height:1, background:"rgba(255,255,255,0.1)", margin:"12px 0 10px"}} />
-
-        {/* Row 3: Daily spend + days left in one line */}
-        <div style={{display:"flex",alignItems:"baseline",gap:6,flexWrap:"wrap"}}>
-          <p style={{margin:0,fontSize:18,fontWeight:700,fontFamily:"Georgia,serif",color:dailyLimit>0?"#E7E5E0":"#F87171"}}>
-            {dailyLimit > 0 ? fmt(dailyLimit) : "₹0"}
+        {/* LEFT: main info stack */}
+        <div style={{flex:1, minWidth:0}}>
+          {/* Label */}
+          <p style={{margin:0, fontSize:9, color:"#78716C", textTransform:"uppercase", letterSpacing:"1.3px", fontWeight:700}}>
+            Remaining Balance
           </p>
-          <p style={{margin:0,fontSize:11,color:"#A8A29E"}}>suggested / day &nbsp;·&nbsp; {daysLeft} days left in {monthName}</p>
+          {/* Primary number — largest text */}
+          <p style={{
+            margin:"2px 0 0", lineHeight:1, fontWeight:700, fontFamily:"Georgia,serif",
+            fontSize: remaining >= 1000000 ? 30 : remaining >= 100000 ? 34 : 38,
+            color: remaining >= 0 ? "#fff" : "#F87171",
+          }}>
+            {remaining >= 0 ? fmt(remaining) : `−${fmt(remaining)}`}
+          </p>
+
+          {/* Thin rule */}
+          <div style={{height:1, background:"rgba(255,255,255,0.08)", margin:"9px 0 8px", maxWidth:280}} />
+
+          {/* Daily spend row */}
+          <div style={{display:"flex", alignItems:"baseline", gap:5, flexWrap:"wrap"}}>
+            <p style={{margin:0, fontSize:10, color:"#A8A29E", fontWeight:500}}>Suggested daily spend</p>
+            <p style={{margin:0, fontSize:15, fontWeight:700, fontFamily:"Georgia,serif", color: dailyLimit>0?"#E7E5E0":"#F87171"}}>
+              {dailyLimit > 0 ? fmt(dailyLimit) : "₹0"}
+            </p>
+          </div>
+
+          {/* Days remaining */}
+          <p style={{margin:"3px 0 0", fontSize:10, color:"#57534E"}}>
+            {daysLeft} days remaining in {monthName}
+          </p>
         </div>
 
-        {/* Row 4: description */}
-        <p style={{margin:"3px 0 0",fontSize:10,color:"#57534E",lineHeight:1.5}}>
-          Recommended daily spend based on your remaining budget.
-        </p>
-
-        {/* Row 5: today's spend pill — only when spent something */}
+        {/* RIGHT: today's spend indicator */}
         {todaySpent > 0 && (
-          <div style={{marginTop:10,display:"inline-flex",gap:5,alignItems:"center",background:"rgba(255,255,255,0.07)",borderRadius:99,padding:"4px 11px",border:"1px solid rgba(255,255,255,0.1)"}}>
-            <span style={{fontSize:10,color:"#D6D3D1"}}>Today:</span>
-            <span style={{fontSize:11,fontWeight:700,color:todaySpent<=dailyLimit?"#86EFAC":"#F87171"}}>{fmt(todaySpent)}</span>
-            <span style={{fontSize:10,color:todaySpent<=dailyLimit?"#86EFAC":"#F87171"}}>
+          <div style={{textAlign:"right", flexShrink:0}}>
+            <p style={{margin:0, fontSize:9, color:"#57534E", textTransform:"uppercase", letterSpacing:"0.8px"}}>Today</p>
+            <p style={{margin:"2px 0 0", fontSize:14, fontWeight:700, fontFamily:"Georgia,serif",
+              color: todaySpent <= dailyLimit ? "#86EFAC" : "#F87171"}}>
+              {fmt(todaySpent)}
+            </p>
+            <p style={{margin:"1px 0 0", fontSize:9, color: todaySpent <= dailyLimit ? "#86EFAC" : "#F87171"}}>
               {todaySpent <= dailyLimit ? "✓ within limit" : "⚠ over limit"}
-            </span>
+            </p>
           </div>
         )}
       </div>
