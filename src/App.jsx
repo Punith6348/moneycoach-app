@@ -2,7 +2,6 @@
 import { useState, useMemo } from "react";
 import InsightCard      from "./InsightCard";
 import SpendingChart    from "./SpendingChart";
-import DailyCheckIn     from "./DailyCheckIn";
 import { useStreak }    from "./useStreak";
 import { useAppData, currentMonthKey, monthKeyToLabel, getActiveMonthKeys } from "./useAppData";
 import BudgetDashboard  from "./BudgetDashboard";
@@ -26,10 +25,12 @@ const groupByDate = (expenses) => {
   return groups;
 };
 
+// Fix #2: Only variable/daily categories in the log form.
+// Fixed expenses are managed exclusively in the Plan tab.
 const VARIABLE_CATS = [{name:"Food",icon:"🍽"},{name:"Travel",icon:"🚗"},{name:"Coffee",icon:"☕"},{name:"Grocery",icon:"🛒"},{name:"Medical",icon:"💊"},{name:"Entertainment",icon:"🎬"},{name:"Other",icon:"💸"}];
-const FIXED_CATS    = [{name:"Rent",icon:"🏠"},{name:"Electricity",icon:"⚡"},{name:"Water",icon:"💧"},{name:"Internet",icon:"📶"},{name:"EMI/Loan",icon:"🏦"},{name:"Insurance",icon:"🛡"},{name:"Maintenance",icon:"🔧"},{name:"School Fees",icon:"🎓"}];
-const ALL_CATS      = [...VARIABLE_CATS,...FIXED_CATS];
-const ICONS         = Object.fromEntries(ALL_CATS.map(c=>[c.name,c.icon]));
+// ICONS keeps fixed cats too so existing logged entries render correctly
+const FIXED_ICONS   = {Rent:"🏠",Electricity:"⚡",Water:"💧",Internet:"📶","EMI/Loan":"🏦",Insurance:"🛡",Maintenance:"🔧","School Fees":"🎓"};
+const ICONS         = {...Object.fromEntries(VARIABLE_CATS.map(c=>[c.name,c.icon])), ...FIXED_ICONS};
 const C = {ink:"#1C1917",muted:"#78716C",border:"#E7E5E0",bg:"#F7F5F0",red:"#DC2626",green:"#16A34A",amber:"#D97706",blue:"#2563EB",purple:"#7C3AED"};
 
 // ─── SHARED UI ────────────────────────────────────────────────────────────
@@ -76,11 +77,8 @@ function EditModal({expense,monthKey,onSave,onClose}) {
         <input type="number" value={amount} onChange={e=>setAmount(e.target.value)} autoFocus
           style={{width:"100%",padding:"10px 12px",borderRadius:8,border:`1.5px solid ${C.border}`,fontFamily:"inherit",fontSize:20,fontFamily:"Georgia,serif",background:C.bg,outline:"none",marginTop:6,marginBottom:12,boxSizing:"border-box"}} />
         <Label>Category</Label>
-        <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:6,marginBottom:6}}>
+        <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:6,marginBottom:12}}>
           {VARIABLE_CATS.map(c=><button key={c.name} onClick={()=>setLabel(c.name)} style={{padding:"5px 11px",borderRadius:99,border:`1.5px solid ${label===c.name?C.ink:C.border}`,background:label===c.name?C.ink:"#fff",color:label===c.name?"#fff":C.ink,fontSize:11,fontFamily:"inherit",fontWeight:600,cursor:"pointer"}}>{c.icon} {c.name}</button>)}
-        </div>
-        <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
-          {FIXED_CATS.map(c=><button key={c.name} onClick={()=>setLabel(c.name)} style={{padding:"5px 11px",borderRadius:99,border:`1.5px solid ${label===c.name?C.ink:C.border}`,background:label===c.name?C.ink:"#fff",color:label===c.name?"#fff":C.ink,fontSize:11,fontFamily:"inherit",fontWeight:600,cursor:"pointer"}}>{c.icon} {c.name}</button>)}
         </div>
         <Label>Note (optional)</Label>
         <input type="text" value={note} onChange={e=>setNote(e.target.value)} placeholder="Optional note"
@@ -151,18 +149,18 @@ function LogExpenseForm({onAdd,disabled}) {
     {cat.icon} {cat.name}</button>;
   return (
     <div style={{background:"#fff",borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 3px rgba(0,0,0,0.06)",padding:18,opacity:disabled?0.65:1}}>
-      <p style={{fontSize:15,fontWeight:700,color:C.ink,margin:"0 0 14px"}}>+ Log Expense</p>
+      <p style={{fontSize:15,fontWeight:700,color:C.ink,margin:"0 0 14px"}}>+ Log Daily Expense</p>
       {disabled&&<div style={{marginBottom:10,padding:"7px 11px",borderRadius:8,background:"#FFFBEB",border:"1px solid #FCD34D",fontSize:12,color:C.amber}}>⚠️ Switch to current month to add expenses.</div>}
       <Label>Amount (₹) *</Label>
       <input type="number" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="e.g. 250" disabled={disabled}
         onKeyDown={e=>e.key==="Enter"&&submit()}
         style={{width:"100%",padding:"10px 12px",borderRadius:8,border:`1.5px solid ${C.border}`,fontFamily:"Georgia,serif",fontSize:20,background:C.bg,outline:"none",marginTop:6,marginBottom:12,boxSizing:"border-box"}} />
-      <Label>Daily Expenses</Label>
-      <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:6,marginBottom:10}}>{VARIABLE_CATS.map(chip)}</div>
-      <Label>Fixed / Monthly Bills</Label>
-      <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:6,marginBottom:10}}>{FIXED_CATS.map(chip)}</div>
+      {/* Fix #2: Only daily/variable categories — fixed expenses managed in Plan tab */}
+      <Label>Category</Label>
+      <p style={{fontSize:11,color:C.muted,margin:"2px 0 6px"}}>For fixed bills like Rent or EMI, use the <strong>Plan tab</strong>.</p>
+      <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>{VARIABLE_CATS.map(chip)}</div>
       <Label>Note (optional)</Label>
-      <input type="text" value={note} onChange={e=>setNote(e.target.value)} placeholder="e.g. Monthly rent" disabled={disabled}
+      <input type="text" value={note} onChange={e=>setNote(e.target.value)} placeholder="e.g. Lunch at Zomato" disabled={disabled}
         style={{width:"100%",padding:"10px 12px",borderRadius:8,border:`1.5px solid ${C.border}`,fontFamily:"inherit",fontSize:14,background:C.bg,outline:"none",marginTop:6,marginBottom:12,boxSizing:"border-box"}} />
       <button onClick={submit} disabled={disabled} style={{width:"100%",padding:13,borderRadius:12,background:C.ink,color:"#fff",border:"none",fontSize:15,fontFamily:"inherit",fontWeight:700,cursor:"pointer",opacity:disabled?0.5:1}}>Save Expense ✓</button>
     </div>
@@ -300,11 +298,11 @@ function DashboardScreen(props) {
     showToast(`${fmt(amount)} saved under ${label} ✓`);
   };
 
+  // Fix #1: Check-In tab removed — streak lives in Home tab
   const TABS=[
     {key:"budget",    label:"📊 Dashboard"},
     {key:"plan",      label:"🗂 Plan"},
     {key:"home",      label:"🏠 Expenses"},
-    {key:"checkin",   label:"✅ Check-In"},
     {key:"charts",    label:"🥧 Charts"},
     {key:"insight",   label:"💡 Insights"},
   ];
@@ -382,10 +380,32 @@ function DashboardScreen(props) {
         {tab==="home"&&(
           <>
             <SummaryStrip totalIncome={totalIncome} remaining={remaining} expenses={currentExpenses} dailyLimit={dailyLimit}/>
-            {streak>0&&<div style={{marginBottom:14,background:"#FFF7ED",borderRadius:12,padding:"10px 14px",border:"1px solid #FDBA74",display:"flex",alignItems:"center",gap:10}}>
-              <span style={{fontSize:18}}>🔥</span>
-              <div><p style={{fontWeight:700,color:"#EA580C",fontSize:13,margin:0}}>{streak}-day streak!</p><p style={{color:"#D97706",fontSize:11,marginTop:1,margin:0}}>Best: {bestStreak} · Zero-spend days: {zeroDays}</p></div>
-            </div>}
+
+            {/* Fix #1: Streak merged into Home tab */}
+            {streak > 0 && (
+              <div style={{marginBottom:14,background:"#FFF7ED",borderRadius:12,padding:"12px 16px",border:"1px solid #FDBA74",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <span style={{fontSize:22}}>🔥</span>
+                  <div>
+                    <p style={{fontWeight:700,color:"#EA580C",fontSize:14,margin:0}}>{streak}-day streak!</p>
+                    <p style={{color:"#D97706",fontSize:11,margin:"2px 0 0"}}>Best: {bestStreak} days · Zero-spend days: {zeroDays}</p>
+                  </div>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <p style={{fontSize:11,color:"#D97706",margin:0}}>Today spent</p>
+                  <p style={{fontSize:16,fontWeight:700,color:todayUnderBudget?"#16A34A":"#DC2626",fontFamily:"Georgia,serif",margin:0}}>
+                    {fmt(todaySpend)}
+                  </p>
+                </div>
+              </div>
+            )}
+            {streak === 0 && (
+              <div style={{marginBottom:14,background:"#F0FDF4",borderRadius:12,padding:"10px 14px",border:"1px solid #86EFAC",display:"flex",alignItems:"center",gap:10}}>
+                <span style={{fontSize:18}}>🌱</span>
+                <p style={{fontSize:13,color:"#16A34A",margin:0,fontWeight:500}}>Log your first expense to start your streak!</p>
+              </div>
+            )}
+
             <MonthBar/>
             <div style={{display:"grid",gridTemplateColumns:"1fr",gap:14}}>
               <LogExpenseForm onAdd={handleAdd} disabled={!isCurrentMonth}/>
@@ -394,19 +414,7 @@ function DashboardScreen(props) {
           </>
         )}
 
-        {/* ══ CHECK-IN ══ */}
-        {tab==="checkin"&&(
-          <>
-            <p style={{fontSize:13,color:C.muted,marginBottom:14,lineHeight:1.6}}>Check in daily — even zero-spend days count toward your streak!</p>
-            <div style={{display:"grid",gridTemplateColumns:"1fr",gap:14}}>
-              <DailyCheckIn streak={streak} bestStreak={bestStreak} zeroDays={zeroDays} totalDays={totalDays}
-                todayCheckedIn={todayCheckedIn} todaySpend={todaySpend} todayUnderBudget={todayUnderBudget}
-                safeDailySpend={dailyLimit} checkIns={checkIns} expenses={currentExpenses}
-                onZeroSpend={recordZeroSpend} onAddExpense={()=>setTab("home")}/>
-              <LogExpenseForm onAdd={handleAdd} disabled={false}/>
-            </div>
-          </>
-        )}
+        {/* Check-In tab removed — Fix #1 */}
 
         {/* ══ CHARTS ══ */}
         {tab==="charts"&&(
