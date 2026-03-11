@@ -15,12 +15,12 @@ const Label = ({children}) => <p style={{fontSize:11,color:C.muted,textTransform
 // ── Section card wrapper ──────────────────────────────────────────────────
 function SectionCard({icon,title,color,children}) {
   return (
-    <div style={{background:"#fff",borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 3px rgba(0,0,0,0.06)",overflow:"hidden",marginBottom:16}}>
-      <div style={{background:color+"14",borderBottom:`1px solid ${color}28`,padding:"13px 18px",display:"flex",alignItems:"center",gap:10}}>
-        <span style={{fontSize:18}}>{icon}</span>
-        <p style={{fontWeight:700,fontSize:14,color:C.ink,margin:0}}>{title}</p>
+    <div style={{background:"#fff",borderRadius:12,border:`1px solid ${C.border}`,boxShadow:"0 1px 2px rgba(0,0,0,0.05)",overflow:"hidden",marginBottom:12}}>
+      <div style={{background:color+"10",borderBottom:`1px solid ${color}22`,padding:"10px 14px",display:"flex",alignItems:"center",gap:8}}>
+        <span style={{fontSize:15}}>{icon}</span>
+        <p style={{fontWeight:700,fontSize:13,color:C.ink,margin:0}}>{title}</p>
       </div>
-      <div style={{padding:16}}>{children}</div>
+      <div style={{padding:"12px 14px"}}>{children}</div>
     </div>
   );
 }
@@ -78,26 +78,27 @@ function DotMenu({onEdit, onDelete}) {
   );
 }
 
-// ── Row for standard items (Income, Fixed, Savings) ──────────────────────
+// ── Row for standard items (Income, Fixed, Savings) — compact ────────────
 function ItemRow({label, amount, sublabel, color, onEdit, onDelete}) {
   return (
-    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 0",borderBottom:`1px solid ${C.bg}`,gap:8}}>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 0",borderBottom:`1px solid ${C.bg}`,gap:8}}>
       <div style={{flex:1,minWidth:0}}>
-        <p style={{fontSize:13,fontWeight:600,color:C.ink,margin:0}}>{label}</p>
-        {sublabel && <p style={{fontSize:11,color:C.muted,marginTop:2,margin:"2px 0 0"}}>{sublabel}</p>}
+        <p style={{fontSize:12,fontWeight:600,color:C.ink,margin:0,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{label}</p>
+        {sublabel && <p style={{fontSize:10,color:C.muted,margin:"1px 0 0"}}>{sublabel}</p>}
       </div>
-      <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
-        <span style={{fontSize:14,fontWeight:700,color,fontFamily:"Georgia,serif"}}>{fmt(amount)}</span>
+      <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+        <span style={{fontSize:13,fontWeight:700,color,fontFamily:"Georgia,serif"}}>{fmt(amount)}</span>
         <DotMenu onEdit={onEdit} onDelete={onDelete} />
       </div>
     </div>
   );
 }
 
+// Smaller, more compact add button
 function AddButton({onClick, label}) {
   return (
     <button onClick={onClick}
-      style={{marginTop:10,width:"100%",padding:"9px",borderRadius:10,border:`1.5px dashed ${C.border}`,background:"transparent",color:C.muted,fontSize:13,fontFamily:"inherit",cursor:"pointer",fontWeight:600}}
+      style={{marginTop:8,width:"100%",padding:"7px",borderRadius:8,border:`1.5px dashed ${C.border}`,background:"transparent",color:C.muted,fontSize:12,fontFamily:"inherit",cursor:"pointer",fontWeight:600}}
       onMouseEnter={e=>{e.currentTarget.style.borderColor=C.ink;e.currentTarget.style.color=C.ink;}}
       onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.color=C.muted;}}>
       + {label}
@@ -174,9 +175,9 @@ export function IncomeSources({sources,totalIncome,onAdd,onUpdate,onDelete}) {
 
   return (
     <SectionCard icon="💰" title="Income Sources" color={C.green}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-        <Label>Total Monthly Income</Label>
-        <p style={{fontSize:20,fontWeight:700,color:C.green,fontFamily:"Georgia,serif",margin:0}}>{fmt(totalIncome)}</p>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+        <p style={{fontSize:10,color:"#78716C",textTransform:"uppercase",letterSpacing:"0.9px",fontWeight:600,margin:0}}>Total Monthly Income</p>
+        <p style={{fontSize:17,fontWeight:700,color:"#16A34A",fontFamily:"Georgia,serif",margin:0}}>{fmt(totalIncome)}</p>
       </div>
 
       {sources.map(s => (
@@ -222,12 +223,12 @@ export function FixedExpensesSection({items,totalFixed,onAdd,onUpdate,onDelete})
 
   return (
     <SectionCard icon="🏠" title="Fixed Monthly Expenses" color={C.red}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-        <Label>Total Fixed</Label>
-        <p style={{fontSize:20,fontWeight:700,color:C.red,fontFamily:"Georgia,serif",margin:0}}>{fmt(totalFixed)}</p>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+        <p style={{fontSize:10,color:C.muted,textTransform:"uppercase",letterSpacing:"0.9px",fontWeight:600,margin:0}}>Total Fixed</p>
+        <p style={{fontSize:17,fontWeight:700,color:C.red,fontFamily:"Georgia,serif",margin:0}}>{fmt(totalFixed)}</p>
       </div>
-      <p style={{fontSize:12,color:C.muted,marginBottom:10,lineHeight:1.5}}>
-        These auto-deduct from your remaining budget every month.
+      <p style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.4}}>
+        Auto-deducted from your remaining budget every month.
       </p>
 
       {items.map(x=>(
@@ -272,12 +273,12 @@ export function SavingsSection({plans,totalSavings,onAdd,onUpdate,onDelete}) {
 
   return (
     <SectionCard icon="📈" title="Savings & Investments" color={C.blue}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-        <Label>Total Monthly Savings</Label>
-        <p style={{fontSize:20,fontWeight:700,color:C.blue,fontFamily:"Georgia,serif",margin:0}}>{fmt(totalSavings)}</p>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+        <p style={{fontSize:10,color:C.muted,textTransform:"uppercase",letterSpacing:"0.9px",fontWeight:600,margin:0}}>Total Monthly Savings</p>
+        <p style={{fontSize:17,fontWeight:700,color:C.blue,fontFamily:"Georgia,serif",margin:0}}>{fmt(totalSavings)}</p>
       </div>
-      <p style={{fontSize:12,color:C.muted,marginBottom:10,lineHeight:1.5}}>
-        Treated as planned savings — not counted as daily spending.
+      <p style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.4}}>
+        Planned savings — not counted as daily spending.
       </p>
 
       {plans.map(x=>(
@@ -338,13 +339,13 @@ export function FuturePaymentsSection({payments,totalReserve,onAdd,onUpdate,onDe
 
   return (
     <SectionCard icon="📅" title="Future Payment Reserve" color={C.purple}>
-      <p style={{fontSize:12,color:C.muted,marginBottom:10,lineHeight:1.5}}>
-        Save a little each month so big annual/quarterly bills don't catch you off guard.
-      </p>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-        <Label>Total Monthly Reserve</Label>
-        <p style={{fontSize:20,fontWeight:700,color:C.purple,fontFamily:"Georgia,serif",margin:0}}>{fmt(totalReserve)}</p>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+        <p style={{fontSize:10,color:C.muted,textTransform:"uppercase",letterSpacing:"0.9px",fontWeight:600,margin:0}}>Total Monthly Reserve</p>
+        <p style={{fontSize:17,fontWeight:700,color:C.purple,fontFamily:"Georgia,serif",margin:0}}>{fmt(totalReserve)}</p>
       </div>
+      <p style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.4}}>
+        Save monthly so annual/quarterly bills don't surprise you.
+      </p>
 
       {payments.map(p => {
         const monthly = calcMonthlyReserve(p);
@@ -352,15 +353,14 @@ export function FuturePaymentsSection({payments,totalReserve,onAdd,onUpdate,onDe
         const months  = Math.max(1, Math.round(days/30));
         const urgency = days<30?C.red:days<90?C.amber:C.purple;
         return (
-          <div key={p.id} style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",padding:"11px 0",borderBottom:`1px solid ${C.bg}`,gap:8}}>
+          <div key={p.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 0",borderBottom:`1px solid ${C.bg}`,gap:8}}>
             <div style={{flex:1,minWidth:0}}>
-              <p style={{fontSize:13,fontWeight:700,color:C.ink,margin:0}}>{p.label}</p>
-              <p style={{fontSize:11,color:C.muted,margin:"3px 0 6px"}}>
-                {fmt(p.totalAmount)} · {freqLabel(p.frequency)} · due in {days} days ({months}mo)
-                {p.note ? ` · ${p.note}` : ""}
+              <p style={{fontSize:12,fontWeight:700,color:C.ink,margin:0,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{p.label}</p>
+              <p style={{fontSize:10,color:C.muted,margin:"1px 0 4px"}}>
+                {fmt(p.totalAmount)} · {freqLabel(p.frequency)} · {days}d ({months}mo){p.note ? ` · ${p.note}` : ""}
               </p>
-              <span style={{display:"inline-block",background:`${urgency}12`,border:`1px solid ${urgency}40`,borderRadius:99,padding:"2px 10px",fontSize:12,color:urgency,fontWeight:700}}>
-                Save {fmt(monthly)}/month
+              <span style={{display:"inline-block",background:`${urgency}10`,border:`1px solid ${urgency}35`,borderRadius:99,padding:"1px 8px",fontSize:10,color:urgency,fontWeight:700}}>
+                Save {fmt(monthly)}/mo
               </span>
             </div>
             <DotMenu onEdit={()=>setMode(p.id)} onDelete={()=>{if(window.confirm(`Delete "${p.label}"?`))onDelete(p.id);}} />

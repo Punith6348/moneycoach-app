@@ -36,14 +36,16 @@ const C = {ink:"#1C1917",muted:"#78716C",border:"#E7E5E0",bg:"#F7F5F0",red:"#DC2
 // Responsive CSS injected once into <head> equivalent via a style tag in the app shell
 const APP_CSS = `
   /* Plan tab: 2-col desktop, 1-col mobile */
-  .mc-plan-top   { display:grid; grid-template-columns:1fr; gap:0; }
-  .mc-plan-full  { width:100%; }
+  .mc-plan-top  { display:grid; grid-template-columns:1fr; gap:0; }
+  .mc-plan-full { width:100%; }
   @media(min-width:768px){
-    .mc-plan-top { grid-template-columns:1fr 1fr; gap:16px; }
+    .mc-plan-top { grid-template-columns:1fr 1fr; gap:12px; }
   }
   /* Expense rows: compact */
-  .mc-expense-row { display:flex; align-items:center; justify-content:space-between; padding:7px 0; border-bottom:1px solid #F7F5F0; gap:8px; }
+  .mc-expense-row { display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px solid #F7F5F0; gap:8px; }
   .mc-expense-row:last-child { border-bottom:none; }
+  /* Scrollable tabs — hide scrollbar */
+  .mc-tabs::-webkit-scrollbar { display:none; }
 `;
 
 // ─── SHARED UI ────────────────────────────────────────────────────────────
@@ -157,7 +159,7 @@ function ExpenseList({expenses,monthKey,onEdit,onDelete,isCurrentMonth}) {
           <div style={{textAlign:"center",padding:"28px 0"}}><p style={{fontSize:28,marginBottom:8}}>📭</p><p style={{color:C.muted,fontSize:13}}>No expenses logged yet.</p></div>
         ):Object.entries(groups).map(([gl,items])=>(
           <div key={gl}>
-            <p style={{fontSize:11,color:C.muted,textTransform:"uppercase",letterSpacing:"1px",fontWeight:700,padding:"10px 0 6px",margin:0}}>{gl}</p>
+            <p style={{fontSize:10,color:C.muted,textTransform:"uppercase",letterSpacing:"1px",fontWeight:700,padding:"8px 0 4px",margin:0}}>{gl}</p>
             {items.map(e=>(
               <div key={e.id} className="mc-expense-row">
                 <div style={{display:"flex",alignItems:"center",gap:8,flex:1,minWidth:0}}>
@@ -209,8 +211,8 @@ function LogExpenseForm({onAdd,disabled}) {
       <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>{VARIABLE_CATS.map(chip)}</div>
       <Label>Note (optional)</Label>
       <input type="text" value={note} onChange={e=>setNote(e.target.value)} placeholder="e.g. Lunch at Zomato" disabled={disabled}
-        style={{width:"100%",padding:"10px 12px",borderRadius:8,border:`1.5px solid ${C.border}`,fontFamily:"inherit",fontSize:14,background:C.bg,outline:"none",marginTop:6,marginBottom:12,boxSizing:"border-box"}} />
-      <button onClick={submit} disabled={disabled} style={{width:"100%",padding:13,borderRadius:12,background:C.ink,color:"#fff",border:"none",fontSize:15,fontFamily:"inherit",fontWeight:700,cursor:"pointer",opacity:disabled?0.5:1}}>Save Expense ✓</button>
+        style={{width:"100%",padding:"8px 12px",borderRadius:8,border:`1.5px solid ${C.border}`,fontFamily:"inherit",fontSize:14,background:C.bg,outline:"none",marginTop:6,marginBottom:10,boxSizing:"border-box"}} />
+      <button onClick={submit} disabled={disabled} style={{width:"100%",padding:"10px",borderRadius:10,background:C.ink,color:"#fff",border:"none",fontSize:14,fontFamily:"inherit",fontWeight:700,cursor:"pointer",opacity:disabled?0.5:1}}>Save Expense ✓</button>
     </div>
   );
 }
