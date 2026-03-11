@@ -1,5 +1,5 @@
 // ─── App.jsx — Full financial planning integration ─────────────────────
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import InsightCard      from "./InsightCard";
 import SpendingChart    from "./SpendingChart";
 import { useStreak }    from "./useStreak";
@@ -92,6 +92,38 @@ function EditModal({expense,monthKey,onSave,onClose}) {
   );
 }
 
+// ─── 3-DOT MENU (reused in expense list) ─────────────────────────────────
+function ExpenseDotMenu({onEdit, onDelete}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const fn = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", fn);
+    return () => document.removeEventListener("mousedown", fn);
+  }, [open]);
+  return (
+    <div ref={ref} style={{position:"relative",flexShrink:0}}>
+      <button onClick={()=>setOpen(p=>!p)}
+        style={{width:28,height:28,borderRadius:6,border:`1px solid ${C.border}`,background:open?C.bg:"#fff",color:C.muted,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"inherit",lineHeight:1}}
+        title="Options">⋮</button>
+      {open && (
+        <div style={{position:"absolute",right:0,top:32,zIndex:50,background:"#fff",border:`1px solid ${C.border}`,borderRadius:10,boxShadow:"0 4px 20px rgba(0,0,0,0.12)",minWidth:110,overflow:"hidden"}}>
+          <button onClick={()=>{setOpen(false);onEdit();}}
+            style={{display:"block",width:"100%",padding:"10px 14px",textAlign:"left",background:"none",border:"none",fontSize:13,color:C.ink,cursor:"pointer",fontFamily:"inherit",fontWeight:500}}
+            onMouseEnter={e=>e.target.style.background=C.bg} onMouseLeave={e=>e.target.style.background="none"}>
+            ✏️ Edit</button>
+          <div style={{height:1,background:C.border,margin:"0 8px"}} />
+          <button onClick={()=>{setOpen(false);onDelete();}}
+            style={{display:"block",width:"100%",padding:"10px 14px",textAlign:"left",background:"none",border:"none",fontSize:13,color:C.red,cursor:"pointer",fontFamily:"inherit",fontWeight:500}}
+            onMouseEnter={e=>e.target.style.background="#FFF1F2"} onMouseLeave={e=>e.target.style.background="none"}>
+            🗑 Delete</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── EXPENSE LIST ─────────────────────────────────────────────────────────
 function ExpenseList({expenses,monthKey,onEdit,onDelete,isCurrentMonth}) {
   const [editTarget,setEditTarget]=useState(null);
@@ -122,12 +154,13 @@ function ExpenseList({expenses,monthKey,onEdit,onDelete,isCurrentMonth}) {
                     <p style={{fontSize:11,color:C.muted,marginTop:2,margin:0}}>{new Date(e.date).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"})}</p>
                   </div>
                 </div>
-                <div style={{display:"flex",alignItems:"center",gap:7,flexShrink:0}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
                   <span style={{fontSize:14,fontWeight:700,color:C.red,fontFamily:"Georgia,serif"}}>{fmt(e.amount)}</span>
-                  {isCurrentMonth&&<>
-                    <button onClick={()=>setEditTarget(e)} style={{background:"#F0F9FF",border:"1px solid #BAE6FD",borderRadius:6,padding:"3px 9px",fontSize:11,color:"#0284C7",cursor:"pointer",fontFamily:"inherit",fontWeight:600}}>Edit</button>
-                    <button onClick={()=>{if(window.confirm("Delete this expense?"))onDelete(monthKey,e.id);}} style={{background:"#FFF1F2",border:"1px solid #FCA5A5",borderRadius:6,padding:"3px 9px",fontSize:11,color:C.red,cursor:"pointer",fontFamily:"inherit",fontWeight:600}}>Del</button>
-                  </>}
+                  {isCurrentMonth && (
+                    <ExpenseDotMenu
+                      onEdit={()=>setEditTarget(e)}
+                      onDelete={()=>{if(window.confirm("Delete this expense?"))onDelete(monthKey,e.id);}} />
+                  )}
                 </div>
               </div>
             ))}
