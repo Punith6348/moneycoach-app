@@ -33,6 +33,19 @@ const FIXED_ICONS   = {Rent:"🏠",Electricity:"⚡",Water:"💧",Internet:"📶
 const ICONS         = {...Object.fromEntries(VARIABLE_CATS.map(c=>[c.name,c.icon])), ...FIXED_ICONS};
 const C = {ink:"#1C1917",muted:"#78716C",border:"#E7E5E0",bg:"#F7F5F0",red:"#DC2626",green:"#16A34A",amber:"#D97706",blue:"#2563EB",purple:"#7C3AED"};
 
+// Responsive CSS injected once into <head> equivalent via a style tag in the app shell
+const APP_CSS = `
+  /* Plan tab: 2-col desktop, 1-col mobile */
+  .mc-plan-top   { display:grid; grid-template-columns:1fr; gap:0; }
+  .mc-plan-full  { width:100%; }
+  @media(min-width:768px){
+    .mc-plan-top { grid-template-columns:1fr 1fr; gap:16px; }
+  }
+  /* Expense rows: compact */
+  .mc-expense-row { display:flex; align-items:center; justify-content:space-between; padding:7px 0; border-bottom:1px solid #F7F5F0; gap:8px; }
+  .mc-expense-row:last-child { border-bottom:none; }
+`;
+
 // ─── SHARED UI ────────────────────────────────────────────────────────────
 const Label = ({children}) => <p style={{fontSize:11,color:C.muted,textTransform:"uppercase",letterSpacing:"1.1px",fontWeight:600,margin:0}}>{children}</p>;
 function ProgressBar({pct}) {
@@ -146,16 +159,18 @@ function ExpenseList({expenses,monthKey,onEdit,onDelete,isCurrentMonth}) {
           <div key={gl}>
             <p style={{fontSize:11,color:C.muted,textTransform:"uppercase",letterSpacing:"1px",fontWeight:700,padding:"10px 0 6px",margin:0}}>{gl}</p>
             {items.map(e=>(
-              <div key={e.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"9px 0",borderBottom:`1px solid ${C.bg}`,gap:8}}>
-                <div style={{display:"flex",alignItems:"center",gap:10,flex:1,minWidth:0}}>
-                  <div style={{width:34,height:34,borderRadius:9,background:C.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0}}>{ICONS[e.label]||"💸"}</div>
-                  <div style={{minWidth:0}}>
-                    <p style={{fontSize:13,fontWeight:600,color:C.ink,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",margin:0}}>{e.label}{e.note?` · ${e.note}`:""}</p>
-                    <p style={{fontSize:11,color:C.muted,marginTop:2,margin:0}}>{new Date(e.date).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"})}</p>
+              <div key={e.id} className="mc-expense-row">
+                <div style={{display:"flex",alignItems:"center",gap:8,flex:1,minWidth:0}}>
+                  <div style={{width:30,height:30,borderRadius:8,background:C.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0}}>{ICONS[e.label]||"💸"}</div>
+                  <div style={{minWidth:0,flex:1}}>
+                    <p style={{fontSize:12,fontWeight:600,color:C.ink,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",margin:0}}>
+                      {e.label}{e.note?` · ${e.note}`:""}
+                    </p>
+                    <p style={{fontSize:10,color:C.muted,margin:0}}>{new Date(e.date).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"})}</p>
                   </div>
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-                  <span style={{fontSize:14,fontWeight:700,color:C.red,fontFamily:"Georgia,serif"}}>{fmt(e.amount)}</span>
+                  <span style={{fontSize:13,fontWeight:700,color:C.red,fontFamily:"Georgia,serif"}}>{fmt(e.amount)}</span>
                   {isCurrentMonth && (
                     <ExpenseDotMenu
                       onEdit={()=>setEditTarget(e)}
@@ -344,6 +359,7 @@ function DashboardScreen(props) {
 
   return (
     <div style={{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column"}}>
+      <style>{APP_CSS}</style>
       {toast&&<div style={{position:"fixed",top:20,left:"50%",transform:"translateX(-50%)",background:C.ink,color:"#fff",padding:"9px 20px",borderRadius:99,fontSize:13,zIndex:9999,whiteSpace:"nowrap",boxShadow:"0 4px 20px rgba(0,0,0,0.18)",animation:"fadeUp 0.2s ease"}}>
         <style>{`@keyframes fadeUp{from{opacity:0;transform:translateX(-50%) translateY(-8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}`}</style>
         {toast}</div>}
@@ -379,32 +395,38 @@ function DashboardScreen(props) {
         {/* ══ BUDGET DASHBOARD ══ */}
         {tab==="budget"&&(
           <>
-            <p style={{fontSize:13,color:C.muted,marginBottom:14,lineHeight:1.6}}>Your complete financial picture for {new Date().toLocaleDateString("en-IN",{month:"long",year:"numeric"})}.</p>
-            <div style={{display:"grid",gridTemplateColumns:"1fr",gap:16}}>
-              <div style={{maxWidth:680}}>
-                <BudgetDashboard
-                  totalIncome={totalIncome} totalFixed={totalFixed}
-                  totalSavings={totalSavings} totalReserve={totalReserve}
-                  remaining={remaining} dailyLimit={dailyLimit}
-                  incomeSources={incomeSources} fixedExpenses={fixedExpenses}
-                  savingsPlans={savingsPlans} futurePayments={futurePayments}
-                  currentExpenses={currentExpenses} />
-              </div>
-            </div>
+            <p style={{fontSize:12,color:C.muted,marginBottom:14,lineHeight:1.6}}>
+              Financial overview for {new Date().toLocaleDateString("en-IN",{month:"long",year:"numeric"})}.
+            </p>
+            <BudgetDashboard
+              totalIncome={totalIncome} totalFixed={totalFixed}
+              totalSavings={totalSavings} totalReserve={totalReserve}
+              remaining={remaining} dailyLimit={dailyLimit}
+              incomeSources={incomeSources} fixedExpenses={fixedExpenses}
+              savingsPlans={savingsPlans} futurePayments={futurePayments}
+              currentExpenses={currentExpenses} />
           </>
         )}
 
         {/* ══ PLAN ══ */}
         {tab==="plan"&&(
           <>
-            <p style={{fontSize:13,color:C.muted,marginBottom:14,lineHeight:1.6}}>Define your income, fixed bills, savings, and future payments. These drive your daily spending limit.</p>
-            <div style={{display:"grid",gridTemplateColumns:"1fr",gap:0}}>
-              <div style={{maxWidth:720}}>
+            <p style={{fontSize:12,color:C.muted,marginBottom:14,lineHeight:1.6}}>
+              Define your income, fixed bills, savings, and future payments. These drive your daily spending limit.
+            </p>
+            {/* Top row: Income (left) + Savings (right) — 2-col on desktop */}
+            <div className="mc-plan-top">
+              <div>
                 <IncomeSources sources={incomeSources} totalIncome={totalIncome} onAdd={addIncomeSource} onUpdate={updateIncomeSource} onDelete={deleteIncomeSource}/>
-                <FixedExpensesSection items={fixedExpenses} totalFixed={totalFixed} onAdd={addFixedExpense} onUpdate={updateFixedExpense} onDelete={deleteFixedExpense}/>
-                <SavingsSection plans={savingsPlans} totalSavings={totalSavings} onAdd={addSavingsPlan} onUpdate={updateSavingsPlan} onDelete={deleteSavingsPlan}/>
-                <FuturePaymentsSection payments={futurePayments} totalReserve={totalReserve} onAdd={addFuturePayment} onUpdate={updateFuturePayment} onDelete={deleteFuturePayment}/>
               </div>
+              <div>
+                <SavingsSection plans={savingsPlans} totalSavings={totalSavings} onAdd={addSavingsPlan} onUpdate={updateSavingsPlan} onDelete={deleteSavingsPlan}/>
+              </div>
+            </div>
+            {/* Full-width below: Fixed Expenses + Future Payments */}
+            <div className="mc-plan-full">
+              <FixedExpensesSection items={fixedExpenses} totalFixed={totalFixed} onAdd={addFixedExpense} onUpdate={updateFixedExpense} onDelete={deleteFixedExpense}/>
+              <FuturePaymentsSection payments={futurePayments} totalReserve={totalReserve} onAdd={addFuturePayment} onUpdate={updateFuturePayment} onDelete={deleteFuturePayment}/>
             </div>
           </>
         )}
