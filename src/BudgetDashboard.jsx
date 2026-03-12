@@ -1,7 +1,7 @@
-// ─── BudgetDashboard.jsx — Refined layout, tighter spacing ───────────────
-// Changes: compact hero card (~25% shorter), 4-card summary row balanced,
-//          tighter flow breakdown rows, compact future payment list.
-// Zero calculation changes.
+// ─── BudgetDashboard.jsx ─────────────────────────────────────────────────
+// Layout: Hero → Summary row → Income Allocation → Recent Expenses
+// "Monthly Budget Flow" removed — numbers already in summary cards above.
+// No calculation changes.
 
 import { calcMonthlyReserve } from "./useAppData";
 
@@ -9,44 +9,22 @@ const C = {ink:"#1C1917",muted:"#78716C",border:"#E7E5E0",bg:"#F7F5F0",red:"#DC2
 const fmt = (n) => `₹${Math.abs(Math.round(n)).toLocaleString("en-IN")}`;
 
 const DASH_CSS = `
-  /* 4-col summary row: 2-col on mobile → 4-col ≥600px */
   .mc-summary-row { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-bottom:12px; }
   @media(min-width:600px){ .mc-summary-row { grid-template-columns:repeat(4,1fr); } }
+  .mc-alloc-row { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
+  @media(min-width:600px){ .mc-alloc-row { grid-template-columns:repeat(3,1fr); } }
 `;
 
-// ── Flow row inside budget breakdown ─────────────────────────────────────
-function FlowRow({icon, label, sublabel, amount, color, isTotal}) {
-  return (
-    <div style={{
-      display:"flex", justifyContent:"space-between", alignItems:"center",
-      padding: isTotal ? "10px 14px" : "8px 14px",
-      background: isTotal ? `${color}0C` : "transparent",
-      borderRadius: isTotal ? 7 : 0,
-      borderBottom: isTotal ? "none" : `1px solid ${C.bg}`,
-    }}>
-      <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
-        <span style={{fontSize:isTotal?16:14,flexShrink:0}}>{icon}</span>
-        <div style={{minWidth:0}}>
-          <p style={{margin:0,fontSize:isTotal?12:11,fontWeight:isTotal?700:500,color:C.ink,whiteSpace:"nowrap"}}>{label}</p>
-          {sublabel && <p style={{margin:0,fontSize:10,color:C.muted,whiteSpace:"nowrap"}}>{sublabel}</p>}
-        </div>
-      </div>
-      <p style={{margin:0,marginLeft:12,fontSize:isTotal?15:12,fontWeight:700,color,fontFamily:"Georgia,serif",flexShrink:0}}>
-        {amount}
-      </p>
-    </div>
-  );
-}
-
-function Divider({label}) {
-  return (
-    <div style={{display:"flex",alignItems:"center",gap:8,padding:"3px 14px"}}>
-      <div style={{flex:1,height:1,background:C.border}} />
-      <p style={{margin:0,fontSize:9,color:C.muted,textTransform:"uppercase",letterSpacing:"1px",fontWeight:600,whiteSpace:"nowrap"}}>{label}</p>
-      <div style={{flex:1,height:1,background:C.border}} />
-    </div>
-  );
-}
+const ICONS_MAP = {
+  "🍽":"Food","🚗":"Travel","☕":"Coffee","🛒":"Grocery",
+  "💊":"Medical","🎬":"Entertainment","💸":"Other",
+  "🏠":"Rent","⚡":"Electricity","💧":"Water","📶":"Internet",
+  "🏦":"EMI/Loan","🛡":"Insurance","🔧":"Maintenance","🎓":"School Fees",
+};
+const CAT_ICONS = {
+  Food:"🍽",Travel:"🚗",Coffee:"☕",Grocery:"🛒",Medical:"💊",Entertainment:"🎬",Other:"💸",
+  Rent:"🏠",Electricity:"⚡",Water:"💧",Internet:"📶","EMI/Loan":"🏦",Insurance:"🛡",Maintenance:"🔧","School Fees":"🎓",
+};
 
 export default function BudgetDashboard({
   totalIncome, totalFixed, totalSavings, totalReserve,
@@ -67,22 +45,27 @@ export default function BudgetDashboard({
   const barColor  = spentPct < 60 ? C.green : spentPct < 85 ? C.amber : C.red;
   const monthName = now.toLocaleDateString("en-IN", {month:"long"});
 
+  // ── Recent expenses: last 5 across all days ──────────────────────────
+  const recentExp = [...currentExpenses]
+    .sort((a,b) => new Date(b.date) - new Date(a.date))
+    .slice(0, 5);
+
+  // ── Income allocation %s ─────────────────────────────────────────────
+  const allocPct = (v) => totalIncome > 0 ? Math.round((v / totalIncome) * 100) : 0;
+
   return (
     <div>
       <style>{DASH_CSS}</style>
 
-      {/* ══ 1. HERO CARD — compact, left-aligned ══ */}
+      {/* ══ 1. HERO CARD ══ */}
       <div style={{
         background:"#1C1917", borderRadius:13, padding:"14px 16px",
         marginBottom:12, display:"flex", justifyContent:"space-between", alignItems:"flex-end", gap:12,
       }}>
-        {/* LEFT: main info stack */}
         <div style={{flex:1, minWidth:0}}>
-          {/* Label */}
           <p style={{margin:0, fontSize:9, color:"#78716C", textTransform:"uppercase", letterSpacing:"1.3px", fontWeight:700}}>
             Remaining Balance
           </p>
-          {/* Primary number — largest text */}
           <p style={{
             margin:"2px 0 0", lineHeight:1, fontWeight:700, fontFamily:"Georgia,serif",
             fontSize: remaining >= 1000000 ? 30 : remaining >= 100000 ? 34 : 38,
@@ -90,25 +73,17 @@ export default function BudgetDashboard({
           }}>
             {remaining >= 0 ? fmt(remaining) : `−${fmt(remaining)}`}
           </p>
-
-          {/* Thin rule */}
           <div style={{height:1, background:"rgba(255,255,255,0.08)", margin:"9px 0 8px", maxWidth:280}} />
-
-          {/* Daily spend row */}
           <div style={{display:"flex", alignItems:"baseline", gap:5, flexWrap:"wrap"}}>
-            <p style={{margin:0, fontSize:10, color:"#A8A29E", fontWeight:500}}>Suggested daily spend</p>
+            <p style={{margin:0, fontSize:10, color:"#A8A29E"}}>Suggested daily spend</p>
             <p style={{margin:0, fontSize:15, fontWeight:700, fontFamily:"Georgia,serif", color: dailyLimit>0?"#E7E5E0":"#F87171"}}>
               {dailyLimit > 0 ? fmt(dailyLimit) : "₹0"}
             </p>
           </div>
-
-          {/* Days remaining */}
           <p style={{margin:"3px 0 0", fontSize:10, color:"#57534E"}}>
             {daysLeft} days remaining in {monthName}
           </p>
         </div>
-
-        {/* RIGHT: today's spend indicator */}
         {todaySpent > 0 && (
           <div style={{textAlign:"right", flexShrink:0}}>
             <p style={{margin:0, fontSize:9, color:"#57534E", textTransform:"uppercase", letterSpacing:"0.8px"}}>Today</p>
@@ -116,20 +91,20 @@ export default function BudgetDashboard({
               color: todaySpent <= dailyLimit ? "#86EFAC" : "#F87171"}}>
               {fmt(todaySpent)}
             </p>
-            <p style={{margin:"1px 0 0", fontSize:9, color: todaySpent <= dailyLimit ? "#86EFAC" : "#F87171"}}>
-              {todaySpent <= dailyLimit ? "✓ within limit" : "⚠ over limit"}
+            <p style={{margin:"1px 0 0", fontSize:9, color: todaySpent<=dailyLimit?"#86EFAC":"#F87171"}}>
+              {todaySpent<=dailyLimit?"✓ within limit":"⚠ over limit"}
             </p>
           </div>
         )}
       </div>
 
-      {/* ══ 2. SUMMARY CARDS — 4-up desktop, 2-up mobile ══ */}
+      {/* ══ 2. SUMMARY CARDS — 4 metrics, appear once only ══ */}
       <div className="mc-summary-row">
         {[
-          {label:"Total Income",         value:fmt(totalIncome),  color:C.green,  icon:"💰"},
-          {label:"Fixed Expenses",        value:fmt(totalFixed),   color:C.red,    icon:"🏠"},
-          {label:"Savings & Inv.",        value:fmt(totalSavings), color:C.blue,   icon:"📈"},
-          {label:"Remaining Budget",      value:remaining>=0?fmt(remaining):`−${fmt(remaining)}`, color:remColor, icon:"✅"},
+          {label:"Total Income",    value:fmt(totalIncome),  color:C.green,  icon:"💰"},
+          {label:"Fixed Expenses",  value:fmt(totalFixed),   color:C.red,    icon:"🏠"},
+          {label:"Savings & Inv.",  value:fmt(totalSavings), color:C.blue,   icon:"📈"},
+          {label:"Remaining",       value:remaining>=0?fmt(remaining):`−${fmt(remaining)}`, color:remColor, icon:"✅"},
         ].map(t => (
           <div key={t.label} style={{
             background:"#fff", borderRadius:11, border:`1px solid ${C.border}`,
@@ -145,79 +120,143 @@ export default function BudgetDashboard({
         ))}
       </div>
 
-      {/* ══ 3. BUDGET FLOW BREAKDOWN ══ */}
+      {/* ══ 3. INCOME ALLOCATION — replaces duplicate "Monthly Budget Flow" ══ */}
       <div style={{background:"#fff",borderRadius:12,border:`1px solid ${C.border}`,boxShadow:"0 1px 2px rgba(0,0,0,0.04)",overflow:"hidden",marginBottom:12}}>
-        {/* Header */}
-        <div style={{padding:"10px 14px",borderBottom:`1px solid ${C.bg}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        {/* Card header */}
+        <div style={{padding:"9px 14px",borderBottom:`1px solid ${C.bg}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <div>
-            <p style={{margin:0,fontSize:12,fontWeight:700,color:C.ink}}>Monthly Budget Flow</p>
-            <p style={{margin:0,fontSize:10,color:C.muted}}>Where your money is allocated</p>
+            <p style={{margin:0,fontSize:12,fontWeight:700,color:C.ink}}>Income Allocation</p>
+            <p style={{margin:0,fontSize:10,color:C.muted}}>How your {fmt(totalIncome)} is distributed</p>
           </div>
+          {/* Spent this month — the one metric not in summary cards */}
           <div style={{textAlign:"right"}}>
             <p style={{margin:0,fontSize:9,color:C.muted,textTransform:"uppercase",letterSpacing:"0.8px"}}>Spent this month</p>
             <p style={{margin:0,fontSize:13,fontWeight:700,color:barColor,fontFamily:"Georgia,serif"}}>{fmt(monthSpent)}</p>
           </div>
         </div>
 
-        <FlowRow icon="💰" label="Total Income"
-          sublabel={`${incomeSources.length} source${incomeSources.length!==1?"s":""}`}
-          amount={fmt(totalIncome)} color={C.green} />
+        {/* 3-up allocation tiles */}
+        <div style={{padding:"10px 14px 4px"}}>
+          <div className="mc-alloc-row">
+            {/* Savings tile */}
+            <div style={{borderRadius:9,border:`1px solid ${C.blue}22`,background:`${C.blue}06`,padding:"9px 11px"}}>
+              <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:4}}>
+                <span style={{fontSize:13}}>📈</span>
+                <p style={{margin:0,fontSize:10,fontWeight:700,color:C.blue}}>Savings & Inv.</p>
+              </div>
+              <p style={{margin:0,fontSize:15,fontWeight:700,color:C.blue,fontFamily:"Georgia,serif"}}>{fmt(totalSavings)}</p>
+              <p style={{margin:"2px 0 0",fontSize:10,color:C.muted}}>{allocPct(totalSavings)}% of income</p>
+              {savingsPlans.length > 0 && (
+                <div style={{marginTop:6,borderTop:`1px solid ${C.blue}18`,paddingTop:5}}>
+                  {savingsPlans.map(p=>(
+                    <div key={p.id} style={{display:"flex",justifyContent:"space-between",padding:"2px 0"}}>
+                      <p style={{margin:0,fontSize:10,color:C.muted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"55%"}}>{p.label}</p>
+                      <p style={{margin:0,fontSize:10,fontWeight:600,color:C.blue,fontFamily:"Georgia,serif"}}>{fmt(p.amount)}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
-        <Divider label="monthly deductions" />
+            {/* Fixed expenses tile */}
+            <div style={{borderRadius:9,border:`1px solid ${C.red}22`,background:`${C.red}06`,padding:"9px 11px"}}>
+              <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:4}}>
+                <span style={{fontSize:13}}>🏠</span>
+                <p style={{margin:0,fontSize:10,fontWeight:700,color:C.red}}>Fixed Bills</p>
+              </div>
+              <p style={{margin:0,fontSize:15,fontWeight:700,color:C.red,fontFamily:"Georgia,serif"}}>{fmt(totalFixed)}</p>
+              <p style={{margin:"2px 0 0",fontSize:10,color:C.muted}}>{allocPct(totalFixed)}% of income</p>
+              {fixedExpenses.length > 0 && (
+                <div style={{marginTop:6,borderTop:`1px solid ${C.red}18`,paddingTop:5}}>
+                  {fixedExpenses.slice(0,4).map(f=>(
+                    <div key={f.id} style={{display:"flex",justifyContent:"space-between",padding:"2px 0"}}>
+                      <p style={{margin:0,fontSize:10,color:C.muted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"55%"}}>{f.label}</p>
+                      <p style={{margin:0,fontSize:10,fontWeight:600,color:C.red,fontFamily:"Georgia,serif"}}>{fmt(f.amount)}</p>
+                    </div>
+                  ))}
+                  {fixedExpenses.length > 4 && (
+                    <p style={{margin:"3px 0 0",fontSize:9,color:C.muted}}>+{fixedExpenses.length-4} more</p>
+                  )}
+                </div>
+              )}
+            </div>
 
-        <FlowRow icon="🏠" label="Fixed Expenses"
-          sublabel={`${fixedExpenses.length} item${fixedExpenses.length!==1?"s":""}`}
-          amount={`− ${fmt(totalFixed)}`} color={C.red} />
-
-        <FlowRow icon="📈" label="Savings & Investments"
-          sublabel={`${savingsPlans.length} plan${savingsPlans.length!==1?"s":""}`}
-          amount={`− ${fmt(totalSavings)}`} color={C.blue} />
-
-        {totalReserve > 0 && (
-          <FlowRow icon="📅" label="Future Reserve"
-            sublabel={`${futurePayments.length} upcoming`}
-            amount={`− ${fmt(totalReserve)}`} color={C.purple} />
-        )}
-
-        <Divider label="available to spend" />
-
-        <FlowRow icon="✅" label="Remaining Budget" isTotal
-          sublabel="For daily expenses this month"
-          amount={remaining >= 0 ? fmt(remaining) : `−${fmt(remaining)}`}
-          color={remColor} />
-
-        {/* Spend progress bar */}
-        <div style={{padding:"6px 14px 10px"}}>
-          <div style={{height:4,borderRadius:99,background:C.bg,overflow:"hidden"}}>
-            <div style={{height:"100%",borderRadius:99,width:`${spentPct}%`,background:barColor,transition:"width 0.5s"}} />
+            {/* Future reserve tile — only if entries exist, else daily spend */}
+            {totalReserve > 0 ? (
+              <div style={{borderRadius:9,border:`1px solid ${C.purple}22`,background:`${C.purple}06`,padding:"9px 11px"}}>
+                <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:4}}>
+                  <span style={{fontSize:13}}>📅</span>
+                  <p style={{margin:0,fontSize:10,fontWeight:700,color:C.purple}}>Future Reserve</p>
+                </div>
+                <p style={{margin:0,fontSize:15,fontWeight:700,color:C.purple,fontFamily:"Georgia,serif"}}>{fmt(totalReserve)}</p>
+                <p style={{margin:"2px 0 0",fontSize:10,color:C.muted}}>{allocPct(totalReserve)}% of income · /month</p>
+                {futurePayments.length > 0 && (
+                  <div style={{marginTop:6,borderTop:`1px solid ${C.purple}18`,paddingTop:5}}>
+                    {futurePayments.map(p=>{
+                      const monthly=calcMonthlyReserve(p);
+                      const days=Math.max(0,Math.round((new Date(p.nextDate)-new Date())/(1000*60*60*24)));
+                      return (
+                        <div key={p.id} style={{display:"flex",justifyContent:"space-between",padding:"2px 0"}}>
+                          <p style={{margin:0,fontSize:10,color:C.muted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"55%"}}>{p.label} <span style={{color:days<30?C.red:C.muted}}>({days}d)</span></p>
+                          <p style={{margin:0,fontSize:10,fontWeight:600,color:C.purple,fontFamily:"Georgia,serif"}}>{fmt(monthly)}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* No future payments: show daily spend context tile instead */
+              <div style={{borderRadius:9,border:`1px solid ${C.amber}22`,background:`${C.amber}06`,padding:"9px 11px"}}>
+                <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:4}}>
+                  <span style={{fontSize:13}}>📆</span>
+                  <p style={{margin:0,fontSize:10,fontWeight:700,color:C.amber}}>Daily Budget</p>
+                </div>
+                <p style={{margin:0,fontSize:15,fontWeight:700,color:C.amber,fontFamily:"Georgia,serif"}}>{fmt(dailyLimit)}</p>
+                <p style={{margin:"2px 0 0",fontSize:10,color:C.muted}}>per day · {daysLeft} days left</p>
+              </div>
+            )}
           </div>
-          <p style={{margin:"4px 0 0",fontSize:9,color:C.muted,textAlign:"right"}}>
-            {Math.round(spentPct)}% of available budget spent
-          </p>
+
+          {/* Spend progress bar — only new info here */}
+          <div style={{margin:"10px 0 6px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+              <p style={{margin:0,fontSize:9,color:C.muted}}>Daily budget used this month</p>
+              <p style={{margin:0,fontSize:9,color:barColor,fontWeight:600}}>{Math.round(spentPct)}%</p>
+            </div>
+            <div style={{height:4,borderRadius:99,background:C.bg,overflow:"hidden"}}>
+              <div style={{height:"100%",borderRadius:99,width:`${spentPct}%`,background:barColor,transition:"width 0.5s"}} />
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* ══ 4. FUTURE PAYMENT RESERVE (only if entries exist) ══ */}
-      {futurePayments.length > 0 && (
+      {/* ══ 4. RECENT EXPENSES (last 5) ══ */}
+      {recentExp.length > 0 && (
         <div style={{background:"#fff",borderRadius:12,border:`1px solid ${C.border}`,boxShadow:"0 1px 2px rgba(0,0,0,0.04)",overflow:"hidden"}}>
-          <div style={{padding:"10px 14px",borderBottom:`1px solid ${C.bg}`,background:"#FAF5FF"}}>
-            <p style={{margin:0,fontSize:12,fontWeight:700,color:C.ink}}>📅 Future Payment Reserve</p>
-            <p style={{margin:0,fontSize:10,color:C.muted}}>Monthly targets to cover upcoming bills</p>
+          <div style={{padding:"9px 14px",borderBottom:`1px solid ${C.bg}`}}>
+            <p style={{margin:0,fontSize:12,fontWeight:700,color:C.ink}}>Recent Expenses</p>
+            <p style={{margin:0,fontSize:10,color:C.muted}}>Last {recentExp.length} transactions this month</p>
           </div>
-          {futurePayments.map(p => {
-            const monthly = calcMonthlyReserve(p);
-            const days    = Math.max(0, Math.round((new Date(p.nextDate)-new Date())/(1000*60*60*24)));
-            const urgency = days<30?C.red:days<90?C.amber:C.purple;
+          {recentExp.map((e,i) => {
+            const icon = CAT_ICONS[e.label] || "💸";
+            const time = new Date(e.date).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"});
+            const dateStr = new Date(e.date).toLocaleDateString("en-IN",{day:"numeric",month:"short"});
             return (
-              <div key={p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 14px",borderBottom:`1px solid ${C.bg}`,gap:8}}>
-                <div style={{minWidth:0}}>
-                  <p style={{margin:0,fontSize:11,fontWeight:700,color:C.ink}}>{p.label}</p>
-                  <p style={{margin:0,fontSize:10,color:C.muted}}>{fmt(p.totalAmount)} · due in {days} days</p>
+              <div key={e.id} style={{
+                display:"flex", alignItems:"center", justifyContent:"space-between",
+                padding:"7px 14px", borderBottom: i<recentExp.length-1?`1px solid ${C.bg}`:"none", gap:8,
+              }}>
+                <div style={{display:"flex",alignItems:"center",gap:9,flex:1,minWidth:0}}>
+                  <div style={{width:28,height:28,borderRadius:7,background:C.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,flexShrink:0}}>{icon}</div>
+                  <div style={{minWidth:0}}>
+                    <p style={{margin:0,fontSize:12,fontWeight:600,color:C.ink,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                      {e.label}{e.note?` · ${e.note}`:""}
+                    </p>
+                    <p style={{margin:0,fontSize:10,color:C.muted}}>{dateStr} · {time}</p>
+                  </div>
                 </div>
-                <div style={{textAlign:"right",flexShrink:0}}>
-                  <p style={{margin:0,fontSize:12,fontWeight:700,color:urgency,fontFamily:"Georgia,serif"}}>{fmt(monthly)}</p>
-                  <p style={{margin:0,fontSize:9,color:C.muted}}>/ month</p>
-                </div>
+                <p style={{margin:0,fontSize:13,fontWeight:700,color:C.red,fontFamily:"Georgia,serif",flexShrink:0}}>{fmt(e.amount)}</p>
               </div>
             );
           })}
