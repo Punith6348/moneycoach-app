@@ -139,36 +139,130 @@ function ExpenseDotMenu({onEdit, onDelete}) {
   );
 }
 
-// ─── EXPENSE LIST ─────────────────────────────────────────────────────────
-function ExpenseList({expenses,monthKey,onEdit,onDelete,isCurrentMonth}) {
-  const [editTarget,setEditTarget]=useState(null);
-  const totalSpent=expenses.reduce((s,e)=>s+e.amount,0);
-  const groups=useMemo(()=>groupByDate(expenses),[expenses]);
+// ─── DATE-FILTERED EXPENSE LIST ──────────────────────────────────────────
+function ExpenseList({expenses, monthKey, onEdit, onDelete, isCurrentMonth}) {
+  const todayStr     = new Date().toISOString().split("T")[0];
+  const yesterdayStr = (() => { const d=new Date(); d.setDate(d.getDate()-1); return d.toISOString().split("T")[0]; })();
+
+  // mode: "today" | "yesterday" | "pick"
+  // pickedDate: "YYYY-MM-DD" string
+  const [mode,       setMode]       = useState("today");
+  const [pickedDate, setPickedDate] = useState(todayStr);
+  const [editTarget, setEditTarget] = useState(null);
+
+  // Which date are we showing?
+  const activeDate =
+    mode === "today"     ? todayStr :
+    mode === "yesterday" ? yesterdayStr :
+    pickedDate;
+
+  // Filter to that date only
+  const filtered = useMemo(
+    () => expenses.filter(e => e.date.split("T")[0] === activeDate),
+    [expenses, activeDate]
+  );
+  const dayTotal = filtered.reduce((s,e) => s+e.amount, 0);
+
+  // Label for the date pill
+  const dateLabel =
+    activeDate === todayStr     ? "Today" :
+    activeDate === yesterdayStr ? "Yesterday" :
+    new Date(activeDate).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"});
+
+  // All unique dates that have expenses (for the calendar min/max)
+  const allDates = [...new Set(expenses.map(e=>e.date.split("T")[0]))].sort();
+  const minDate  = allDates[0] || todayStr;
+
   return (
     <>
-      {editTarget&&<EditModal expense={editTarget} monthKey={monthKey} onSave={onEdit} onClose={()=>setEditTarget(null)} />}
-      <div style={{background:"#fff",borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 3px rgba(0,0,0,0.06)",padding:18}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-          <p style={{fontSize:15,fontWeight:700,color:C.ink,margin:0}}>Expenses</p>
-          <div style={{textAlign:"right"}}>
-            <p style={{fontSize:10,color:C.muted,textTransform:"uppercase",letterSpacing:"1px",fontWeight:600,margin:0}}>Total</p>
-            <p style={{fontSize:18,fontWeight:700,color:C.red,fontFamily:"Georgia,serif",margin:0}}>{fmt(totalSpent)}</p>
+      {editTarget && (
+        <EditModal expense={editTarget} monthKey={monthKey}
+          onSave={onEdit} onClose={()=>setEditTarget(null)} />
+      )}
+
+      <div style={{background:"#fff",borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 3px rgba(0,0,0,0.06)",overflow:"hidden"}}>
+
+        {/* ── Header row: title + date selector ── */}
+        <div style={{padding:"12px 14px",borderBottom:`1px solid ${C.bg}`,display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
+          <div>
+            <p style={{margin:0,fontSize:14,fontWeight:700,color:C.ink}}>Expense History</p>
+            {dayTotal > 0 && (
+              <p style={{margin:0,fontSize:10,color:C.muted}}>
+                {dateLabel} · <span style={{color:C.red,fontWeight:700}}>{fmt(dayTotal)}</span> total
+              </p>
+            )}
+          </div>
+
+          {/* Date selector pills */}
+          <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+            {[
+              {key:"today",     label:"Today"},
+              {key:"yesterday", label:"Yesterday"},
+            ].map(opt => (
+              <button key={opt.key} onClick={()=>setMode(opt.key)}
+                style={{
+                  padding:"5px 11px", borderRadius:99, cursor:"pointer",
+                  fontFamily:"inherit", fontSize:11, fontWeight:600,
+                  border:`1.5px solid ${mode===opt.key?C.ink:C.border}`,
+                  background: mode===opt.key?C.ink:"#fff",
+                  color: mode===opt.key?"#fff":C.muted,
+                  transition:"all 0.12s",
+                }}>
+                {opt.label}
+              </button>
+            ))}
+
+            {/* Calendar date picker — styled to match */}
+            <label style={{position:"relative",cursor:"pointer"}}>
+              <button
+                onClick={()=>setMode("pick")}
+                style={{
+                  padding:"5px 11px", borderRadius:99, cursor:"pointer",
+                  fontFamily:"inherit", fontSize:11, fontWeight:600,
+                  border:`1.5px solid ${mode==="pick"?C.ink:C.border}`,
+                  background: mode==="pick"?C.ink:"#fff",
+                  color: mode==="pick"?"#fff":C.muted,
+                  pointerEvents:"none",   // click handled by the label
+                }}>
+                {mode==="pick"
+                  ? new Date(pickedDate).toLocaleDateString("en-IN",{day:"numeric",month:"short"})
+                  : "📅 Pick date"}
+              </button>
+              <input type="date"
+                value={pickedDate}
+                min={minDate}
+                max={todayStr}
+                onChange={e=>{ setPickedDate(e.target.value); setMode("pick"); }}
+                style={{
+                  position:"absolute", inset:0, opacity:0,
+                  cursor:"pointer", width:"100%",
+                }} />
+            </label>
           </div>
         </div>
-        {expenses.length===0?(
-          <div style={{textAlign:"center",padding:"28px 0"}}><p style={{fontSize:28,marginBottom:8}}>📭</p><p style={{color:C.muted,fontSize:13}}>No expenses logged yet.</p></div>
-        ):Object.entries(groups).map(([gl,items])=>(
-          <div key={gl}>
-            <p style={{fontSize:10,color:C.muted,textTransform:"uppercase",letterSpacing:"1px",fontWeight:700,padding:"8px 0 4px",margin:0}}>{gl}</p>
-            {items.map(e=>(
-              <div key={e.id} className="mc-expense-row">
+
+        {/* ── Transaction rows ── */}
+        <div style={{padding:"0 14px"}}>
+          {filtered.length === 0 ? (
+            <div style={{textAlign:"center",padding:"28px 0"}}>
+              <p style={{fontSize:26,margin:"0 0 6px"}}>📭</p>
+              <p style={{color:C.muted,fontSize:13,margin:0}}>No expenses on {dateLabel.toLowerCase()}.</p>
+            </div>
+          ) : (
+            filtered.map((e, i) => (
+              <div key={e.id} className="mc-expense-row"
+                style={{borderBottom: i<filtered.length-1?`1px solid ${C.bg}`:"none"}}>
                 <div style={{display:"flex",alignItems:"center",gap:8,flex:1,minWidth:0}}>
-                  <div style={{width:30,height:30,borderRadius:8,background:C.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0}}>{ICONS[e.label]||"💸"}</div>
+                  <div style={{width:30,height:30,borderRadius:8,background:C.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0}}>
+                    {ICONS[e.label]||"💸"}
+                  </div>
                   <div style={{minWidth:0,flex:1}}>
                     <p style={{fontSize:12,fontWeight:600,color:C.ink,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",margin:0}}>
                       {e.label}{e.note?` · ${e.note}`:""}
                     </p>
-                    <p style={{fontSize:10,color:C.muted,margin:0}}>{new Date(e.date).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"})}</p>
+                    <p style={{fontSize:10,color:C.muted,margin:0}}>
+                      {new Date(e.date).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"})}
+                    </p>
                   </div>
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
@@ -176,13 +270,21 @@ function ExpenseList({expenses,monthKey,onEdit,onDelete,isCurrentMonth}) {
                   {isCurrentMonth && (
                     <ExpenseDotMenu
                       onEdit={()=>setEditTarget(e)}
-                      onDelete={()=>{if(window.confirm("Delete this expense?"))onDelete(monthKey,e.id);}} />
+                      onDelete={()=>{ if(window.confirm("Delete this expense?")) onDelete(monthKey,e.id); }} />
                   )}
                 </div>
               </div>
-            ))}
+            ))
+          )}
+        </div>
+
+        {/* ── Footer: total for the day ── */}
+        {filtered.length > 0 && (
+          <div style={{padding:"9px 14px",borderTop:`1px solid ${C.bg}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <p style={{margin:0,fontSize:10,color:C.muted}}>{filtered.length} transaction{filtered.length!==1?"s":""} · {dateLabel}</p>
+            <p style={{margin:0,fontSize:14,fontWeight:700,color:C.red,fontFamily:"Georgia,serif"}}>{fmt(dayTotal)}</p>
           </div>
-        ))}
+        )}
       </div>
     </>
   );
