@@ -579,7 +579,6 @@ function DashboardScreen(props) {
         {/* ══ CHARTS ══ */}
         {tab==="charts"&&(
           <>
-            <p style={{fontSize:13,color:C.muted,marginBottom:14}}>Tap any slice or bar to inspect a category.</p>
             <MonthBar/>
             <SpendingChart expenses={expenses} monthlyIncome={totalIncome}/>
           </>

@@ -1,211 +1,354 @@
-// ─── SpendingChart.jsx (chart overlap fix) ────────────────────────────────
+// ─── SpendingChart.jsx — Donut chart + category breakdown + drill-down ────
 import { useMemo, useState } from "react";
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 
+// ── Colour palette per category ──────────────────────────────────────────
 export const CATEGORY_CONFIG = {
-  // Variable
-  Food:          { icon: "🍽", color: "#F97316", group: "variable" },
-  Travel:        { icon: "🚗", color: "#3B82F6", group: "variable" },
-  Coffee:        { icon: "☕", color: "#92400E", group: "variable" },
-  Grocery:       { icon: "🛒", color: "#22C55E", group: "variable" },
-  Medical:       { icon: "💊", color: "#EF4444", group: "variable" },
-  Entertainment: { icon: "🎬", color: "#A855F7", group: "variable" },
-  Other:         { icon: "💸", color: "#78716C", group: "variable" },
-  // Fixed
-  Rent:          { icon: "🏠", color: "#0EA5E9", group: "fixed" },
-  Electricity:   { icon: "⚡", color: "#EAB308", group: "fixed" },
-  Water:         { icon: "💧", color: "#06B6D4", group: "fixed" },
-  Internet:      { icon: "📶", color: "#8B5CF6", group: "fixed" },
-  "EMI/Loan":    { icon: "🏦", color: "#DC2626", group: "fixed" },
-  Insurance:     { icon: "🛡", color: "#059669", group: "fixed" },
-  "School Fees": { icon: "🎓", color: "#D97706", group: "fixed" },
-  Maintenance:   { icon: "🔧", color: "#64748B", group: "fixed" },
+  Food:          { icon:"🍽", color:"#F97316" },
+  Travel:        { icon:"🚗", color:"#3B82F6" },
+  Coffee:        { icon:"☕", color:"#92400E" },
+  Grocery:       { icon:"🛒", color:"#22C55E" },
+  Medical:       { icon:"💊", color:"#EF4444" },
+  Entertainment: { icon:"🎬", color:"#A855F7" },
+  Other:         { icon:"💸", color:"#78716C" },
+  Rent:          { icon:"🏠", color:"#0EA5E9" },
+  Electricity:   { icon:"⚡", color:"#EAB308" },
+  Water:         { icon:"💧", color:"#06B6D4" },
+  Internet:      { icon:"📶", color:"#8B5CF6" },
+  "EMI/Loan":    { icon:"🏦", color:"#DC2626" },
+  Insurance:     { icon:"🛡", color:"#059669" },
+  "School Fees": { icon:"🎓", color:"#D97706" },
+  Maintenance:   { icon:"🔧", color:"#64748B" },
 };
 
-function aggregateByCategory(expenses) {
-  if (!expenses || expenses.length === 0) return [];
-  const grandTotal = expenses.reduce((s, e) => s + e.amount, 0);
-  if (grandTotal === 0) return [];
-  const grouped = {};
+const C   = { ink:"#1C1917", muted:"#78716C", border:"#E7E5E0", bg:"#F7F5F0" };
+const fmt = (n) => `₹${Math.abs(Math.round(n)).toLocaleString("en-IN")}`;
+
+// ── Aggregate expenses into per-category totals ──────────────────────────
+function aggregate(expenses) {
+  if (!expenses?.length) return [];
+  const grand = expenses.reduce((s,e) => s+e.amount, 0);
+  if (!grand) return [];
+  const map = {};
   expenses.forEach(e => {
-    if (!grouped[e.label]) grouped[e.label] = { total: 0, count: 0 };
-    grouped[e.label].total += e.amount;
-    grouped[e.label].count += 1;
+    if (!map[e.label]) map[e.label] = { total:0, count:0, items:[] };
+    map[e.label].total += e.amount;
+    map[e.label].count += 1;
+    map[e.label].items.push(e);
   });
-  return Object.entries(grouped).map(([name, { total, count }]) => ({
+  return Object.entries(map).map(([name,{total,count,items}]) => ({
     name,
     icon:  CATEGORY_CONFIG[name]?.icon  || "💸",
     color: CATEGORY_CONFIG[name]?.color || "#78716C",
     total: Math.round(total),
-    pct:   Math.round((total / grandTotal) * 100),
+    pct:   Math.round((total/grand)*100),
     count,
-  })).sort((a, b) => b.total - a.total);
+    items: [...items].sort((a,b) => new Date(b.date)-new Date(a.date)),
+  })).sort((a,b) => b.total - a.total);
 }
 
-const fmt      = (n) => `₹${Math.round(n).toLocaleString("en-IN")}`;
-const fmtShort = (n) => n >= 1000 ? `₹${(n/1000).toFixed(1)}k` : `₹${n}`;
+// ── Pure SVG donut — no recharts dependency ──────────────────────────────
+function DonutChart({ data, grandTotal, selectedCat, onSelect }) {
+  const SIZE = 220;
+  const CX   = SIZE / 2;
+  const CY   = SIZE / 2;
+  const R    = 80;   // outer radius
+  const r    = 52;   // inner radius (hole)
+  const GAP  = 1.5;  // degrees gap between segments
 
-function CustomTooltip({ active, payload }) {
-  if (!active || !payload?.length) return null;
-  const d = payload[0].payload;
+  // Build segments from sorted data
+  const segments = useMemo(() => {
+    if (!data.length) return [];
+    const total = data.reduce((s,d) => s+d.total, 0);
+    let angle = -90; // start at top
+    return data.map(d => {
+      const sweep   = (d.total / total) * 360;
+      const start   = angle;
+      const end     = angle + sweep - GAP;
+      angle        += sweep;
+      // Arc path helper
+      const polar = (cx, cy, rad, deg) => {
+        const rad2 = (deg * Math.PI) / 180;
+        return [cx + rad * Math.cos(rad2), cy + rad * Math.sin(rad2)];
+      };
+      const [x1,y1] = polar(CX, CY, R, start);
+      const [x2,y2] = polar(CX, CY, R, end);
+      const [x3,y3] = polar(CX, CY, r, end);
+      const [x4,y4] = polar(CX, CY, r, start);
+      const large   = sweep - GAP > 180 ? 1 : 0;
+      const path    = `M${x1},${y1} A${R},${R} 0 ${large},1 ${x2},${y2} L${x3},${y3} A${r},${r} 0 ${large},0 ${x4},${y4} Z`;
+      return { ...d, path, sweep };
+    });
+  }, [data]);
+
+  const selectedData = data.find(d => d.name === selectedCat);
+
   return (
-    <div style={{ background: "#fff", border: "1px solid #E7E5E0", borderRadius: 10, padding: "10px 14px", boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}>
-      <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#1C1917" }}>{d.icon} {d.name}</p>
-      <p style={{ margin: "3px 0 0", fontSize: 13, color: d.color, fontWeight: 700, fontFamily: "Georgia, serif" }}>{fmt(d.total)}</p>
-      <p style={{ margin: "2px 0 0", fontSize: 11, color: "#78716C" }}>{d.pct}% · {d.count} {d.count === 1 ? "entry" : "entries"}</p>
+    <div style={{ display:"flex", justifyContent:"center", margin:"4px 0 8px" }}>
+      <svg width={SIZE} height={SIZE} style={{ overflow:"visible" }}>
+        {/* Segments */}
+        {segments.map(seg => {
+          const dimmed = selectedCat && selectedCat !== seg.name;
+          const active = selectedCat === seg.name;
+          return (
+            <path
+              key={seg.name}
+              d={seg.path}
+              fill={seg.color}
+              opacity={dimmed ? 0.25 : 1}
+              stroke={active ? "#1C1917" : "#fff"}
+              strokeWidth={active ? 2 : 1}
+              style={{ cursor:"pointer", transition:"opacity 0.2s" }}
+              onClick={() => onSelect(seg.name)}
+            />
+          );
+        })}
+        {/* Centre label */}
+        <text x={CX} y={CY - 12} textAnchor="middle"
+          style={{ fontSize:11, fill:C.muted, fontFamily:"inherit" }}>
+          {selectedData ? `${selectedData.pct}%` : "Total Spent"}
+        </text>
+        <text x={CX} y={CY + 10} textAnchor="middle"
+          style={{ fontSize:selectedData?19:18, fontWeight:700, fill:C.ink, fontFamily:"Georgia,serif" }}>
+          {selectedData ? fmt(selectedData.total) : fmt(grandTotal)}
+        </text>
+        {selectedData && (
+          <text x={CX} y={CY + 26} textAnchor="middle"
+            style={{ fontSize:10, fill:C.muted, fontFamily:"inherit" }}>
+            {selectedData.icon} {selectedData.name}
+          </text>
+        )}
+      </svg>
     </div>
   );
 }
 
-function CategoryRow({ cat, rank, isSelected, onClick }) {
+// ── Drill-down: transactions for a single category ───────────────────────
+function DrillDown({ cat, onClose }) {
   return (
-    <div onClick={onClick} style={{
-      display: "flex", alignItems: "center", gap: 10, padding: "10px 10px",
-      borderRadius: 10, cursor: "pointer", marginBottom: 4,
-      background: isSelected ? `${cat.color}11` : "transparent",
-      border: `1.5px solid ${isSelected ? cat.color : "transparent"}`,
+    <div style={{
+      background:"#fff", borderRadius:12, border:`1.5px solid ${cat.color}55`,
+      marginBottom:12, overflow:"hidden",
     }}>
-      <span style={{ fontSize: 11, color: "#78716C", minWidth: 18, textAlign: "center" }}>#{rank}</span>
-      <div style={{ width: 10, height: 10, borderRadius: "50%", background: cat.color, flexShrink: 0 }} />
-      <div style={{ flex: 1 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: "#1C1917" }}>{cat.icon} {cat.name}</span>
-          <span style={{ fontSize: 13, fontWeight: 700, color: cat.color, fontFamily: "Georgia, serif" }}>{fmt(cat.total)}</span>
+      {/* Header */}
+      <div style={{
+        padding:"10px 14px", background:`${cat.color}0E`,
+        borderBottom:`1px solid ${cat.color}22`,
+        display:"flex", justifyContent:"space-between", alignItems:"center",
+      }}>
+        <div>
+          <p style={{margin:0, fontSize:13, fontWeight:700, color:C.ink}}>
+            {cat.icon} {cat.name}
+          </p>
+          <p style={{margin:0, fontSize:10, color:C.muted}}>
+            {cat.count} transaction{cat.count!==1?"s":""} · {cat.pct}% of spend
+          </p>
         </div>
-        <div style={{ height: 4, borderRadius: 99, background: "#E7E5E0" }}>
-          <div style={{ height: "100%", borderRadius: 99, width: `${cat.pct}%`, background: cat.color, transition: "width 0.5s" }} />
+        <div style={{display:"flex", alignItems:"center", gap:12}}>
+          <p style={{margin:0, fontSize:16, fontWeight:700, color:cat.color, fontFamily:"Georgia,serif"}}>
+            {fmt(cat.total)}
+          </p>
+          <button onClick={onClose}
+            style={{background:"none", border:"none", cursor:"pointer", fontSize:16, color:C.muted, lineHeight:1}}>
+            ✕
+          </button>
         </div>
-        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 2 }}>
-          <span style={{ fontSize: 10, color: "#78716C" }}>{cat.count} entries</span>
-          <span style={{ fontSize: 10, color: "#78716C" }}>{cat.pct}%</span>
-        </div>
+      </div>
+      {/* Transaction rows */}
+      <div>
+        {cat.items.map((e,i) => {
+          const time    = new Date(e.date).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"});
+          const dateStr = new Date(e.date).toLocaleDateString("en-IN",{day:"numeric",month:"short"});
+          return (
+            <div key={e.id} style={{
+              display:"flex", justifyContent:"space-between", alignItems:"center",
+              padding:"8px 14px",
+              borderBottom: i<cat.items.length-1 ? `1px solid ${C.bg}` : "none",
+            }}>
+              <div>
+                <p style={{margin:0, fontSize:12, fontWeight:600, color:C.ink}}>
+                  {e.note || cat.name}
+                </p>
+                <p style={{margin:0, fontSize:10, color:C.muted}}>{dateStr} · {time}</p>
+              </div>
+              <p style={{margin:0, fontSize:13, fontWeight:700, color:cat.color, fontFamily:"Georgia,serif"}}>
+                {fmt(e.amount)}
+              </p>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
 }
 
+// ── Main component ────────────────────────────────────────────────────────
 export default function SpendingChart({ expenses = [], monthlyIncome = 0 }) {
-  const [chartType,   setChartType]   = useState("pie");
   const [selectedCat, setSelectedCat] = useState(null);
 
-  const data       = useMemo(() => aggregateByCategory(expenses), [expenses]);
-  const grandTotal = useMemo(() => expenses.reduce((s, e) => s + e.amount, 0), [expenses]);
+  const data       = useMemo(() => aggregate(expenses), [expenses]);
+  const grandTotal = useMemo(() => expenses.reduce((s,e) => s+e.amount, 0), [expenses]);
+  const selected   = data.find(d => d.name === selectedCat) || null;
 
+  const toggle = (name) => setSelectedCat(p => p===name ? null : name);
+
+  // ── Empty state ──
   if (data.length === 0) {
     return (
-      <div className="card" style={{ textAlign: "center", padding: "40px 20px" }}>
-        <p style={{ fontSize: 36, marginBottom: 10 }}>📊</p>
-        <p style={{ color: "#78716C", fontSize: 13 }}>Log at least one expense to see your spending breakdown.</p>
+      <div style={{
+        background:"#fff", borderRadius:14, border:`1px solid ${C.border}`,
+        textAlign:"center", padding:"44px 20px",
+      }}>
+        <p style={{fontSize:36, margin:"0 0 10px"}}>📊</p>
+        <p style={{color:C.muted, fontSize:13, margin:0}}>
+          Log at least one expense to see your spending breakdown.
+        </p>
       </div>
     );
   }
 
-  const selected = data.find(d => d.name === selectedCat);
-  const handleClick = (name) => setSelectedCat(p => p === name ? null : name);
-
   return (
-    <div className="card" style={{ overflow: "hidden" }}>
-      {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
-        <div>
-          <p className="label">Spending Breakdown</p>
-          {/* FIX: total shown ABOVE chart, not overlapping */}
-          <p style={{ marginTop: 6, fontSize: 24, fontWeight: 700, color: "#1C1917", fontFamily: "Georgia, serif" }}>
-            {fmt(grandTotal)}
-          </p>
-          <p style={{ marginTop: 2, fontSize: 11, color: "#78716C" }}>
-            {data.length} categories · {expenses.length} expenses
-            {monthlyIncome > 0 && (
-              <span style={{ marginLeft: 8, fontWeight: 700, color: grandTotal > monthlyIncome ? "#DC2626" : "#16A34A" }}>
-                · {Math.round((grandTotal / monthlyIncome) * 100)}% of income
-              </span>
-            )}
-          </p>
+    <div>
+      {/* ══ DONUT CARD ══ */}
+      <div style={{
+        background:"#fff", borderRadius:14, border:`1px solid ${C.border}`,
+        boxShadow:"0 1px 3px rgba(0,0,0,0.06)", padding:"16px 16px 12px",
+        marginBottom:12,
+      }}>
+        {/* Card header */}
+        <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:4}}>
+          <div>
+            <p style={{margin:0, fontSize:12, fontWeight:700, color:C.ink}}>Spending Breakdown</p>
+            <p style={{margin:0, fontSize:10, color:C.muted}}>
+              {data.length} categories · {expenses.length} expense{expenses.length!==1?"s":""}
+              {monthlyIncome>0 && (
+                <span style={{
+                  marginLeft:6, fontWeight:700,
+                  color: grandTotal>monthlyIncome ? "#DC2626" : "#16A34A",
+                }}>
+                  · {Math.round((grandTotal/monthlyIncome)*100)}% of income
+                </span>
+              )}
+            </p>
+          </div>
+          {selectedCat && (
+            <button onClick={()=>setSelectedCat(null)}
+              style={{background:"none", border:`1px solid ${C.border}`, borderRadius:99,
+                padding:"3px 10px", fontSize:11, color:C.muted, cursor:"pointer",
+                fontFamily:"inherit"}}>
+              Clear ✕
+            </button>
+          )}
         </div>
-        {/* Toggle */}
-        <div style={{ display: "flex", gap: 6 }}>
-          {[["pie","🥧"],["bar","📊"]].map(([type, icon]) => (
-            <button key={type} onClick={() => setChartType(type)} style={{
-              padding: "5px 12px", borderRadius: 8,
-              border: `1.5px solid ${chartType === type ? "#1C1917" : "#E7E5E0"}`,
-              background: chartType === type ? "#1C1917" : "#fff",
-              color: chartType === type ? "#fff" : "#78716C",
-              fontSize: 13, cursor: "pointer", fontFamily: "inherit"
-            }}>{icon}</button>
+
+        {/* Donut */}
+        <DonutChart
+          data={data}
+          grandTotal={grandTotal}
+          selectedCat={selectedCat}
+          onSelect={toggle}
+        />
+
+        {/* Legend dots */}
+        <div style={{display:"flex", flexWrap:"wrap", gap:"4px 10px", justifyContent:"center"}}>
+          {data.map(d => (
+            <button key={d.name} onClick={()=>toggle(d.name)}
+              style={{
+                display:"flex", alignItems:"center", gap:4,
+                background:"none", border:"none", cursor:"pointer",
+                padding:"2px 0", fontFamily:"inherit",
+                opacity: selectedCat && selectedCat!==d.name ? 0.35 : 1,
+                transition:"opacity 0.2s",
+              }}>
+              <div style={{width:8, height:8, borderRadius:"50%", background:d.color, flexShrink:0}} />
+              <span style={{fontSize:10, color:C.muted, whiteSpace:"nowrap"}}>{d.name}</span>
+            </button>
           ))}
         </div>
       </div>
 
-      {/* ── PIE CHART — total label is ABOVE, ring is separate ── */}
-      {chartType === "pie" && (
-        <div className="chart-outer">
-          <ResponsiveContainer width="100%" height={200}>
-            <PieChart>
-              <Pie data={data} cx="50%" cy="50%" innerRadius={50} outerRadius={85}
-                paddingAngle={2} dataKey="total" labelLine={false}
-                onClick={d => handleClick(d.name)}>
-                {data.map(entry => (
-                  <Cell key={entry.name} fill={entry.color}
-                    opacity={selectedCat && selectedCat !== entry.name ? 0.3 : 1}
-                    stroke={selectedCat === entry.name ? "#1C1917" : "none"} strokeWidth={2}
-                    style={{ cursor: "pointer" }} />
-                ))}
-              </Pie>
-              <Tooltip content={<CustomTooltip />} />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-
-      {/* ── BAR CHART ── */}
-      {chartType === "bar" && (
-        <div className="chart-outer">
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
-              onClick={d => d?.activePayload && handleClick(d.activePayload[0]?.payload?.name)}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E7E5E0" vertical={false} />
-              <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#78716C" }}
-                tickFormatter={v => v.slice(0,5)} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 10, fill: "#78716C" }} tickFormatter={fmtShort}
-                axisLine={false} tickLine={false} width={40} />
-              <Tooltip content={<CustomTooltip />} cursor={{ fill: "#E7E5E044" }} />
-              <Bar dataKey="total" radius={[6,6,0,0]}>
-                {data.map(entry => (
-                  <Cell key={entry.name} fill={entry.color}
-                    opacity={selectedCat && selectedCat !== entry.name ? 0.3 : 1}
-                    style={{ cursor: "pointer" }} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-
-      {/* Selected detail */}
+      {/* ══ DRILL-DOWN (shown when category selected) ══ */}
       {selected && (
-        <div style={{ margin: "0 0 10px", padding: "12px 14px", borderRadius: 10, background: `${selected.color}11`, border: `1.5px solid ${selected.color}44` }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: 14, fontWeight: 700 }}>{selected.icon} {selected.name}</span>
-            <button onClick={() => setSelectedCat(null)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, color: "#78716C" }}>✕</button>
-          </div>
-          <div style={{ display: "flex", gap: 16, marginTop: 8 }}>
-            {[["Total", fmt(selected.total)], ["Share", `${selected.pct}%`], ["Entries", `${selected.count}`], ["Avg", fmt(selected.total/selected.count)]].map(([l,v]) => (
-              <div key={l}>
-                <p style={{ margin: 0, fontSize: 10, color: "#78716C", textTransform: "uppercase", letterSpacing: 1 }}>{l}</p>
-                <p style={{ margin: "2px 0 0", fontSize: 14, fontWeight: 700, color: selected.color, fontFamily: "Georgia, serif" }}>{v}</p>
-              </div>
-            ))}
-          </div>
-        </div>
+        <DrillDown cat={selected} onClose={()=>setSelectedCat(null)} />
       )}
 
-      {/* Category rows */}
-      <div style={{ marginTop: 8 }}>
-        <p className="label" style={{ marginBottom: 8 }}>By Category — tap to inspect</p>
-        {data.map((cat, i) => (
-          <CategoryRow key={cat.name} cat={cat} rank={i+1}
-            isSelected={selectedCat === cat.name} onClick={() => handleClick(cat.name)} />
-        ))}
+      {/* ══ CATEGORY BREAKDOWN LIST ══ */}
+      <div style={{
+        background:"#fff", borderRadius:14, border:`1px solid ${C.border}`,
+        boxShadow:"0 1px 3px rgba(0,0,0,0.06)", overflow:"hidden",
+      }}>
+        <div style={{padding:"10px 14px", borderBottom:`1px solid ${C.bg}`}}>
+          <p style={{margin:0, fontSize:12, fontWeight:700, color:C.ink}}>By Category</p>
+          <p style={{margin:0, fontSize:10, color:C.muted}}>Tap a row to see transactions</p>
+        </div>
+
+        {data.map((cat, i) => {
+          const isActive = selectedCat === cat.name;
+          return (
+            <div key={cat.name} onClick={()=>toggle(cat.name)}
+              style={{
+                display:"flex", alignItems:"center", gap:10,
+                padding:"10px 14px", cursor:"pointer",
+                borderBottom: i<data.length-1?`1px solid ${C.bg}`:"none",
+                background: isActive ? `${cat.color}08` : "transparent",
+                transition:"background 0.15s",
+              }}>
+
+              {/* Icon bubble */}
+              <div style={{
+                width:34, height:34, borderRadius:9, flexShrink:0,
+                background: `${cat.color}18`,
+                display:"flex", alignItems:"center", justifyContent:"center",
+                fontSize:16,
+                border: isActive ? `1.5px solid ${cat.color}66` : "1.5px solid transparent",
+              }}>
+                {cat.icon}
+              </div>
+
+              {/* Name + bar */}
+              <div style={{flex:1, minWidth:0}}>
+                <div style={{display:"flex", justifyContent:"space-between", marginBottom:4}}>
+                  <p style={{margin:0, fontSize:12, fontWeight:isActive?700:600, color:C.ink}}>
+                    {cat.name}
+                  </p>
+                  <div style={{display:"flex", alignItems:"baseline", gap:5}}>
+                    <p style={{margin:0, fontSize:13, fontWeight:700, color:cat.color, fontFamily:"Georgia,serif"}}>
+                      {fmt(cat.total)}
+                    </p>
+                    <p style={{margin:0, fontSize:10, color:C.muted}}>({cat.pct}%)</p>
+                  </div>
+                </div>
+                {/* Progress bar */}
+                <div style={{height:3, borderRadius:99, background:C.bg, overflow:"hidden"}}>
+                  <div style={{
+                    height:"100%", borderRadius:99,
+                    width:`${cat.pct}%`, background:cat.color,
+                    transition:"width 0.4s",
+                  }} />
+                </div>
+                <p style={{margin:"3px 0 0", fontSize:10, color:C.muted}}>
+                  {cat.count} transaction{cat.count!==1?"s":""}
+                  {cat.count>0 && ` · avg ${fmt(Math.round(cat.total/cat.count))}`}
+                </p>
+              </div>
+
+              {/* Chevron */}
+              <p style={{margin:0, fontSize:12, color:C.muted, flexShrink:0, transform:isActive?"rotate(90deg)":"none", transition:"transform 0.15s"}}>›</p>
+            </div>
+          );
+        })}
+
+        {/* Footer totals */}
+        <div style={{
+          padding:"9px 14px", background:C.bg,
+          display:"flex", justifyContent:"space-between", alignItems:"center",
+        }}>
+          <p style={{margin:0, fontSize:10, color:C.muted, textTransform:"uppercase", letterSpacing:"0.8px", fontWeight:600}}>
+            Total Spent
+          </p>
+          <p style={{margin:0, fontSize:15, fontWeight:700, color:C.ink, fontFamily:"Georgia,serif"}}>
+            {fmt(grandTotal)}
+          </p>
+        </div>
       </div>
     </div>
   );
