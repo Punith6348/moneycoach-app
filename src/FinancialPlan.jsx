@@ -109,7 +109,13 @@ function AddButton({onClick, label}) {
 // ── Fix #3: InlineForm with key prop so it reinitialises on edit switch ───
 // key={editId||"new"} is set by each section — forces fresh useState per item
 function InlineForm({fields, onSave, onCancel, title}) {
-  const init = Object.fromEntries(fields.map(f => [f.key, f.default ?? ""]));
+  // For select fields with no explicit default, seed from first option so the
+  // visible selection always matches the stored value (fixes Mutual Fund SIP save bug)
+  const init = Object.fromEntries(fields.map(f => {
+    if (f.default !== undefined && f.default !== "") return [f.key, f.default];
+    if (f.type === "select" && f.options?.length) return [f.key, f.options[0].value];
+    return [f.key, f.default ?? ""];
+  }));
   const [vals, setVals] = useState(init);
   const set = (k,v) => setVals(p => ({...p,[k]:v}));
 
