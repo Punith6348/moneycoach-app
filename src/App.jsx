@@ -586,14 +586,19 @@ function DashboardScreen(props) {
 
         {/* ══ INSIGHTS ══ */}
         {tab==="insight"&&(
-          <>
-            <p style={{fontSize:13,color:C.muted,marginBottom:14}}>Based on the selected month's activity.</p>
-            <MonthBar/>
-            <div style={{maxWidth:680}}>
-              <InsightCard monthlyIncome={totalIncome} expenses={expenses} showDetails={true}/>
-            </div>
-          </>
-        )}
+          ()=>{
+            // Derive previous month key for trend comparison
+            const d = new Date(); d.setMonth(d.getMonth()-1);
+            const prevKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+            const prevExp = allExpenses[prevKey] || [];
+            return (
+              <>
+                <MonthBar/>
+                <InsightCard monthlyIncome={totalIncome} expenses={expenses} prevMonthExpenses={prevExp} showDetails={true}/>
+              </>
+            );
+          }
+        )()}
 
       </main>
     </div>
