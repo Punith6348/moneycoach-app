@@ -28,6 +28,7 @@ const groupByDate = (expenses) => {
 // Fix #2: Only variable/daily categories in the log form.
 // Fixed expenses are managed exclusively in the Plan tab.
 const VARIABLE_CATS = [{name:"Food",icon:"🍽"},{name:"Travel",icon:"🚗"},{name:"Coffee",icon:"☕"},{name:"Grocery",icon:"🛒"},{name:"Medical",icon:"💊"},{name:"Entertainment",icon:"🎬"},{name:"Other",icon:"💸"}];
+const NOTE_PLACEHOLDER = {Food:"e.g. Lunch at Zomato",Travel:"e.g. Auto to office",Coffee:"e.g. Starbucks coffee",Grocery:"e.g. Vegetables from market",Medical:"e.g. Pharmacy medicines",Entertainment:"e.g. Movie tickets",Other:"e.g. Misc expense"};
 // ICONS keeps fixed cats too so existing logged entries render correctly
 const FIXED_ICONS   = {Rent:"🏠",Electricity:"⚡",Water:"💧",Internet:"📶","EMI/Loan":"🏦",Insurance:"🛡",Maintenance:"🔧","School Fees":"🎓"};
 const ICONS         = {...Object.fromEntries(VARIABLE_CATS.map(c=>[c.name,c.icon])), ...FIXED_ICONS};
@@ -312,7 +313,7 @@ function LogExpenseForm({onAdd,disabled}) {
       <p style={{fontSize:11,color:C.muted,margin:"2px 0 6px"}}>For fixed bills like Rent or EMI, use the <strong>Plan tab</strong>.</p>
       <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>{VARIABLE_CATS.map(chip)}</div>
       <Label>Note (optional)</Label>
-      <input type="text" value={note} onChange={e=>setNote(e.target.value)} placeholder="e.g. Lunch at Zomato" disabled={disabled}
+      <input type="text" value={note} onChange={e=>setNote(e.target.value)} placeholder={NOTE_PLACEHOLDER[label]||"e.g. Misc expense"} disabled={disabled}
         style={{width:"100%",padding:"8px 12px",borderRadius:8,border:`1.5px solid ${C.border}`,fontFamily:"inherit",fontSize:14,background:C.bg,outline:"none",marginTop:6,marginBottom:10,boxSizing:"border-box"}} />
       <button onClick={submit} disabled={disabled} style={{width:"100%",padding:"10px",borderRadius:10,background:C.ink,color:"#fff",border:"none",fontSize:14,fontFamily:"inherit",fontWeight:700,cursor:"pointer",opacity:disabled?0.5:1}}>Save Expense ✓</button>
     </div>
