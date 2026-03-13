@@ -47,8 +47,9 @@ const APP_CSS = `
   /* Expense rows: compact */
   .mc-expense-row { display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px solid #F7F5F0; gap:8px; }
   .mc-expense-row:last-child { border-bottom:none; }
-  /* Scrollable tabs — hide scrollbar */
+  /* Hide scrollbar on tab bar and pill rows */
   .mc-tabs::-webkit-scrollbar { display:none; }
+  div::-webkit-scrollbar { display:none; }
 `;
 
 // ─── SHARED UI ────────────────────────────────────────────────────────────
@@ -147,34 +148,39 @@ function ExpenseList({expenses, monthKey, onEdit, onDelete, isCurrentMonth}) {
   const todayStr     = new Date().toISOString().split("T")[0];
   const yesterdayStr = (() => { const d=new Date(); d.setDate(d.getDate()-1); return d.toISOString().split("T")[0]; })();
 
-  // mode: "today" | "yesterday" | "pick"
-  // pickedDate: "YYYY-MM-DD" string
   const [mode,       setMode]       = useState("today");
   const [pickedDate, setPickedDate] = useState(todayStr);
   const [editTarget, setEditTarget] = useState(null);
+  const dateInputRef = useRef(null);   // ← ref to trigger native date picker
 
-  // Which date are we showing?
   const activeDate =
     mode === "today"     ? todayStr :
     mode === "yesterday" ? yesterdayStr :
     pickedDate;
 
-  // Filter to that date only
   const filtered = useMemo(
     () => expenses.filter(e => e.date.split("T")[0] === activeDate),
     [expenses, activeDate]
   );
   const dayTotal = filtered.reduce((s,e) => s+e.amount, 0);
 
-  // Label for the date pill
+  const allDates = [...new Set(expenses.map(e=>e.date.split("T")[0]))].sort();
+  const minDate  = allDates[0] || todayStr;
+
   const dateLabel =
     activeDate === todayStr     ? "Today" :
     activeDate === yesterdayStr ? "Yesterday" :
-    new Date(activeDate).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"});
+    new Date(activeDate + "T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"});
 
-  // All unique dates that have expenses (for the calendar min/max)
-  const allDates = [...new Set(expenses.map(e=>e.date.split("T")[0]))].sort();
-  const minDate  = allDates[0] || todayStr;
+  // Active state style for pills
+  const pill = (active) => ({
+    padding:"6px 13px", borderRadius:99, cursor:"pointer",
+    fontFamily:"inherit", fontSize:11, fontWeight:600,
+    border:`1.5px solid ${active ? C.ink : C.border}`,
+    background: active ? C.ink : "#fff",
+    color: active ? "#fff" : C.muted,
+    transition:"all 0.12s", whiteSpace:"nowrap", flexShrink:0,
+  });
 
   return (
     <>
@@ -185,62 +191,47 @@ function ExpenseList({expenses, monthKey, onEdit, onDelete, isCurrentMonth}) {
 
       <div style={{background:"#fff",borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 3px rgba(0,0,0,0.06)",overflow:"hidden"}}>
 
-        {/* ── Header row: title + date selector ── */}
-        <div style={{padding:"12px 14px",borderBottom:`1px solid ${C.bg}`,display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
-          <div>
-            <p style={{margin:0,fontSize:14,fontWeight:700,color:C.ink}}>Expense History</p>
-            {dayTotal > 0 && (
-              <p style={{margin:0,fontSize:10,color:C.muted}}>
-                {dateLabel} · <span style={{color:C.red,fontWeight:700}}>{fmt(dayTotal)}</span> total
+        {/* ── Header: title + date filter pills ── */}
+        <div style={{padding:"12px 14px",borderBottom:`1px solid ${C.bg}`}}>
+          <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:10,marginBottom:8}}>
+            <div>
+              <p style={{margin:0,fontSize:14,fontWeight:700,color:C.ink}}>Expense History</p>
+              <p style={{margin:"2px 0 0",fontSize:10,color:C.muted}}>
+                {dateLabel}
+                {dayTotal > 0 && (
+                  <> · <span style={{color:C.red,fontWeight:700}}>{fmt(dayTotal)}</span> total</>
+                )}
               </p>
-            )}
+            </div>
           </div>
-
-          {/* Date selector pills */}
-          <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-            {[
-              {key:"today",     label:"Today"},
-              {key:"yesterday", label:"Yesterday"},
-            ].map(opt => (
-              <button key={opt.key} onClick={()=>setMode(opt.key)}
-                style={{
-                  padding:"5px 11px", borderRadius:99, cursor:"pointer",
-                  fontFamily:"inherit", fontSize:11, fontWeight:600,
-                  border:`1.5px solid ${mode===opt.key?C.ink:C.border}`,
-                  background: mode===opt.key?C.ink:"#fff",
-                  color: mode===opt.key?"#fff":C.muted,
-                  transition:"all 0.12s",
-                }}>
-                {opt.label}
-              </button>
-            ))}
-
-            {/* Calendar date picker — styled to match */}
-            <label style={{position:"relative",cursor:"pointer"}}>
-              <button
-                onClick={()=>setMode("pick")}
-                style={{
-                  padding:"5px 11px", borderRadius:99, cursor:"pointer",
-                  fontFamily:"inherit", fontSize:11, fontWeight:600,
-                  border:`1.5px solid ${mode==="pick"?C.ink:C.border}`,
-                  background: mode==="pick"?C.ink:"#fff",
-                  color: mode==="pick"?"#fff":C.muted,
-                  pointerEvents:"none",   // click handled by the label
-                }}>
-                {mode==="pick"
-                  ? new Date(pickedDate).toLocaleDateString("en-IN",{day:"numeric",month:"short"})
-                  : "📅 Pick date"}
-              </button>
-              <input type="date"
-                value={pickedDate}
-                min={minDate}
-                max={todayStr}
-                onChange={e=>{ setPickedDate(e.target.value); setMode("pick"); }}
-                style={{
-                  position:"absolute", inset:0, opacity:0,
-                  cursor:"pointer", width:"100%",
-                }} />
-            </label>
+          {/* Pills row — scrollable on mobile */}
+          <div style={{display:"flex",gap:6,overflowX:"auto",scrollbarWidth:"none",paddingBottom:2}}>
+            <button style={pill(mode==="today")}    onClick={()=>setMode("today")}>Today</button>
+            <button style={pill(mode==="yesterday")} onClick={()=>setMode("yesterday")}>Yesterday</button>
+            {/* Pick date — button triggers hidden input via ref */}
+            <button style={pill(mode==="pick")}
+              onClick={() => {
+                // Show the native date picker programmatically
+                if (dateInputRef.current) {
+                  dateInputRef.current.showPicker
+                    ? dateInputRef.current.showPicker()
+                    : dateInputRef.current.click();
+                }
+              }}>
+              {mode === "pick"
+                ? `📅 ${new Date(pickedDate + "T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short"})}`
+                : "📅 Pick Date"}
+            </button>
+            {/* Hidden native date input — positioned off-screen but reachable */}
+            <input
+              ref={dateInputRef}
+              type="date"
+              value={pickedDate}
+              min={minDate}
+              max={todayStr}
+              onChange={e => { if(e.target.value){ setPickedDate(e.target.value); setMode("pick"); }}}
+              style={{position:"absolute",opacity:0,width:0,height:0,pointerEvents:"none"}}
+            />
           </div>
         </div>
 
@@ -249,35 +240,46 @@ function ExpenseList({expenses, monthKey, onEdit, onDelete, isCurrentMonth}) {
           {filtered.length === 0 ? (
             <div style={{textAlign:"center",padding:"28px 0"}}>
               <p style={{fontSize:26,margin:"0 0 6px"}}>📭</p>
-              <p style={{color:C.muted,fontSize:13,margin:0}}>No expenses on {dateLabel.toLowerCase()}.</p>
+              <p style={{color:C.muted,fontSize:13,margin:0}}>
+                No expenses recorded on {dateLabel.toLowerCase()}.
+              </p>
             </div>
           ) : (
-            filtered.map((e, i) => (
-              <div key={e.id} className="mc-expense-row"
-                style={{borderBottom: i<filtered.length-1?`1px solid ${C.bg}`:"none"}}>
-                <div style={{display:"flex",alignItems:"center",gap:8,flex:1,minWidth:0}}>
-                  <div style={{width:30,height:30,borderRadius:8,background:C.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0}}>
+            filtered.slice().reverse().map((e, i) => {
+              const timeStr = new Date(e.date).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit",hour12:true});
+              return (
+                <div key={e.id}
+                  style={{display:"flex",alignItems:"center",gap:10,padding:"9px 0",
+                          borderBottom: i<filtered.length-1?`1px solid ${C.bg}`:"none"}}>
+                  {/* Icon bubble */}
+                  <div style={{width:34,height:34,borderRadius:9,background:C.bg,
+                               display:"flex",alignItems:"center",justifyContent:"center",
+                               fontSize:16,flexShrink:0}}>
                     {ICONS[e.label]||"💸"}
                   </div>
-                  <div style={{minWidth:0,flex:1}}>
-                    <p style={{fontSize:12,fontWeight:600,color:C.ink,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",margin:0}}>
-                      {e.label}{e.note?` · ${e.note}`:""}
+                  {/* Name + note */}
+                  <div style={{flex:1,minWidth:0}}>
+                    <p style={{margin:0,fontSize:12,fontWeight:600,color:C.ink,
+                               overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                      {e.label}
+                      {e.note && <span style={{fontWeight:400,color:C.muted}}> · {e.note}</span>}
                     </p>
-                    <p style={{fontSize:10,color:C.muted,margin:0}}>
-                      {new Date(e.date).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"})}
-                    </p>
+                    <p style={{margin:0,fontSize:10,color:C.muted}}>{timeStr}</p>
+                  </div>
+                  {/* Amount + menu */}
+                  <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+                    <span style={{fontSize:13,fontWeight:700,color:C.red,fontFamily:"Georgia,serif"}}>
+                      {fmt(e.amount)}
+                    </span>
+                    {isCurrentMonth && (
+                      <ExpenseDotMenu
+                        onEdit={()=>setEditTarget(e)}
+                        onDelete={()=>{ if(window.confirm("Delete this expense?")) onDelete(monthKey,e.id); }} />
+                    )}
                   </div>
                 </div>
-                <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-                  <span style={{fontSize:13,fontWeight:700,color:C.red,fontFamily:"Georgia,serif"}}>{fmt(e.amount)}</span>
-                  {isCurrentMonth && (
-                    <ExpenseDotMenu
-                      onEdit={()=>setEditTarget(e)}
-                      onDelete={()=>{ if(window.confirm("Delete this expense?")) onDelete(monthKey,e.id); }} />
-                  )}
-                </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
 
@@ -492,11 +494,32 @@ function DashboardScreen(props) {
       </div>
 
       {/* Tabs */}
-      <div style={{background:"#fff",borderBottom:`1px solid ${C.border}`,width:"100%",overflowX:"auto",scrollbarWidth:"none"}}>
-        <div style={{maxWidth:1200,margin:"0 auto",display:"flex",padding:"0 12px"}}>
-          {TABS.map(({key,label})=>(
-            <button key={key} onClick={()=>setTab(key)} style={{flex:"0 0 auto",padding:"12px 14px",background:"none",border:"none",borderBottom:`2.5px solid ${tab===key?C.ink:"transparent"}`,fontSize:12,fontFamily:"inherit",color:tab===key?C.ink:C.muted,cursor:"pointer",whiteSpace:"nowrap",fontWeight:tab===key?700:400,transition:"all 0.15s"}}>{label}</button>
-          ))}
+      <div style={{background:"#fff",borderBottom:`1px solid ${C.border}`,width:"100%",
+                   overflowX:"auto",scrollbarWidth:"none",WebkitOverflowScrolling:"touch"}}>
+        <div style={{display:"flex",padding:"0 4px",minWidth:"max-content"}}>
+          {TABS.map(({key,label})=>{
+            const active = tab===key;
+            return (
+              <button key={key} onClick={()=>setTab(key)}
+                style={{
+                  flexShrink:0,
+                  padding:"13px 16px",
+                  background:"none", border:"none",
+                  borderBottom:`2.5px solid ${active?C.ink:"transparent"}`,
+                  fontSize:12, fontFamily:"inherit",
+                  color: active ? C.ink : C.muted,
+                  cursor:"pointer", whiteSpace:"nowrap",
+                  fontWeight: active ? 700 : 400,
+                  transition:"color 0.12s, border-color 0.12s",
+                  /* slightly larger touch area */
+                  minHeight:44,
+                  /* subtle bg tint on active for extra clarity */
+                  backgroundColor: active ? "#FAFAF9" : "transparent",
+                }}>
+                {label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
