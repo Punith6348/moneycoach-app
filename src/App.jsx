@@ -38,6 +38,29 @@ const C = {ink:"#1C1917",muted:"#78716C",border:"#E7E5E0",bg:"#F7F5F0",red:"#DC2
 
 // Responsive CSS injected once into <head> equivalent via a style tag in the app shell
 const APP_CSS = `
+  /* ── Sidebar layout ──────────────────────────────────────── */
+  .mc-app          { display:flex; flex-direction:column; min-height:100vh; background:#F7F5F0; }
+  .mc-body         { display:flex; flex:1; }
+  .mc-sidebar      { width:220px; min-width:220px; background:#1C1917; display:flex; flex-direction:column; position:sticky; top:0; height:100vh; overflow-y:auto; flex-shrink:0; }
+  .mc-main         { flex:1; min-width:0; display:flex; flex-direction:column; }
+  .mc-content      { flex:1; padding:20px 20px 80px; max-width:960px; width:100%; margin:0 auto; }
+
+  /* Tablet: narrower sidebar */
+  @media(max-width:900px){
+    .mc-sidebar { width:180px; min-width:180px; }
+  }
+
+  /* Mobile: sidebar collapses — triggered via data-open attribute */
+  @media(max-width:640px){
+    .mc-sidebar {
+      position:fixed; top:0; left:0; z-index:200;
+      transform:translateX(-100%); transition:transform 0.25s ease;
+      height:100%; width:240px; min-width:0;
+    }
+    .mc-sidebar[data-open="true"] { transform:translateX(0); }
+    .mc-content { padding:16px 14px 80px; }
+  }
+
   /* Plan tab: 2-col desktop, 1-col mobile */
   .mc-plan-top  { display:grid; grid-template-columns:1fr; gap:0; }
   .mc-plan-full { width:100%; }
@@ -47,9 +70,18 @@ const APP_CSS = `
   /* Expense rows: compact */
   .mc-expense-row { display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px solid #F7F5F0; gap:8px; }
   .mc-expense-row:last-child { border-bottom:none; }
-  /* Hide scrollbar on tab bar and pill rows */
-  .mc-tabs::-webkit-scrollbar { display:none; }
-  div::-webkit-scrollbar { display:none; }
+  /* Hide scrollbars */
+  ::-webkit-scrollbar { display:none; }
+  * { scrollbar-width:none; }
+
+  @keyframes fadeUp {
+    from { opacity:0; transform:translateX(-50%) translateY(-8px); }
+    to   { opacity:1; transform:translateX(-50%) translateY(0); }
+  }
+  @keyframes slideIn {
+    from { opacity:0; transform:translateX(-6px); }
+    to   { opacity:1; transform:translateX(0); }
+  }
 `;
 
 // ─── SHARED UI ────────────────────────────────────────────────────────────
@@ -457,90 +489,163 @@ function DashboardScreen(props) {
     showToast(`${fmt(amount)} saved under ${label} ✓`);
   };
 
-  // Fix #1: Check-In tab removed — streak lives in Home tab
-  const TABS=[
-    {key:"budget",    label:"📊 Dashboard"},
-    {key:"plan",      label:"🗂 Plan"},
-    {key:"home",      label:"🏠 Expenses"},
-    {key:"loans",     label:"🏦 Loans"},
-    {key:"charts",    label:"🥧 Charts"},
-    {key:"insight",   label:"💡 Insights"},
+  const TABS = [
+    { key:"budget",  icon:"📊", label:"Dashboard" },
+    { key:"plan",    icon:"🗂",  label:"Plan"      },
+    { key:"home",    icon:"🏠",  label:"Expenses"  },
+    { key:"loans",   icon:"🏦",  label:"Loans"     },
+    { key:"charts",  icon:"🥧",  label:"Charts"    },
+    { key:"insight", icon:"💡",  label:"Insights"  },
   ];
 
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const MonthBar=()=><MonthSelector selectedMonth={selectedMonth} onChange={setSelectedMonth} allExpenses={allExpenses}/>;
 
   return (
-    <div style={{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column"}}>
+    <div className="mc-app">
       <style>{APP_CSS}</style>
-      {toast&&<div style={{position:"fixed",top:20,left:"50%",transform:"translateX(-50%)",background:C.ink,color:"#fff",padding:"9px 20px",borderRadius:99,fontSize:13,zIndex:9999,whiteSpace:"nowrap",boxShadow:"0 4px 20px rgba(0,0,0,0.18)",animation:"fadeUp 0.2s ease"}}>
-        <style>{`@keyframes fadeUp{from{opacity:0;transform:translateX(-50%) translateY(-8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}`}</style>
-        {toast}</div>}
 
-      {/* Nav */}
-      <div style={{position:"sticky",top:0,zIndex:100,background:"#fff",borderBottom:`1px solid ${C.border}`,width:"100%"}}>
-        <div style={{maxWidth:1200,margin:"0 auto",padding:"12px 20px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <div>
-            <p style={{margin:0,fontSize:11,color:C.muted,textTransform:"uppercase",letterSpacing:"1.1px",fontWeight:600,marginBottom:3}}>
+      {/* ── Toast ── */}
+      {toast && (
+        <div style={{position:"fixed",top:20,left:"50%",transform:"translateX(-50%)",
+                     background:C.ink,color:"#fff",padding:"9px 20px",borderRadius:99,
+                     fontSize:13,zIndex:9999,whiteSpace:"nowrap",
+                     boxShadow:"0 4px 20px rgba(0,0,0,0.18)",animation:"fadeUp 0.2s ease"}}>
+          {toast}
+        </div>
+      )}
+
+      {/* ── Mobile overlay backdrop ── */}
+      {sidebarOpen && (
+        <div onClick={()=>setSidebarOpen(false)}
+          style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:190}} />
+      )}
+
+      <div className="mc-body">
+
+        {/* ════════════════════════ SIDEBAR ════════════════════════ */}
+        <aside className="mc-sidebar" data-open={String(sidebarOpen)}>
+
+          {/* Brand / logo area */}
+          <div style={{padding:"20px 18px 16px",borderBottom:"1px solid rgba(255,255,255,0.07)"}}>
+            <p style={{margin:0,fontSize:9,color:"#57534E",textTransform:"uppercase",
+                       letterSpacing:"1.4px",fontWeight:700,marginBottom:4}}>Money Coach</p>
+            <p style={{margin:0,fontSize:11,color:"#A8A29E",lineHeight:1.4}}>
               {new Date().toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"short"})}
             </p>
-            <h1 style={{fontSize:17,fontWeight:700,color:C.ink,fontFamily:"Georgia,serif",margin:0}}>{getGreeting(name)} 👋</h1>
           </div>
-          <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <StreakBadge streak={streak}/>
-            <button onClick={()=>{if(window.confirm("Delete ALL data permanently?"))resetAll();}}
-              style={{background:"#FFF1F2",border:"1px solid #FCA5A5",borderRadius:8,padding:"6px 12px",fontSize:12,color:C.red,cursor:"pointer",fontFamily:"inherit",fontWeight:600}}>🗑 Reset</button>
-          </div>
-        </div>
-      </div>
 
-      {/* Tabs */}
-      <div style={{background:"#fff",borderBottom:`1px solid ${C.border}`,width:"100%",
-                   overflowX:"auto",scrollbarWidth:"none",WebkitOverflowScrolling:"touch"}}>
-        <div style={{display:"flex",padding:"0 4px",minWidth:"max-content"}}>
-          {TABS.map(({key,label})=>{
-            const active = tab===key;
-            return (
-              <button key={key} onClick={()=>setTab(key)}
+          {/* Nav items */}
+          <nav style={{flex:1,padding:"10px 8px"}}>
+            {TABS.map(({key,icon,label}) => {
+              const active = tab === key;
+              return (
+                <button key={key}
+                  onClick={() => { setTab(key); setSidebarOpen(false); }}
+                  style={{
+                    display:"flex", alignItems:"center", gap:10,
+                    width:"100%", padding:"10px 12px", marginBottom:2,
+                    borderRadius:9, border:"none",
+                    background: active ? "rgba(255,255,255,0.10)" : "transparent",
+                    borderLeft: `3px solid ${active ? "#E7E5E0" : "transparent"}`,
+                    color: active ? "#F7F5F0" : "#78716C",
+                    fontSize:13, fontFamily:"inherit", fontWeight: active ? 700 : 400,
+                    cursor:"pointer", textAlign:"left",
+                    transition:"background 0.15s, color 0.15s",
+                  }}
+                  onMouseEnter={e => { if(!active) e.currentTarget.style.background="rgba(255,255,255,0.05)"; e.currentTarget.style.color="#D6D3D1"; }}
+                  onMouseLeave={e => { if(!active) { e.currentTarget.style.background="transparent"; e.currentTarget.style.color="#78716C"; }}}
+                >
+                  <span style={{fontSize:16,width:20,textAlign:"center",flexShrink:0}}>{icon}</span>
+                  <span>{label}</span>
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* Streak badge at bottom */}
+          {streak > 0 && (
+            <div style={{padding:"12px 18px",borderTop:"1px solid rgba(255,255,255,0.07)"}}>
+              <div style={{display:"flex",alignItems:"center",gap:7}}>
+                <span style={{fontSize:16}}>🔥</span>
+                <div>
+                  <p style={{margin:0,fontSize:11,fontWeight:700,color:"#FDBA74"}}>{streak} day streak</p>
+                  <p style={{margin:0,fontSize:9,color:"#78716C"}}>Keep it up!</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </aside>
+
+        {/* ════════════════════════ MAIN AREA ════════════════════════ */}
+        <div className="mc-main">
+
+          {/* ── Top header bar ── */}
+          <header style={{
+            background:"#fff", borderBottom:`1px solid ${C.border}`,
+            padding:"11px 20px",
+            display:"flex", justifyContent:"space-between", alignItems:"center",
+            position:"sticky", top:0, zIndex:100,
+          }}>
+            {/* Left: hamburger (mobile only) + greeting */}
+            <div style={{display:"flex",alignItems:"center",gap:12}}>
+              {/* Hamburger — hidden on desktop via inline media workaround */}
+              <button
+                onClick={()=>setSidebarOpen(p=>!p)}
                 style={{
-                  flexShrink:0,
-                  padding:"13px 16px",
-                  background:"none", border:"none",
-                  borderBottom:`2.5px solid ${active?C.ink:"transparent"}`,
-                  fontSize:12, fontFamily:"inherit",
-                  color: active ? C.ink : C.muted,
-                  cursor:"pointer", whiteSpace:"nowrap",
-                  fontWeight: active ? 700 : 400,
-                  transition:"color 0.12s, border-color 0.12s",
-                  /* slightly larger touch area */
-                  minHeight:44,
-                  /* subtle bg tint on active for extra clarity */
-                  backgroundColor: active ? "#FAFAF9" : "transparent",
-                }}>
-                {label}
+                  display:"none", // overridden by inline style on mobile
+                  background:"none", border:`1px solid ${C.border}`,
+                  borderRadius:7, padding:"6px 8px", cursor:"pointer",
+                  fontSize:15, color:C.muted, lineHeight:1,
+                  // CSS media query can't apply here inline; we use a wrapper trick below
+                }}
+                className="mc-hamburger">
+                ☰
               </button>
-            );
-          })}
-        </div>
-      </div>
+              <div>
+                <p style={{margin:0,fontSize:11,color:C.muted,textTransform:"uppercase",
+                           letterSpacing:"1.1px",fontWeight:600,marginBottom:2}}>
+                  {new Date().toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"short"})}
+                </p>
+                <h1 style={{fontSize:16,fontWeight:700,color:C.ink,fontFamily:"Georgia,serif",margin:0}}>
+                  {getGreeting(name)} 👋
+                </h1>
+              </div>
+            </div>
+            {/* Right: reset */}
+            <button onClick={()=>{ if(window.confirm("Delete ALL data permanently?")) resetAll(); }}
+              style={{background:"#FFF1F2",border:"1px solid #FCA5A5",borderRadius:8,
+                      padding:"6px 12px",fontSize:12,color:C.red,cursor:"pointer",
+                      fontFamily:"inherit",fontWeight:600}}>
+              🗑 Reset
+            </button>
+          </header>
 
-      <main style={{flex:1,width:"100%",maxWidth:1200,margin:"0 auto",padding:"20px 16px 80px"}}>
+          {/* Extra CSS to show hamburger on mobile */}
+          <style>{`
+            @media(max-width:640px){ .mc-hamburger{ display:flex !important; align-items:center; } }
+          `}</style>
 
-        {/* ══ BUDGET DASHBOARD ══ */}
-        {tab==="budget"&&(
-          <>
-            <p style={{fontSize:12,color:C.muted,marginBottom:14,lineHeight:1.6}}>
-              Financial overview for {new Date().toLocaleDateString("en-IN",{month:"long",year:"numeric"})}.
-            </p>
-            <BudgetDashboard
-              totalIncome={totalIncome} totalFixed={totalFixed}
-              totalSavings={totalSavings} totalReserve={totalReserve}
-              remaining={remaining} dailyLimit={dailyLimit}
-              incomeSources={incomeSources} fixedExpenses={fixedExpenses}
-              savingsPlans={savingsPlans} futurePayments={futurePayments}
-              currentExpenses={currentExpenses}
-              loans={loans} />
-          </>
-        )}
+          {/* ── Page content ── */}
+          <div className="mc-content">
+            <div style={{animation:"slideIn 0.18s ease"}}>
+
+              {/* ══ BUDGET DASHBOARD ══ */}
+              {tab==="budget"&&(
+                <>
+                  <p style={{fontSize:12,color:C.muted,marginBottom:14,lineHeight:1.6}}>
+                    Financial overview for {new Date().toLocaleDateString("en-IN",{month:"long",year:"numeric"})}.
+                  </p>
+                  <BudgetDashboard
+                    totalIncome={totalIncome} totalFixed={totalFixed}
+                    totalSavings={totalSavings} totalReserve={totalReserve}
+                    remaining={remaining} dailyLimit={dailyLimit}
+                    incomeSources={incomeSources} fixedExpenses={fixedExpenses}
+                    savingsPlans={savingsPlans} futurePayments={futurePayments}
+                    currentExpenses={currentExpenses}
+                    loans={loans} />
+                </>
+              )}
 
         {/* ══ PLAN ══ */}
         {tab==="plan"&&(
@@ -626,7 +731,6 @@ function DashboardScreen(props) {
         {/* ══ INSIGHTS ══ */}
         {tab==="insight"&&(
           ()=>{
-            // Derive previous month key for trend comparison
             const d = new Date(); d.setMonth(d.getMonth()-1);
             const prevKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
             const prevExp = allExpenses[prevKey] || [];
@@ -639,7 +743,10 @@ function DashboardScreen(props) {
           }
         )()}
 
-      </main>
+            </div>{/* /slideIn */}
+          </div>{/* /mc-content */}
+        </div>{/* /mc-main */}
+      </div>{/* /mc-body */}
     </div>
   );
 }
