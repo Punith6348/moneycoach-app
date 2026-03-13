@@ -189,21 +189,40 @@ function LoanForm({initial, onSave, onCancel}) {
         </div>
 
         <div>
-          <Lbl>Monthly EMI (auto-calculated)</Lbl>
-          {autoEmi>0&&(
-            <div style={{padding:"7px 10px",borderRadius:8,background:"#F0FDF4",
-                         border:"1px solid #86EFAC",marginBottom:6,
-                         display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <p style={{margin:0,fontSize:11,color:C.green,fontWeight:600}}>Calculated EMI</p>
-              <p style={{margin:0,fontSize:15,fontWeight:700,color:C.green,fontFamily:"Georgia,serif"}}>{fmt(autoEmi)}/mo</p>
+          <Lbl>Monthly EMI</Lbl>
+          {/* ── Calculated EMI — primary display ── */}
+          {autoEmi>0 ? (
+            <div style={{padding:"10px 12px",borderRadius:8,background:"#F0FDF4",
+                         border:"1.5px solid #86EFAC",marginBottom:8}}>
+              <p style={{margin:0,fontSize:10,color:C.green,fontWeight:700,
+                         textTransform:"uppercase",letterSpacing:"0.8px"}}>Calculated EMI</p>
+              <p style={{margin:"2px 0 0",fontSize:20,fontWeight:700,color:C.green,
+                         fontFamily:"Georgia,serif",letterSpacing:"-0.3px"}}>
+                {fmt(autoEmi)}<span style={{fontSize:12,fontWeight:500,color:C.green}}> / month</span>
+              </p>
+            </div>
+          ) : (
+            <div style={{padding:"9px 12px",borderRadius:8,background:C.bg,
+                         border:`1px solid ${C.border}`,marginBottom:8}}>
+              <p style={{margin:0,fontSize:11,color:C.muted}}>Fill loan amount, rate & tenure to auto-calculate</p>
             </div>
           )}
+          {/* ── Optional override — visually smaller ── */}
+          <p style={{margin:"0 0 4px",fontSize:10,color:C.muted,fontStyle:"italic"}}>
+            Different actual EMI? Enter below (optional)
+          </p>
           <input type="number" value={f.emiOverride}
-            placeholder={autoEmi>0?`Override (default: ${fmt(autoEmi)})`:"Fill fields above"}
+            placeholder="Enter your actual EMI"
             onChange={e=>set("emiOverride",e.target.value)}
-            style={inp({fontFamily:"Georgia,serif",fontSize:14})}/>
-          {+f.emiOverride>0&&+f.emiOverride!==autoEmi&&autoEmi>0&&(
-            <p style={{margin:"3px 0 0",fontSize:10,color:C.amber}}>⚠ Using override: {fmt(+f.emiOverride)}/mo</p>
+            style={inp({fontSize:12,padding:"7px 10px",color:C.muted,
+                        background:+f.emiOverride>0?"#fff":C.bg})}/>
+          {+f.emiOverride>0&&autoEmi>0&&(
+            <p style={{margin:"3px 0 0",fontSize:10,
+                       color:+f.emiOverride!==autoEmi?C.amber:C.green}}>
+              {+f.emiOverride!==autoEmi
+                ? `⚠ Using your EMI: ${fmt(+f.emiOverride)}/mo`
+                : `✓ Same as calculated`}
+            </p>
           )}
         </div>
 
@@ -279,30 +298,33 @@ function InsightPanel({loan, baseTotals}) {
           const imp = calcEarlyClosureImpact(loan, extra);
           const none = imp.savedMonths===0;
           return (
-            <div key={extra} style={{background:"#fff",borderRadius:9,padding:"10px 10px",
-                                     border:`1px solid ${C.blue}22`}}>
-              <p style={{margin:"0 0 5px",fontSize:11,fontWeight:700,color:C.blue}}>
-                Pay ₹{extra.toLocaleString("en-IN")} extra
-              </p>
-              <p style={{margin:"0 0 3px",fontSize:10,color:C.muted}}>
-                New EMI: <strong style={{color:C.ink}}>{fmt(imp.newEmi)}</strong>
-              </p>
+            <div key={extra} style={{background:"#fff",borderRadius:9,padding:"10px 11px",
+                                     border:`1px solid ${C.blue}25`}}>
+              {/* Card header */}
+              <div style={{marginBottom:7,paddingBottom:6,borderBottom:`1px solid ${C.bg}`}}>
+                <p style={{margin:0,fontSize:12,fontWeight:700,color:C.blue}}>
+                  +{fmt(extra)} EMI
+                </p>
+                <p style={{margin:"1px 0 0",fontSize:10,color:C.muted}}>
+                  New EMI: <strong style={{color:C.ink}}>{fmt(imp.newEmi)}</strong>
+                </p>
+              </div>
               {none ? (
                 <p style={{margin:0,fontSize:10,color:C.muted}}>🎉 Loan almost done!</p>
               ) : (
-                <>
-                  <p style={{margin:"2px 0",fontSize:10,color:C.green,fontWeight:600}}>
-                    ⏩ Closes {moSfx(imp.savedMonths)} earlier
+                <div style={{display:"flex",flexDirection:"column",gap:3}}>
+                  <p style={{margin:0,fontSize:10,color:C.ink}}>
+                    ⏩ Closes <strong style={{color:C.green}}>{moSfx(imp.savedMonths)}</strong> earlier
                   </p>
-                  <p style={{margin:"2px 0",fontSize:10,color:C.green,fontWeight:600}}>
-                    💰 Saves {fmt(imp.savedInterest)}
+                  <p style={{margin:0,fontSize:10,color:C.ink}}>
+                    💰 Saves <strong style={{color:C.green}}>{fmt(imp.savedInterest)}</strong>
                   </p>
                   {imp.newCompletionDate&&(
-                    <p style={{margin:"3px 0 0",fontSize:9,color:C.purple}}>
-                      Finishes: {imp.newCompletionDate}
+                    <p style={{margin:"2px 0 0",fontSize:9,color:C.purple,fontWeight:600}}>
+                      📅 {imp.newCompletionDate}
                     </p>
                   )}
-                </>
+                </div>
               )}
             </div>
           );
@@ -310,34 +332,40 @@ function InsightPanel({loan, baseTotals}) {
       </div>
 
       {/* Custom extra EMI */}
-      <div style={{marginTop:12,padding:"10px 12px",background:"#fff",
+      <div style={{marginTop:12,padding:"12px 12px",background:"#fff",
                    borderRadius:9,border:`1px solid ${C.border}`}}>
-        <Lbl>Enter Custom Extra EMI Amount (₹)</Lbl>
+        <p style={{margin:"0 0 6px",fontSize:11,fontWeight:700,color:C.ink}}>
+          Custom Extra EMI
+        </p>
         <input type="number" placeholder="e.g. 1500" value={customExtra}
           onChange={e=>setCustomExtra(e.target.value)}
           style={inp({fontFamily:"Georgia,serif",fontSize:14})}/>
 
         {customImp&&customImp.savedMonths>0&&(
-          <>
-            <div style={{marginTop:8,display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
+          <div style={{marginTop:10,padding:"10px 12px",borderRadius:8,
+                       background:"#EFF6FF",border:`1px solid ${C.blue}22`}}>
+            <p style={{margin:"0 0 8px",fontSize:11,fontWeight:700,color:C.blue}}>
+              With {fmt(customAmt)} extra EMI:
+            </p>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
               {[
-                {label:"New EMI",        value:fmt(customImp.newEmi),          color:C.ink},
-                {label:"Closes Earlier", value:moSfx(customImp.savedMonths),   color:C.green},
-                {label:"Interest Saved", value:fmt(customImp.savedInterest),   color:C.green},
+                {label:"New EMI",        value:fmt(customImp.newEmi),        color:C.ink},
+                {label:"Closes Earlier", value:moSfx(customImp.savedMonths), color:C.green},
+                {label:"Interest Saved", value:fmt(customImp.savedInterest), color:C.green},
+                ...(customImp.newCompletionDate
+                  ? [{label:"Finish Date", value:customImp.newCompletionDate, color:C.purple}]
+                  : []),
               ].map(r=>(
-                <div key={r.label} style={{textAlign:"center",padding:"6px 4px",background:C.bg,borderRadius:7}}>
-                  <p style={{margin:0,fontSize:9,color:C.muted,textTransform:"uppercase",letterSpacing:"0.7px",fontWeight:600}}>{r.label}</p>
-                  <p style={{margin:"2px 0 0",fontSize:12,fontWeight:700,color:r.color,fontFamily:"Georgia,serif"}}>{r.value}</p>
+                <div key={r.label} style={{padding:"6px 8px",background:"#fff",
+                                           borderRadius:7,border:`1px solid ${C.border}`}}>
+                  <p style={{margin:0,fontSize:9,color:C.muted,textTransform:"uppercase",
+                             letterSpacing:"0.7px",fontWeight:600}}>{r.label}</p>
+                  <p style={{margin:"2px 0 0",fontSize:12,fontWeight:700,
+                             color:r.color,fontFamily:"Georgia,serif"}}>{r.value}</p>
                 </div>
               ))}
             </div>
-            {customImp.newCompletionDate&&(
-              <p style={{margin:"7px 0 0",fontSize:10,color:C.purple}}>
-                📅 With ₹{Number(customExtra).toLocaleString("en-IN")} extra EMI — loan finishes in{" "}
-                <strong>{customImp.newCompletionDate}</strong>
-              </p>
-            )}
-          </>
+          </div>
         )}
         {customAmt>0&&customImp&&customImp.savedMonths===0&&(
           <p style={{margin:"6px 0 0",fontSize:10,color:C.muted}}>
@@ -400,26 +428,32 @@ function LoanCard({loan, onEdit, onDelete}) {
 
         {/* Progress vs ORIGINAL PRINCIPAL */}
         <div style={{marginBottom:12}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:5}}>
-            <div>
-              <p style={{margin:0,fontSize:11,fontWeight:600,color:C.ink}}>Repayment Progress</p>
-              <p style={{margin:"1px 0 0",fontSize:10,color:C.muted}}>
-                <span style={{color:barColor,fontWeight:700}}>{fmt(t.paidAmt)}</span>
-                {" paid of "}
-                <span style={{fontWeight:600}}>{fmt(loan.principal)}</span>
-                {" loan"}
-              </p>
-            </div>
-            <div style={{textAlign:"right"}}>
-              <p style={{margin:0,fontSize:17,fontWeight:700,color:barColor,fontFamily:"Georgia,serif"}}>{t.paidPct}%</p>
-              <p style={{margin:0,fontSize:9,color:C.muted}}>completed</p>
-            </div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+            <p style={{margin:0,fontSize:11,fontWeight:600,color:C.ink}}>Repayment Progress</p>
+            <p style={{margin:0,fontSize:17,fontWeight:700,color:barColor,fontFamily:"Georgia,serif"}}>
+              {t.paidPct}%<span style={{fontSize:9,fontWeight:400,color:C.muted,marginLeft:3}}>done</span>
+            </p>
           </div>
           <Bar pct={t.paidPct} color={barColor} height={7}/>
-          <div style={{display:"flex",justifyContent:"space-between",marginTop:3}}>
-            <p style={{margin:0,fontSize:9,color:C.muted}}>{moSfx(t.monthsLeft)} remaining</p>
-            <p style={{margin:0,fontSize:9,color:C.muted}}>Outstanding: {fmt(t.outstanding)}</p>
+          <div style={{display:"flex",justifyContent:"space-between",marginTop:6,gap:8}}>
+            <div style={{flex:1,background:"#F0FDF4",borderRadius:7,padding:"6px 8px",
+                         border:"1px solid #BBF7D0",textAlign:"center"}}>
+              <p style={{margin:0,fontSize:9,color:C.green,textTransform:"uppercase",
+                         letterSpacing:"0.7px",fontWeight:700}}>Paid</p>
+              <p style={{margin:"2px 0 0",fontSize:12,fontWeight:700,color:C.green,
+                         fontFamily:"Georgia,serif"}}>{fmt(t.paidAmt)}</p>
+            </div>
+            <div style={{flex:1,background:"#FFF1F2",borderRadius:7,padding:"6px 8px",
+                         border:"1px solid #FECACA",textAlign:"center"}}>
+              <p style={{margin:0,fontSize:9,color:C.red,textTransform:"uppercase",
+                         letterSpacing:"0.7px",fontWeight:700}}>Remaining</p>
+              <p style={{margin:"2px 0 0",fontSize:12,fontWeight:700,color:C.red,
+                         fontFamily:"Georgia,serif"}}>{fmt(t.outstanding)}</p>
+            </div>
           </div>
+          <p style={{margin:"5px 0 0",fontSize:9,color:C.muted,textAlign:"center"}}>
+            {moSfx(t.monthsLeft)} left · Original loan: {fmt(loan.principal)}
+          </p>
         </div>
 
         {/* Toggle insight */}
