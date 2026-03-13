@@ -1,151 +1,154 @@
-// ─── LoansTab.jsx — Improved UX: amount-in-words, year+month tenure,
-//     live EMI preview, total payment, rich progress, completion date ────────
+// ─── LoansTab.jsx ─────────────────────────────────────────────────────────────
+// Fixes: tenure years-only, correct interest-saved via amortization,
+// multi-option insights (+500/+1000/+2000), custom extra EMI, completion dates,
+// progress vs original principal, clean wording.
+// ──────────────────────────────────────────────────────────────────────────────
 import { useState, useRef, useEffect } from "react";
 import { calcEMI, calcLoanTotals, calcEarlyClosureImpact } from "./useAppData";
 
-const C   = {ink:"#1C1917",muted:"#78716C",border:"#E7E5E0",bg:"#F7F5F0",red:"#DC2626",green:"#16A34A",amber:"#D97706",blue:"#2563EB",purple:"#7C3AED"};
-const fmt = (n) => `₹${Math.abs(Math.round(n)).toLocaleString("en-IN")}`;
-const Lbl = ({children,req}) => (
+const C = { ink:"#1C1917", muted:"#78716C", border:"#E7E5E0", bg:"#F7F5F0",
+            red:"#DC2626", green:"#16A34A", amber:"#D97706", blue:"#2563EB", purple:"#7C3AED" };
+const fmt   = (n) => `₹${Math.abs(Math.round(n)).toLocaleString("en-IN")}`;
+const moSfx = (n) => `${n} month${n !== 1 ? "s" : ""}`;
+
+const LOAN_TYPES = ["Home Loan","Car Loan","Personal Loan","Gold Loan",
+                    "Education Loan","Business Loan","Two-Wheeler Loan","Other"];
+const LOAN_ICON  = { "Home Loan":"🏠","Car Loan":"🚗","Personal Loan":"💳","Gold Loan":"🥇",
+                     "Education Loan":"🎓","Business Loan":"🏢","Two-Wheeler Loan":"🛵","Other":"🏦" };
+const QUICK_EXTRAS = [500, 1000, 2000];
+
+const LOAN_CSS = `
+  .mc-loan-grid       { display:grid; grid-template-columns:1fr; gap:14px; }
+  .mc-loan-form-grid  { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .mc-insight-opts    { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  @media(min-width:640px){ .mc-loan-grid { grid-template-columns:1fr 1fr; } }
+  @media(max-width:480px){
+    .mc-loan-form-grid { grid-template-columns:1fr; }
+    .mc-insight-opts   { grid-template-columns:1fr; }
+  }
+`;
+
+const inp = (x={}) => ({ width:"100%", padding:"9px 11px", borderRadius:8,
+  border:`1.5px solid ${C.border}`, fontFamily:"inherit",
+  fontSize:13, background:"#fff", outline:"none", boxSizing:"border-box", ...x });
+
+const Lbl = ({children, req}) => (
   <p style={{fontSize:10,color:C.muted,textTransform:"uppercase",letterSpacing:"1px",fontWeight:700,margin:"0 0 4px"}}>
     {children}{req&&<span style={{color:C.red}}> *</span>}
   </p>
 );
 
-const LOAN_TYPES = ["Home Loan","Car Loan","Personal Loan","Gold Loan","Education Loan","Business Loan","Two-Wheeler Loan","Other"];
-const LOAN_ICON  = {"Home Loan":"🏠","Car Loan":"🚗","Personal Loan":"💳","Gold Loan":"🥇","Education Loan":"🎓","Business Loan":"🏢","Two-Wheeler Loan":"🛵","Other":"🏦"};
-
-const LOAN_CSS = `
-  .mc-loan-grid { display:grid; grid-template-columns:1fr; gap:14px; }
-  @media(min-width:640px){ .mc-loan-grid { grid-template-columns:1fr 1fr; } }
-  .mc-loan-form-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-  @media(max-width:480px){ .mc-loan-form-grid { grid-template-columns:1fr; } }
-`;
-
-const inp = (extra={}) => ({
-  width:"100%", padding:"9px 11px", borderRadius:8,
-  border:`1.5px solid ${C.border}`, fontFamily:"inherit",
-  fontSize:13, background:"#fff", outline:"none",
-  boxSizing:"border-box", ...extra,
-});
-
-// ── Amount in Indian words ────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function amountInWords(n) {
-  if (!n || isNaN(n) || n <= 0) return "";
-  const num = Math.round(+n);
-  if (num >= 1e7)  return `${(num/1e7).toFixed(num%1e7===0?0:2)} Crore Rupees`;
-  if (num >= 1e5)  return `${(num/1e5).toFixed(num%1e5===0?0:2)} Lakh Rupees`;
-  if (num >= 1e3)  return `${(num/1e3).toFixed(num%1e3===0?0:1)} Thousand Rupees`;
-  return `${num} Rupees`;
+  if (!n || isNaN(n) || +n <= 0) return "";
+  const v = Math.round(+n);
+  if (v >= 1e7) return `${(v/1e7).toFixed(v%1e7===0?0:2)} Crore Rupees`;
+  if (v >= 1e5) return `${(v/1e5).toFixed(v%1e5===0?0:2)} Lakh Rupees`;
+  if (v >= 1e3) return `${(v/1e3).toFixed(v%1e3===0?0:1)} Thousand Rupees`;
+  return `${v} Rupees`;
 }
-
-// ── Tenure display helper ─────────────────────────────────────────────────
 function tenureLabel(months) {
   if (!months) return "";
-  const y = Math.floor(months / 12);
-  const m = months % 12;
+  const y = Math.floor(months/12), m = months%12;
   if (y && m) return `${y} yr ${m} mo`;
   if (y)      return `${y} year${y>1?"s":""}`;
   return `${m} month${m>1?"s":""}`;
 }
-
-// ── Completion date from start + tenure ──────────────────────────────────
-function completionDate(startDate, tenureMonths) {
+function completionStr(startDate, tenureMonths) {
   if (!startDate || !tenureMonths) return null;
   const d = new Date(startDate);
   d.setMonth(d.getMonth() + +tenureMonths);
   return d.toLocaleDateString("en-IN", {month:"long", year:"numeric"});
 }
 
-// ── 3-dot menu ────────────────────────────────────────────────────────────
-function DotMenu({onEdit,onDelete}) {
-  const [open,setOpen] = useState(false);
+// ── DotMenu ───────────────────────────────────────────────────────────────────
+function DotMenu({onEdit, onDelete}) {
+  const [open, setOpen] = useState(false);
   const ref = useRef(null);
-  useEffect(()=>{
-    if(!open) return;
-    const fn = e => { if(ref.current&&!ref.current.contains(e.target)) setOpen(false); };
-    document.addEventListener("mousedown",fn);
-    return ()=>document.removeEventListener("mousedown",fn);
-  },[open]);
+  useEffect(() => {
+    if (!open) return;
+    const fn = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", fn);
+    return () => document.removeEventListener("mousedown", fn);
+  }, [open]);
+  const btn = (danger) => ({
+    display:"block", width:"100%", padding:"10px 14px", textAlign:"left",
+    background:"none", border:"none", fontSize:13, color:danger?C.red:C.ink,
+    cursor:"pointer", fontFamily:"inherit", fontWeight:500,
+  });
   return (
     <div ref={ref} style={{position:"relative",flexShrink:0}}>
       <button onClick={()=>setOpen(p=>!p)}
-        style={{width:28,height:28,borderRadius:6,border:`1px solid ${C.border}`,background:open?C.bg:"#fff",color:C.muted,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"inherit",lineHeight:1}}>⋮</button>
-      {open&&(
-        <div style={{position:"absolute",right:0,top:32,zIndex:60,background:"#fff",border:`1px solid ${C.border}`,borderRadius:10,boxShadow:"0 4px 20px rgba(0,0,0,0.12)",minWidth:110,overflow:"hidden"}}>
-          <button onClick={()=>{setOpen(false);onEdit();}}
-            style={{display:"block",width:"100%",padding:"10px 14px",textAlign:"left",background:"none",border:"none",fontSize:13,color:C.ink,cursor:"pointer",fontFamily:"inherit",fontWeight:500}}
-            onMouseEnter={e=>e.currentTarget.style.background=C.bg} onMouseLeave={e=>e.currentTarget.style.background="none"}>✏️ Edit</button>
+        style={{width:28,height:28,borderRadius:6,border:`1px solid ${C.border}`,
+                background:open?C.bg:"#fff",color:C.muted,cursor:"pointer",fontSize:16,
+                display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"inherit",lineHeight:1}}>⋮</button>
+      {open && (
+        <div style={{position:"absolute",right:0,top:32,zIndex:60,background:"#fff",
+                     border:`1px solid ${C.border}`,borderRadius:10,
+                     boxShadow:"0 4px 20px rgba(0,0,0,0.12)",minWidth:110,overflow:"hidden"}}>
+          <button style={btn(false)} onClick={()=>{setOpen(false);onEdit();}}
+            onMouseEnter={e=>e.currentTarget.style.background=C.bg}
+            onMouseLeave={e=>e.currentTarget.style.background="none"}>✏️ Edit</button>
           <div style={{height:1,background:C.border,margin:"0 8px"}}/>
-          <button onClick={()=>{setOpen(false);onDelete();}}
-            style={{display:"block",width:"100%",padding:"10px 14px",textAlign:"left",background:"none",border:"none",fontSize:13,color:C.red,cursor:"pointer",fontFamily:"inherit",fontWeight:500}}
-            onMouseEnter={e=>e.currentTarget.style.background="#FFF1F2"} onMouseLeave={e=>e.currentTarget.style.background="none"}>🗑 Delete</button>
+          <button style={btn(true)} onClick={()=>{setOpen(false);onDelete();}}
+            onMouseEnter={e=>e.currentTarget.style.background="#FFF1F2"}
+            onMouseLeave={e=>e.currentTarget.style.background="none"}>🗑 Delete</button>
         </div>
       )}
     </div>
   );
 }
 
-// ── Progress bar ──────────────────────────────────────────────────────────
-function Bar({pct,color,height=5}) {
+function Bar({pct, color, height=5}) {
   return (
     <div style={{height,borderRadius:99,background:C.border,overflow:"hidden"}}>
-      <div style={{height:"100%",borderRadius:99,width:`${Math.min(pct,100)}%`,background:color,transition:"width 0.5s"}}/>
+      <div style={{height:"100%",borderRadius:99,width:`${Math.min(pct,100)}%`,background:color,transition:"width 0.6s"}}/>
     </div>
   );
 }
 
-// ═════════════════════════════════════════════════════════════════════════
-// LOAN FORM — years+months tenure, amount-in-words, live EMI preview
-// ═════════════════════════════════════════════════════════════════════════
+// ═════════════════════════════════════════════════════════════════════════════
+// LOAN FORM
+// ═════════════════════════════════════════════════════════════════════════════
 function LoanForm({initial, onSave, onCancel}) {
-  const today = new Date().toISOString().split("T")[0];
-
-  // Split stored tenureMonths back into years+months for display
-  const initYears  = initial?.tenureMonths ? Math.floor(initial.tenureMonths/12) : "";
-  const initMonths = initial?.tenureMonths ? initial.tenureMonths % 12 : "";
+  const today    = new Date().toISOString().split("T")[0];
+  const initYrs  = initial?.tenureMonths ? Math.floor(initial.tenureMonths/12) : "";
+  const initMos  = initial?.tenureMonths ? initial.tenureMonths%12 : "";
 
   const [f, setF] = useState({
-    name:       initial?.name      || "Home Loan",
-    principal:  initial?.principal || "",
-    rate:       initial?.rate      || "",
-    tenureYears:  String(initYears),
-    tenureMonths: String(initMonths),
-    emiOverride:  initial?.emi && initial.emi !== calcEMI(initial.principal,initial.rate,initial.tenureMonths)
-                    ? String(initial.emi) : "",
-    startDate:  initial?.startDate || today,
+    name:        initial?.name      || "Home Loan",
+    principal:   initial?.principal || "",
+    rate:        initial?.rate      || "",
+    tenureYears: String(initYrs),
+    tenureMos:   String(initMos),
+    emiOverride: "",
+    startDate:   initial?.startDate || today,
   });
   const set = (k,v) => setF(p=>({...p,[k]:v}));
 
-  // Total months from years + months inputs
-  const totalMonths = (parseInt(f.tenureYears)||0)*12 + (parseInt(f.tenureMonths)||0);
-  const autoEmi     = calcEMI(+f.principal, +f.rate, totalMonths);
-  const displayEmi  = +f.emiOverride || autoEmi;
-  const words       = amountInWords(f.principal);
-
-  const valid = f.name && +f.principal > 0 && +f.rate > 0 && totalMonths > 0;
+  // FIX: blank months → treat as 0
+  const totalMonths = (parseInt(f.tenureYears)||0)*12 + (parseInt(f.tenureMos)||0);
+  const autoEmi  = calcEMI(+f.principal, +f.rate, totalMonths);
+  const useEmi   = +f.emiOverride > 0 ? +f.emiOverride : autoEmi;
+  const words    = amountInWords(f.principal);
+  const endDate  = completionStr(f.startDate, totalMonths);
+  const valid    = f.name && +f.principal>0 && +f.rate>0 && totalMonths>0;
+  const totalInt = Math.max(0, useEmi*totalMonths - +f.principal);
 
   const save = () => {
     if (!valid) return;
-    onSave({
-      name: f.name,
-      principal: +f.principal,
-      rate: +f.rate,
-      tenureMonths: totalMonths,
-      emi: displayEmi,
-      startDate: f.startDate,
-    });
+    onSave({ name:f.name, principal:+f.principal, rate:+f.rate,
+             tenureMonths:totalMonths, emi:useEmi, startDate:f.startDate });
   };
 
   return (
     <div style={{background:C.bg,borderRadius:12,padding:16,border:`1px solid ${C.border}`,marginBottom:16}}>
       <p style={{fontSize:13,fontWeight:700,color:C.ink,margin:"0 0 14px"}}>
-        {initial ? "✏️ Edit Loan" : "🏦 Add New Loan"}
+        {initial?"✏️ Edit Loan":"🏦 Add New Loan"}
       </p>
       <style>{LOAN_CSS}</style>
-
       <div className="mc-loan-form-grid">
 
-        {/* Loan type */}
         <div>
           <Lbl req>Loan Type</Lbl>
           <select value={f.name} onChange={e=>set("name",e.target.value)} style={inp()}>
@@ -153,51 +156,44 @@ function LoanForm({initial, onSave, onCancel}) {
           </select>
         </div>
 
-        {/* Loan amount + words */}
         <div>
           <Lbl req>Loan Amount (₹)</Lbl>
           <input type="number" placeholder="e.g. 500000" value={f.principal}
             onChange={e=>set("principal",e.target.value)}
             style={inp({fontFamily:"Georgia,serif",fontSize:15})}/>
-          {words && (
-            <p style={{margin:"4px 0 0",fontSize:11,color:C.blue,fontWeight:600}}>
-              📝 {words}
-            </p>
-          )}
+          {words&&<p style={{margin:"4px 0 0",fontSize:11,color:C.blue,fontWeight:600}}>📝 {words}</p>}
         </div>
 
-        {/* Interest rate */}
         <div>
           <Lbl req>Interest Rate (% p.a.)</Lbl>
           <input type="number" step="0.1" placeholder="e.g. 8.5" value={f.rate}
             onChange={e=>set("rate",e.target.value)} style={inp()}/>
         </div>
 
-        {/* Tenure — years + months side by side */}
+        {/* Tenure: years + months, months optional */}
         <div>
           <Lbl req>Loan Tenure</Lbl>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
             <div>
-              <input type="number" min="0" max="30" placeholder="Years" value={f.tenureYears}
-                onChange={e=>set("tenureYears",e.target.value)} style={inp()}/>
+              <input type="number" min="0" max="30" placeholder="Years"
+                value={f.tenureYears} onChange={e=>set("tenureYears",e.target.value)} style={inp()}/>
               <p style={{margin:"2px 0 0",fontSize:9,color:C.muted,textAlign:"center"}}>Years</p>
             </div>
             <div>
-              <input type="number" min="0" max="11" placeholder="Months" value={f.tenureMonths}
-                onChange={e=>set("tenureMonths",e.target.value)} style={inp()}/>
-              <p style={{margin:"2px 0 0",fontSize:9,color:C.muted,textAlign:"center"}}>Months</p>
+              <input type="number" min="0" max="11" placeholder="0"
+                value={f.tenureMos} onChange={e=>set("tenureMos",e.target.value)} style={inp()}/>
+              <p style={{margin:"2px 0 0",fontSize:9,color:C.muted,textAlign:"center"}}>Extra Months</p>
             </div>
           </div>
-          {totalMonths > 0 && (
-            <p style={{margin:"4px 0 0",fontSize:11,color:C.muted}}>= {totalMonths} months total</p>
-          )}
+          {totalMonths>0&&<p style={{margin:"4px 0 0",fontSize:11,color:C.muted}}>= {totalMonths} months total</p>}
         </div>
 
-        {/* EMI — auto-calculated, optional override */}
         <div>
           <Lbl>Monthly EMI (auto-calculated)</Lbl>
-          {autoEmi > 0 && (
-            <div style={{padding:"8px 10px",borderRadius:8,background:"#F0FDF4",border:"1px solid #86EFAC",marginBottom:6,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          {autoEmi>0&&(
+            <div style={{padding:"7px 10px",borderRadius:8,background:"#F0FDF4",
+                         border:"1px solid #86EFAC",marginBottom:6,
+                         display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <p style={{margin:0,fontSize:11,color:C.green,fontWeight:600}}>Calculated EMI</p>
               <p style={{margin:0,fontSize:15,fontWeight:700,color:C.green,fontFamily:"Georgia,serif"}}>{fmt(autoEmi)}/mo</p>
             </div>
@@ -206,32 +202,27 @@ function LoanForm({initial, onSave, onCancel}) {
             placeholder={autoEmi>0?`Override (default: ${fmt(autoEmi)})`:"Fill fields above"}
             onChange={e=>set("emiOverride",e.target.value)}
             style={inp({fontFamily:"Georgia,serif",fontSize:14})}/>
-          {f.emiOverride && +f.emiOverride !== autoEmi && autoEmi>0 && (
-            <p style={{margin:"3px 0 0",fontSize:10,color:C.amber}}>⚠ Using your override: {fmt(+f.emiOverride)}/mo</p>
+          {+f.emiOverride>0&&+f.emiOverride!==autoEmi&&autoEmi>0&&(
+            <p style={{margin:"3px 0 0",fontSize:10,color:C.amber}}>⚠ Using override: {fmt(+f.emiOverride)}/mo</p>
           )}
         </div>
 
-        {/* Start date */}
         <div>
           <Lbl>Loan Start Date</Lbl>
           <input type="date" value={f.startDate} max={today}
             onChange={e=>set("startDate",e.target.value)} style={inp()}/>
-          {f.startDate && totalMonths > 0 && (
-            <p style={{margin:"4px 0 0",fontSize:11,color:C.muted}}>
-              📅 Completes: {completionDate(f.startDate, totalMonths)}
-            </p>
-          )}
+          {endDate&&<p style={{margin:"4px 0 0",fontSize:11,color:C.purple}}>📅 Finishes: {endDate}</p>}
         </div>
-
       </div>
 
-      {/* Live summary before saving */}
-      {valid && displayEmi > 0 && (
-        <div style={{marginTop:12,padding:"10px 14px",borderRadius:10,background:"#fff",border:`1px solid ${C.border}`,display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
+      {/* Live summary */}
+      {valid&&useEmi>0&&(
+        <div style={{marginTop:12,padding:"10px 14px",borderRadius:10,background:"#fff",
+                     border:`1px solid ${C.border}`,display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
           {[
-            {label:"Monthly EMI",     value:fmt(displayEmi),                                    color:C.ink},
-            {label:"Total Interest",  value:fmt(displayEmi*totalMonths - +f.principal),           color:C.amber},
-            {label:"Total Payment",   value:fmt(displayEmi*totalMonths),                         color:C.red},
+            {label:"Monthly EMI",   value:fmt(useEmi),               color:C.ink},
+            {label:"Total Interest",value:fmt(totalInt),             color:C.amber},
+            {label:"Total Payment", value:fmt(+f.principal+totalInt),color:C.red},
           ].map(s=>(
             <div key={s.label} style={{textAlign:"center"}}>
               <p style={{margin:0,fontSize:9,color:C.muted,textTransform:"uppercase",letterSpacing:"0.7px",fontWeight:600}}>{s.label}</p>
@@ -243,42 +234,147 @@ function LoanForm({initial, onSave, onCancel}) {
 
       <div style={{display:"flex",gap:10,marginTop:14}}>
         <button onClick={onCancel}
-          style={{flex:1,padding:"9px",borderRadius:10,border:`1px solid ${C.border}`,background:"#fff",color:C.muted,fontFamily:"inherit",fontSize:13,cursor:"pointer"}}>
+          style={{flex:1,padding:"9px",borderRadius:10,border:`1px solid ${C.border}`,
+                  background:"#fff",color:C.muted,fontFamily:"inherit",fontSize:13,cursor:"pointer"}}>
           Cancel</button>
         <button onClick={save} disabled={!valid}
-          style={{flex:2,padding:"9px",borderRadius:10,border:"none",background:valid?C.ink:"#9CA3AF",color:"#fff",fontFamily:"inherit",fontSize:13,fontWeight:700,cursor:valid?"pointer":"not-allowed"}}>
+          style={{flex:2,padding:"9px",borderRadius:10,border:"none",
+                  background:valid?C.ink:"#9CA3AF",color:"#fff",fontFamily:"inherit",
+                  fontSize:13,fontWeight:700,cursor:valid?"pointer":"not-allowed"}}>
           Save Loan ✓</button>
       </div>
     </div>
   );
 }
 
-// ═════════════════════════════════════════════════════════════════════════
-// LOAN CARD — total payment, rich progress, completion date, insight
-// ═════════════════════════════════════════════════════════════════════════
-function LoanCard({loan, onEdit, onDelete}) {
-  const [showInsight, setShowInsight] = useState(false);
-  const t   = calcLoanTotals(loan);
-  const imp = calcEarlyClosureImpact(loan, 1000);
-
-  const icon        = LOAN_ICON[loan.name] || "🏦";
-  const barColor    = t.paidPct < 30 ? C.red : t.paidPct < 70 ? C.amber : C.green;
-  const endDate     = completionDate(loan.startDate, loan.tenureMonths);
+// ═════════════════════════════════════════════════════════════════════════════
+// INSIGHT PANEL  — multi-option + custom EMI
+// ═════════════════════════════════════════════════════════════════════════════
+function InsightPanel({loan, baseTotals}) {
+  const [customExtra, setCustomExtra] = useState("");
+  const baseEmi  = baseTotals.emi;
+  const endDate  = completionStr(loan.startDate, loan.tenureMonths);
+  const customAmt = parseInt(customExtra)||0;
+  const customImp = customAmt>0 ? calcEarlyClosureImpact(loan, customAmt) : null;
 
   return (
-    <div style={{background:"#fff",borderRadius:13,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",overflow:"hidden"}}>
+    <div style={{marginTop:10,padding:"12px 14px",borderRadius:10,
+                 background:"#EFF6FF",border:`1px solid ${C.blue}28`}}>
 
-      {/* ── Header ── */}
-      <div style={{padding:"12px 14px",borderBottom:`1px solid ${C.bg}`,display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+      {/* Current finish date */}
+      {endDate&&(
+        <p style={{margin:"0 0 10px",fontSize:11,color:C.muted}}>
+          📅 At current EMI of <strong>{fmt(baseEmi)}/mo</strong>: finishes{" "}
+          <strong style={{color:C.purple}}>{endDate}</strong>
+        </p>
+      )}
+
+      <p style={{margin:"0 0 8px",fontSize:12,fontWeight:700,color:C.ink}}>
+        💡 Pay extra EMI — Close Loan Faster
+      </p>
+
+      {/* Quick option cards */}
+      <div className="mc-insight-opts">
+        {QUICK_EXTRAS.map(extra=>{
+          const imp = calcEarlyClosureImpact(loan, extra);
+          const none = imp.savedMonths===0;
+          return (
+            <div key={extra} style={{background:"#fff",borderRadius:9,padding:"10px 10px",
+                                     border:`1px solid ${C.blue}22`}}>
+              <p style={{margin:"0 0 5px",fontSize:11,fontWeight:700,color:C.blue}}>
+                Pay ₹{extra.toLocaleString("en-IN")} extra
+              </p>
+              <p style={{margin:"0 0 3px",fontSize:10,color:C.muted}}>
+                New EMI: <strong style={{color:C.ink}}>{fmt(imp.newEmi)}</strong>
+              </p>
+              {none ? (
+                <p style={{margin:0,fontSize:10,color:C.muted}}>🎉 Loan almost done!</p>
+              ) : (
+                <>
+                  <p style={{margin:"2px 0",fontSize:10,color:C.green,fontWeight:600}}>
+                    ⏩ Closes {moSfx(imp.savedMonths)} earlier
+                  </p>
+                  <p style={{margin:"2px 0",fontSize:10,color:C.green,fontWeight:600}}>
+                    💰 Saves {fmt(imp.savedInterest)}
+                  </p>
+                  {imp.newCompletionDate&&(
+                    <p style={{margin:"3px 0 0",fontSize:9,color:C.purple}}>
+                      Finishes: {imp.newCompletionDate}
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Custom extra EMI */}
+      <div style={{marginTop:12,padding:"10px 12px",background:"#fff",
+                   borderRadius:9,border:`1px solid ${C.border}`}}>
+        <Lbl>Enter Custom Extra EMI Amount (₹)</Lbl>
+        <input type="number" placeholder="e.g. 1500" value={customExtra}
+          onChange={e=>setCustomExtra(e.target.value)}
+          style={inp({fontFamily:"Georgia,serif",fontSize:14})}/>
+
+        {customImp&&customImp.savedMonths>0&&(
+          <>
+            <div style={{marginTop:8,display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
+              {[
+                {label:"New EMI",        value:fmt(customImp.newEmi),          color:C.ink},
+                {label:"Closes Earlier", value:moSfx(customImp.savedMonths),   color:C.green},
+                {label:"Interest Saved", value:fmt(customImp.savedInterest),   color:C.green},
+              ].map(r=>(
+                <div key={r.label} style={{textAlign:"center",padding:"6px 4px",background:C.bg,borderRadius:7}}>
+                  <p style={{margin:0,fontSize:9,color:C.muted,textTransform:"uppercase",letterSpacing:"0.7px",fontWeight:600}}>{r.label}</p>
+                  <p style={{margin:"2px 0 0",fontSize:12,fontWeight:700,color:r.color,fontFamily:"Georgia,serif"}}>{r.value}</p>
+                </div>
+              ))}
+            </div>
+            {customImp.newCompletionDate&&(
+              <p style={{margin:"7px 0 0",fontSize:10,color:C.purple}}>
+                📅 With ₹{Number(customExtra).toLocaleString("en-IN")} extra EMI — loan finishes in{" "}
+                <strong>{customImp.newCompletionDate}</strong>
+              </p>
+            )}
+          </>
+        )}
+        {customAmt>0&&customImp&&customImp.savedMonths===0&&(
+          <p style={{margin:"6px 0 0",fontSize:10,color:C.muted}}>
+            🎉 Loan is almost fully repaid — great work!
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// LOAN CARD
+// ═════════════════════════════════════════════════════════════════════════════
+function LoanCard({loan, onEdit, onDelete}) {
+  const [showInsight, setShowInsight] = useState(false);
+  const t        = calcLoanTotals(loan);
+  const icon     = LOAN_ICON[loan.name]||"🏦";
+  const barColor = t.paidPct<30?C.red:t.paidPct<70?C.amber:C.green;
+  const endDate  = completionStr(loan.startDate, loan.tenureMonths);
+
+  return (
+    <div style={{background:"#fff",borderRadius:13,border:`1px solid ${C.border}`,
+                 boxShadow:"0 1px 4px rgba(0,0,0,0.06)",overflow:"hidden"}}>
+
+      {/* Header */}
+      <div style={{padding:"12px 14px",borderBottom:`1px solid ${C.bg}`,
+                   display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
         <div style={{display:"flex",gap:10,alignItems:"center",flex:1,minWidth:0}}>
-          <div style={{width:40,height:40,borderRadius:10,background:`${C.blue}12`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>
-            {icon}
-          </div>
+          <div style={{width:40,height:40,borderRadius:10,background:`${C.blue}12`,
+                       display:"flex",alignItems:"center",justifyContent:"center",
+                       fontSize:20,flexShrink:0}}>{icon}</div>
           <div style={{minWidth:0}}>
             <p style={{margin:0,fontSize:13,fontWeight:700,color:C.ink}}>{loan.name}</p>
             <p style={{margin:0,fontSize:10,color:C.muted}}>
               {loan.rate}% p.a. · {tenureLabel(loan.tenureMonths)}
-              {endDate && <span style={{color:C.purple}}> · until {endDate}</span>}
+              {endDate&&<span style={{color:C.purple}}> · finishes {endDate}</span>}
             </p>
           </div>
         </div>
@@ -287,13 +383,13 @@ function LoanCard({loan, onEdit, onDelete}) {
 
       <div style={{padding:"12px 14px"}}>
 
-        {/* ── 4 metric tiles: Outstanding, EMI, Interest, Total Payment ── */}
+        {/* 4 metric tiles */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7,marginBottom:12}}>
           {[
-            {label:"Outstanding",   value:fmt(t.outstanding),              color:C.red},
-            {label:"Monthly EMI",   value:fmt(t.emi),                      color:C.ink},
-            {label:"Total Interest",value:fmt(t.totalInterest),            color:C.amber},
-            {label:"Total Payment", value:fmt(t.totalPayable),             color:C.purple},
+            {label:"Outstanding",   value:fmt(t.outstanding),   color:C.red},
+            {label:"Monthly EMI",   value:fmt(t.emi),           color:C.ink},
+            {label:"Total Interest",value:fmt(t.totalInterest), color:C.amber},
+            {label:"Total Payment", value:fmt(t.totalPayable),  color:C.purple},
           ].map(m=>(
             <div key={m.label} style={{background:C.bg,borderRadius:8,padding:"8px 10px"}}>
               <p style={{margin:0,fontSize:9,color:C.muted,textTransform:"uppercase",letterSpacing:"0.7px",fontWeight:600}}>{m.label}</p>
@@ -302,7 +398,7 @@ function LoanCard({loan, onEdit, onDelete}) {
           ))}
         </div>
 
-        {/* ── Progress: paid vs total payable ── */}
+        {/* Progress vs ORIGINAL PRINCIPAL */}
         <div style={{marginBottom:12}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:5}}>
             <div>
@@ -310,88 +406,53 @@ function LoanCard({loan, onEdit, onDelete}) {
               <p style={{margin:"1px 0 0",fontSize:10,color:C.muted}}>
                 <span style={{color:barColor,fontWeight:700}}>{fmt(t.paidAmt)}</span>
                 {" paid of "}
-                <span style={{fontWeight:600}}>{fmt(t.totalPayable)}</span>
+                <span style={{fontWeight:600}}>{fmt(loan.principal)}</span>
+                {" loan"}
               </p>
             </div>
             <div style={{textAlign:"right"}}>
-              <p style={{margin:0,fontSize:16,fontWeight:700,color:barColor,fontFamily:"Georgia,serif"}}>{t.paidPct}%</p>
+              <p style={{margin:0,fontSize:17,fontWeight:700,color:barColor,fontFamily:"Georgia,serif"}}>{t.paidPct}%</p>
               <p style={{margin:0,fontSize:9,color:C.muted}}>completed</p>
             </div>
           </div>
           <Bar pct={t.paidPct} color={barColor} height={7}/>
           <div style={{display:"flex",justifyContent:"space-between",marginTop:3}}>
-            <p style={{margin:0,fontSize:9,color:C.muted}}>
-              {t.monthsLeft} month{t.monthsLeft!==1?"s":""} remaining
-            </p>
-            <p style={{margin:0,fontSize:9,color:C.muted}}>
-              Loan amount: {fmt(loan.principal)}
-            </p>
+            <p style={{margin:0,fontSize:9,color:C.muted}}>{moSfx(t.monthsLeft)} remaining</p>
+            <p style={{margin:0,fontSize:9,color:C.muted}}>Outstanding: {fmt(t.outstanding)}</p>
           </div>
         </div>
 
-        {/* ── Close Loan Faster button ── */}
+        {/* Toggle insight */}
         <button onClick={()=>setShowInsight(p=>!p)}
-          style={{
-            width:"100%", padding:"8px", borderRadius:8,
-            border:`1.5px solid ${C.blue}44`, background: showInsight?`${C.blue}12`:`${C.blue}06`,
-            color:C.blue, fontFamily:"inherit", fontSize:12, fontWeight:700,
-            cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:6,
-          }}>
+          style={{width:"100%",padding:"8px",borderRadius:8,
+                  border:`1.5px solid ${C.blue}44`,
+                  background:showInsight?`${C.blue}12`:`${C.blue}06`,
+                  color:C.blue,fontFamily:"inherit",fontSize:12,fontWeight:700,
+                  cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
           <span>💡</span>
-          <span>{showInsight ? "Hide Insight" : "Close Loan Faster"}</span>
+          <span>{showInsight?"Hide Insight":"Close Loan Faster"}</span>
         </button>
 
-        {/* ── Insight panel ── */}
-        {showInsight && (
-          <div style={{marginTop:10,padding:"12px 14px",borderRadius:10,background:"#EFF6FF",border:`1px solid ${C.blue}30`}}>
-            {imp.savedMonths > 0 ? (
-              <>
-                <p style={{margin:"0 0 10px",fontSize:12,color:C.ink,lineHeight:1.6}}>
-                  If you increase your EMI by{" "}
-                  <strong style={{color:C.blue}}>₹1,000/month</strong>{" "}
-                  (new EMI: <strong>{fmt(t.emi+1000)}</strong>):
-                </p>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
-                  {[
-                    {label:"Close Earlier",    value:`${imp.savedMonths} month${imp.savedMonths!==1?"s":""}`, color:C.green, icon:"⏩"},
-                    {label:"Interest Saved",   value:fmt(imp.savedInterest),                                  color:C.green, icon:"💰"},
-                  ].map(r=>(
-                    <div key={r.label} style={{background:"#fff",borderRadius:8,padding:"8px 10px",border:`1px solid ${C.blue}22`}}>
-                      <p style={{margin:0,fontSize:9,color:C.muted,textTransform:"uppercase",letterSpacing:"0.7px",fontWeight:600}}>{r.icon} {r.label}</p>
-                      <p style={{margin:"3px 0 0",fontSize:15,fontWeight:700,color:r.color,fontFamily:"Georgia,serif"}}>{r.value}</p>
-                    </div>
-                  ))}
-                </div>
-                <p style={{margin:0,fontSize:10,color:C.muted,lineHeight:1.5}}>
-                  Even a small increase in EMI reduces the principal faster, cutting total interest significantly over time.
-                </p>
-              </>
-            ) : (
-              <p style={{margin:0,fontSize:12,color:C.muted}}>
-                🎉 This loan is almost fully repaid — great work!
-              </p>
-            )}
-          </div>
-        )}
+        {showInsight&&<InsightPanel loan={loan} baseTotals={t}/>}
       </div>
     </div>
   );
 }
 
-// ═════════════════════════════════════════════════════════════════════════
-// MAIN LOANS TAB
-// ═════════════════════════════════════════════════════════════════════════
+// ═════════════════════════════════════════════════════════════════════════════
+// MAIN
+// ═════════════════════════════════════════════════════════════════════════════
 export default function LoansTab({loans, onAdd, onUpdate, onDelete}) {
   const [showForm, setShowForm] = useState(false);
   const [editId,   setEditId]   = useState(null);
 
-  const totalEmi         = loans.reduce((s,l)=>s+calcLoanTotals(l).emi, 0);
-  const totalOutstanding = loans.reduce((s,l)=>s+calcLoanTotals(l).outstanding, 0);
-  const totalInterest    = loans.reduce((s,l)=>s+calcLoanTotals(l).totalInterest, 0);
+  const totalEmi         = loans.reduce((s,l)=>s+calcLoanTotals(l).emi,0);
+  const totalOutstanding = loans.reduce((s,l)=>s+calcLoanTotals(l).outstanding,0);
+  const totalInterest    = loans.reduce((s,l)=>s+calcLoanTotals(l).totalInterest,0);
 
   const handleSave = (data) => {
-    if (editId !== null) { onUpdate(editId, data); setEditId(null); }
-    else                 { onAdd(data); }
+    if (editId!==null) { onUpdate(editId,data); setEditId(null); }
+    else               { onAdd(data); }
     setShowForm(false);
   };
 
@@ -399,18 +460,19 @@ export default function LoansTab({loans, onAdd, onUpdate, onDelete}) {
     <div>
       <style>{LOAN_CSS}</style>
 
-      {/* ── Summary strip ── */}
-      {loans.length > 0 && (
+      {loans.length>0&&(
         <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:14}}>
           {[
-            {label:"Total Outstanding", value:fmt(totalOutstanding), color:C.red,   icon:"💰"},
-            {label:"Monthly EMI",       value:fmt(totalEmi),         color:C.ink,   icon:"📅"},
-            {label:"Total Interest",    value:fmt(totalInterest),    color:C.amber, icon:"📈"},
+            {label:"Total Outstanding",value:fmt(totalOutstanding),color:C.red,  icon:"💰"},
+            {label:"Monthly EMI",      value:fmt(totalEmi),        color:C.ink,  icon:"📅"},
+            {label:"Total Interest",   value:fmt(totalInterest),   color:C.amber,icon:"📈"},
           ].map(s=>(
-            <div key={s.label} style={{background:"#fff",borderRadius:11,border:`1px solid ${C.border}`,padding:"10px 12px",boxShadow:"0 1px 2px rgba(0,0,0,0.04)"}}>
+            <div key={s.label} style={{background:"#fff",borderRadius:11,border:`1px solid ${C.border}`,
+                                       padding:"10px 12px",boxShadow:"0 1px 2px rgba(0,0,0,0.04)"}}>
               <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:2}}>
                 <span style={{fontSize:12}}>{s.icon}</span>
-                <p style={{margin:0,fontSize:9,color:C.muted,textTransform:"uppercase",letterSpacing:"0.8px",fontWeight:600,lineHeight:1.2}}>{s.label}</p>
+                <p style={{margin:0,fontSize:9,color:C.muted,textTransform:"uppercase",
+                            letterSpacing:"0.8px",fontWeight:600,lineHeight:1.2}}>{s.label}</p>
               </div>
               <p style={{margin:0,fontSize:15,fontWeight:700,color:s.color,fontFamily:"Georgia,serif"}}>{s.value}</p>
             </div>
@@ -418,26 +480,26 @@ export default function LoansTab({loans, onAdd, onUpdate, onDelete}) {
         </div>
       )}
 
-      {/* ── Add button / form ── */}
-      {(showForm || editId!==null) ? (
-        <LoanForm
-          key={editId ?? "new"}
-          initial={editId!==null ? loans.find(l=>l.id===editId) : undefined}
+      {(showForm||editId!==null) ? (
+        <LoanForm key={editId??"new"}
+          initial={editId!==null?loans.find(l=>l.id===editId):undefined}
           onSave={handleSave}
-          onCancel={()=>{setShowForm(false);setEditId(null);}}
-        />
+          onCancel={()=>{setShowForm(false);setEditId(null);}}/>
       ) : (
         <button onClick={()=>setShowForm(true)}
-          style={{width:"100%",padding:"10px",borderRadius:10,border:`1.5px dashed ${C.border}`,background:"transparent",color:C.muted,fontSize:13,fontFamily:"inherit",cursor:"pointer",fontWeight:600,marginBottom:14}}
+          style={{width:"100%",padding:"10px",borderRadius:10,
+                  border:`1.5px dashed ${C.border}`,background:"transparent",
+                  color:C.muted,fontSize:13,fontFamily:"inherit",
+                  cursor:"pointer",fontWeight:600,marginBottom:14}}
           onMouseEnter={e=>{e.currentTarget.style.borderColor=C.ink;e.currentTarget.style.color=C.ink;}}
           onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.color=C.muted;}}>
           + Add Loan
         </button>
       )}
 
-      {/* ── Loan cards ── */}
-      {loans.length === 0 && !showForm ? (
-        <div style={{background:"#fff",borderRadius:14,border:`1px solid ${C.border}`,textAlign:"center",padding:"40px 20px"}}>
+      {loans.length===0&&!showForm ? (
+        <div style={{background:"#fff",borderRadius:14,border:`1px solid ${C.border}`,
+                     textAlign:"center",padding:"40px 20px"}}>
           <p style={{fontSize:32,margin:"0 0 8px"}}>🏦</p>
           <p style={{color:C.muted,fontSize:13,margin:"0 0 4px",fontWeight:600}}>No loans added yet</p>
           <p style={{color:C.muted,fontSize:12,margin:0}}>Track your home loan, car loan, personal loan and more.</p>

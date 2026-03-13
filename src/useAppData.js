@@ -72,45 +72,99 @@ export function calcEMI(principal, annualRate, tenureMonths) {
   if (r === 0) return Math.round(principal / tenureMonths);
   return Math.round(principal * r * Math.pow(1+r, tenureMonths) / (Math.pow(1+r, tenureMonths) - 1));
 }
-export function calcLoanTotals(loan) {
-  const emi            = loan.emi || calcEMI(loan.principal, loan.rate, loan.tenureMonths);
-  const totalPayable   = emi * loan.tenureMonths;
-  const totalInterest  = totalPayable - loan.principal;
-  // Months elapsed since startDate
-  const start          = loan.startDate ? new Date(loan.startDate) : new Date();
-  const now            = new Date();
-  const monthsElapsed  = Math.max(0, Math.floor((now - start) / (1000*60*60*24*30.44)));
-  const monthsLeft     = Math.max(0, loan.tenureMonths - monthsElapsed);
-  const paidAmt        = Math.min(emi * monthsElapsed, totalPayable);
-  const outstanding    = Math.max(0, totalPayable - paidAmt);
-  const paidPct        = totalPayable > 0 ? Math.min(100, Math.round((paidAmt / totalPayable) * 100)) : 0;
-  return { emi, totalPayable, totalInterest, monthsElapsed, monthsLeft, paidAmt, outstanding, paidPct };
-}
-// "What if EMI increases by X?" helper
-export function calcEarlyClosureImpact(loan, extraEmi) {
-  const { emi } = calcLoanTotals(loan);
-  const newEmi  = emi + extraEmi;
-  const r       = loan.rate / 12 / 100;
-  if (r === 0) {
-    const newMonths = Math.ceil(loan.principal / newEmi);
-    return { savedMonths: Math.max(0, loan.tenureMonths - newMonths), savedInterest: 0 };
+
+// Walk an amortization schedule from a given outstanding balance.
+// Returns { months, totalInterest } until balance reaches 0.
+function amortize(outstanding, annualRate, emi) {
+  if (outstanding <= 0 || emi <= 0) return { months: 0, totalInterest: 0 };
+  const r = annualRate / 12 / 100;
+  let balance = outstanding;
+  let totalInterest = 0;
+  let months = 0;
+  const MAX = 1200; // safety cap (100 years)
+  while (balance > 0 && months < MAX) {
+    const interest = r > 0 ? balance * r : 0;
+    const principal = Math.min(emi - interest, balance);
+    if (principal <= 0) break; // EMI too small to cover interest
+    totalInterest += interest;
+    balance -= principal;
+    months++;
   }
-  // Remaining principal from today
+  return { months, totalInterest: Math.round(totalInterest) };
+}
+
+// Outstanding balance after N months of payments (reducing balance)
+function outstandingAfter(principal, annualRate, emi, monthsElapsed) {
+  if (monthsElapsed <= 0) return principal;
+  const r = annualRate / 12 / 100;
+  let balance = principal;
+  for (let i = 0; i < monthsElapsed && balance > 0; i++) {
+    const interest  = r > 0 ? balance * r : 0;
+    const repaid    = Math.min(emi - interest, balance);
+    if (repaid <= 0) break;
+    balance -= repaid;
+  }
+  return Math.max(0, balance);
+}
+
+export function calcLoanTotals(loan) {
+  const emi           = loan.emi || calcEMI(loan.principal, loan.rate, loan.tenureMonths);
+  const totalPayable  = emi * loan.tenureMonths;
+  const totalInterest = Math.max(0, totalPayable - loan.principal);
+
   const start         = loan.startDate ? new Date(loan.startDate) : new Date();
   const now           = new Date();
-  const elapsed       = Math.max(0, Math.floor((now - start) / (1000*60*60*24*30.44)));
-  const remaining     = Math.max(0, loan.tenureMonths - elapsed);
-  const outstandingP  = emi > 0
-    ? loan.principal * Math.pow(1+r, elapsed) - emi * (Math.pow(1+r, elapsed) - 1) / r
-    : loan.principal;
-  if (outstandingP <= 0) return { savedMonths: 0, savedInterest: 0 };
-  const newMonths     = Math.ceil(Math.log(newEmi / (newEmi - outstandingP * r)) / Math.log(1+r));
-  const savedMonths   = Math.max(0, remaining - newMonths);
-  const savedInterest = Math.max(0, Math.round(savedMonths * emi - (savedMonths > 0 ? 0 : 0)));
-  // simpler: interest saved = difference in total payable
-  const oldTotal      = emi     * remaining;
-  const newTotal      = newEmi  * Math.max(0, newMonths);
-  return { savedMonths, savedInterest: Math.max(0, Math.round(oldTotal - newTotal)) };
+  const monthsElapsed = Math.max(0, Math.floor((now - start) / (1000*60*60*24*30.44)));
+  const monthsLeft    = Math.max(0, loan.tenureMonths - monthsElapsed);
+
+  // Actual outstanding balance via amortization walkthrough
+  const outstanding   = outstandingAfter(loan.principal, loan.rate, emi, monthsElapsed);
+
+  // Amount paid = principal - remaining principal (true repaid principal)
+  const principalPaid = Math.max(0, loan.principal - outstanding);
+  // paidPct relative to original principal (not total payable)
+  const paidPct       = loan.principal > 0
+    ? Math.min(100, Math.round((principalPaid / loan.principal) * 100))
+    : 0;
+
+  return {
+    emi, totalPayable, totalInterest,
+    monthsElapsed, monthsLeft,
+    outstanding,
+    principalPaid,   // principal repaid so far
+    paidAmt: principalPaid,
+    paidPct,
+  };
+}
+
+// "What if EMI increases by X?" — full amortization comparison
+export function calcEarlyClosureImpact(loan, extraEmi) {
+  const emi      = loan.emi || calcEMI(loan.principal, loan.rate, loan.tenureMonths);
+  const newEmi   = emi + extraEmi;
+  const r        = loan.rate / 12 / 100;
+
+  // Current outstanding balance
+  const start        = loan.startDate ? new Date(loan.startDate) : new Date();
+  const now          = new Date();
+  const elapsed      = Math.max(0, Math.floor((now - start) / (1000*60*60*24*30.44)));
+  const outstanding  = outstandingAfter(loan.principal, loan.rate, emi, elapsed);
+  const monthsLeft   = Math.max(0, loan.tenureMonths - elapsed);
+
+  if (outstanding <= 0) return { newEmi, savedMonths: 0, savedInterest: 0, newMonths: 0 };
+
+  // Amortize remaining balance at current EMI vs new EMI
+  const orig = amortize(outstanding, loan.rate, emi);
+  const next = amortize(outstanding, loan.rate, newEmi);
+
+  const savedMonths   = Math.max(0, orig.months - next.months);
+  const savedInterest = Math.max(0, orig.totalInterest - next.totalInterest);
+
+  // New estimated completion date = today + newMonths
+  const newEndDate = new Date();
+  newEndDate.setMonth(newEndDate.getMonth() + next.months);
+  const newCompletionDate = newEndDate.toLocaleDateString("en-IN", {month:"long", year:"numeric"});
+
+  return { newEmi, savedMonths, savedInterest, newMonths: next.months, newCompletionDate };
 }
 
 // ── Date/month helpers ────────────────────────────────────────────────────
