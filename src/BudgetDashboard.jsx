@@ -9,8 +9,16 @@ const C = {ink:"#1C1917",muted:"#78716C",border:"#E7E5E0",bg:"#F7F5F0",red:"#DC2
 const fmt = (n) => `₹${Math.abs(Math.round(n)).toLocaleString("en-IN")}`;
 
 const DASH_CSS = `
-  .mc-summary-row { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-bottom:12px; }
-  @media(min-width:600px){ .mc-summary-row { grid-template-columns:repeat(4,1fr); } }
+  /* Summary cards: vertical stack on mobile, single row on desktop */
+  .mc-summary-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  @media(min-width:600px){
+    .mc-summary-row { grid-template-columns: repeat(5,1fr); }
+  }
   .mc-alloc-row { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
   @media(min-width:600px){ .mc-alloc-row { grid-template-columns:repeat(3,1fr); } }
 `;
@@ -107,25 +115,38 @@ export default function BudgetDashboard({
         )}
       </div>
 
-      {/* ══ 2. SUMMARY CARDS — 4 metrics (+ Loan EMI if loans exist) ══ */}
+      {/* ══ 2. SUMMARY CARDS ══ */}
       <div className="mc-summary-row">
         {[
-          {label:"Total Income",    value:fmt(totalIncome),  color:C.green,  icon:"💰"},
-          {label:"Fixed Expenses",  value:fmt(totalFixed),   color:C.red,    icon:"🏠"},
-          {label:"Savings & Inv.",  value:fmt(totalSavings), color:C.blue,   icon:"📈"},
-          {label:"Remaining",       value:remaining>=0?fmt(remaining):`−${fmt(remaining)}`, color:remColor, icon:"✅"},
-          ...(loans.length > 0 ? [{label:"Loan EMI", value:fmt(totalLoanEmi), color:C.purple, icon:"🏦"}] : []),
+          {label:"Total Income",         value:fmt(totalIncome),                                          color:C.green,  icon:"💰"},
+          {label:"Fixed Expenses",        value:fmt(totalFixed),                                           color:C.red,    icon:"🏠"},
+          {label:"Savings & Investments", value:fmt(totalSavings),                                        color:C.blue,   icon:"📈"},
+          {label:"Remaining Budget",      value:remaining>=0?fmt(remaining):`−${fmt(remaining)}`,         color:remColor, icon:"✅"},
+          {label:"Loan EMI",              value:loans.length>0?`${fmt(totalLoanEmi)}/mo`:"₹0",            color:C.purple, icon:"🏦"},
         ].map(t => (
           <div key={t.label} style={{
-            background:"#fff", borderRadius:11, border:`1px solid ${C.border}`,
-            padding:"10px 12px", boxShadow:"0 1px 2px rgba(0,0,0,0.04)",
-            display:"flex", flexDirection:"column", gap:4,
+            background:"#fff", borderRadius:11,
+            border:`1px solid ${C.border}`,
+            boxShadow:"0 1px 3px rgba(0,0,0,0.05)",
+            padding:"11px 12px",
+            display:"flex", flexDirection:"column", gap:0,
           }}>
-            <div style={{display:"flex",alignItems:"center",gap:5}}>
-              <span style={{fontSize:12}}>{t.icon}</span>
-              <p style={{margin:0,fontSize:9,color:C.muted,textTransform:"uppercase",letterSpacing:"0.8px",fontWeight:600,lineHeight:1.2}}>{t.label}</p>
+            {/* Icon + label row */}
+            <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:5}}>
+              <span style={{fontSize:13,lineHeight:1}}>{t.icon}</span>
+              <p style={{
+                margin:0, fontSize:9, color:C.muted,
+                textTransform:"uppercase", letterSpacing:"0.8px",
+                fontWeight:700, lineHeight:1.3,
+              }}>{t.label}</p>
             </div>
-            <p style={{margin:0,fontSize:16,fontWeight:700,color:t.color,fontFamily:"Georgia,serif"}}>{t.value}</p>
+            {/* Amount */}
+            <p style={{
+              margin:0, fontWeight:700, color:t.color,
+              fontFamily:"Georgia,serif", lineHeight:1.1,
+              /* Scale font down if value is long to stay on one line */
+              fontSize: t.value.length > 9 ? 14 : 17,
+            }}>{t.value}</p>
           </div>
         ))}
       </div>
