@@ -3,7 +3,7 @@
 // "Monthly Budget Flow" removed — numbers already in summary cards above.
 // No calculation changes.
 
-import { calcMonthlyReserve } from "./useAppData";
+import { calcMonthlyReserve, calcLoanTotals } from "./useAppData";
 
 const C = {ink:"#1C1917",muted:"#78716C",border:"#E7E5E0",bg:"#F7F5F0",red:"#DC2626",green:"#16A34A",amber:"#D97706",blue:"#2563EB",purple:"#7C3AED"};
 const fmt = (n) => `₹${Math.abs(Math.round(n)).toLocaleString("en-IN")}`;
@@ -30,7 +30,7 @@ export default function BudgetDashboard({
   totalIncome, totalFixed, totalSavings, totalReserve,
   remaining, dailyLimit,
   incomeSources, fixedExpenses, savingsPlans, futurePayments,
-  currentExpenses,
+  currentExpenses, loans = [],
 }) {
   const now        = new Date();
   const lastDay    = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
@@ -39,6 +39,15 @@ export default function BudgetDashboard({
   const todaySpent = currentExpenses
     .filter(e => e.date.startsWith(now.toISOString().split("T")[0]))
     .reduce((s,e) => s+e.amount, 0);
+
+  // Loan aggregates
+  const loanTotals     = loans.map(l => calcLoanTotals(l));
+  const totalLoanEmi   = loanTotals.reduce((s,t) => s+t.emi, 0);
+  const totalOutstanding = loanTotals.reduce((s,t) => s+t.outstanding, 0);
+  const totalLoanInterest = loanTotals.reduce((s,t) => s+t.totalInterest, 0);
+  const debtRatio      = totalIncome > 0 ? Math.round((totalLoanEmi / totalIncome) * 100) : 0;
+  const debtColor      = debtRatio < 30 ? C.green : debtRatio < 40 ? C.amber : C.red;
+  const debtLabel      = debtRatio < 30 ? "Safe" : debtRatio < 40 ? "Risky" : "High Debt";
 
   const remColor  = remaining < 0 ? C.red : remaining < totalIncome * 0.1 ? C.amber : C.green;
   const spentPct  = remaining > 0 ? Math.min((monthSpent / remaining) * 100, 100) : 100;
@@ -98,13 +107,14 @@ export default function BudgetDashboard({
         )}
       </div>
 
-      {/* ══ 2. SUMMARY CARDS — 4 metrics, appear once only ══ */}
+      {/* ══ 2. SUMMARY CARDS — 4 metrics (+ Loan EMI if loans exist) ══ */}
       <div className="mc-summary-row">
         {[
           {label:"Total Income",    value:fmt(totalIncome),  color:C.green,  icon:"💰"},
           {label:"Fixed Expenses",  value:fmt(totalFixed),   color:C.red,    icon:"🏠"},
           {label:"Savings & Inv.",  value:fmt(totalSavings), color:C.blue,   icon:"📈"},
           {label:"Remaining",       value:remaining>=0?fmt(remaining):`−${fmt(remaining)}`, color:remColor, icon:"✅"},
+          ...(loans.length > 0 ? [{label:"Loan EMI", value:fmt(totalLoanEmi), color:C.purple, icon:"🏦"}] : []),
         ].map(t => (
           <div key={t.label} style={{
             background:"#fff", borderRadius:11, border:`1px solid ${C.border}`,
@@ -231,7 +241,54 @@ export default function BudgetDashboard({
         </div>
       </div>
 
-      {/* ══ 4. RECENT EXPENSES (last 5) ══ */}
+      {/* ══ 4. LOAN SUMMARY — only if loans exist ══ */}
+      {loans.length > 0 && (
+        <div style={{background:"#fff",borderRadius:12,border:`1px solid ${C.border}`,boxShadow:"0 1px 2px rgba(0,0,0,0.04)",overflow:"hidden",marginBottom:12}}>
+          <div style={{padding:"9px 14px",borderBottom:`1px solid ${C.bg}`,background:`${C.purple}08`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div>
+              <p style={{margin:0,fontSize:12,fontWeight:700,color:C.ink}}>🏦 Loan Summary</p>
+              <p style={{margin:0,fontSize:10,color:C.muted}}>{loans.length} active loan{loans.length!==1?"s":""}</p>
+            </div>
+            {/* Debt ratio badge */}
+            <div style={{textAlign:"right"}}>
+              <p style={{margin:0,fontSize:9,color:C.muted,textTransform:"uppercase",letterSpacing:"0.8px"}}>Debt Ratio</p>
+              <div style={{display:"flex",alignItems:"center",gap:5,justifyContent:"flex-end"}}>
+                <p style={{margin:0,fontSize:14,fontWeight:700,color:debtColor,fontFamily:"Georgia,serif"}}>{debtRatio}%</p>
+                <span style={{fontSize:10,fontWeight:700,color:debtColor,background:`${debtColor}15`,borderRadius:99,padding:"1px 7px",border:`1px solid ${debtColor}30`}}>{debtLabel}</span>
+              </div>
+              <p style={{margin:0,fontSize:9,color:C.muted}}>of monthly income</p>
+            </div>
+          </div>
+
+          {/* Three metrics */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:0}}>
+            {[
+              {label:"Outstanding",   value:fmt(totalOutstanding),   color:C.red},
+              {label:"Monthly EMI",   value:fmt(totalLoanEmi),       color:C.purple},
+              {label:"Interest Left", value:fmt(totalLoanInterest),  color:C.amber},
+            ].map((m,i)=>(
+              <div key={m.label} style={{padding:"10px 14px",borderRight:i<2?`1px solid ${C.bg}`:"none"}}>
+                <p style={{margin:0,fontSize:9,color:C.muted,textTransform:"uppercase",letterSpacing:"0.8px",fontWeight:600}}>{m.label}</p>
+                <p style={{margin:"3px 0 0",fontSize:14,fontWeight:700,color:m.color,fontFamily:"Georgia,serif"}}>{m.value}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Debt ratio bar */}
+          <div style={{padding:"4px 14px 10px"}}>
+            <div style={{height:3,borderRadius:99,background:C.bg,overflow:"hidden"}}>
+              <div style={{height:"100%",borderRadius:99,width:`${Math.min(debtRatio,100)}%`,background:debtColor,transition:"width 0.5s"}}/>
+            </div>
+            <p style={{margin:"3px 0 0",fontSize:9,color:C.muted}}>
+              {debtRatio < 30 ? "✓ Healthy debt load — below 30% of income" :
+               debtRatio < 40 ? "⚠ Getting risky — consider prepaying one loan" :
+               "🔴 High debt — EMIs exceed 40% of income"}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ══ 5. RECENT EXPENSES (last 5) ══ */}
       {recentExp.length > 0 && (
         <div style={{background:"#fff",borderRadius:12,border:`1px solid ${C.border}`,boxShadow:"0 1px 2px rgba(0,0,0,0.04)",overflow:"hidden"}}>
           <div style={{padding:"9px 14px",borderBottom:`1px solid ${C.bg}`}}>

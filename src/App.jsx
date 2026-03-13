@@ -6,6 +6,8 @@ import { useStreak }    from "./useStreak";
 import { useAppData, currentMonthKey, monthKeyToLabel, getActiveMonthKeys } from "./useAppData";
 import BudgetDashboard  from "./BudgetDashboard";
 import { IncomeSources, FixedExpensesSection, SavingsSection, FuturePaymentsSection } from "./FinancialPlan";
+import LoansTab         from "./LoansTab";
+import { calcLoanTotals } from "./useAppData";
 
 const fmt = (n) => `₹${Math.abs(Math.round(n)).toLocaleString("en-IN")}`;
 const getGreeting = (name) => {
@@ -423,12 +425,14 @@ function DashboardScreen(props) {
   const {
     name, totalIncome, totalFixed, totalSavings, totalReserve, remaining, dailyLimit,
     incomeSources, fixedExpenses, savingsPlans, futurePayments,
+    loans,
     allExpenses, checkIns,
     addIncomeSource, updateIncomeSource, deleteIncomeSource,
     addFixedExpense,  updateFixedExpense,  deleteFixedExpense,
     addSavingsPlan,   updateSavingsPlan,   deleteSavingsPlan,
     addFuturePayment, updateFuturePayment, deleteFuturePayment,
     addExpense, editExpense, deleteExpense, addCheckIn, resetAll,
+    addLoan, updateLoan, deleteLoan,
   } = props;
 
   const [selectedMonth,setSelectedMonth] = useState(currentMonthKey());
@@ -456,6 +460,7 @@ function DashboardScreen(props) {
     {key:"budget",    label:"📊 Dashboard"},
     {key:"plan",      label:"🗂 Plan"},
     {key:"home",      label:"🏠 Expenses"},
+    {key:"loans",     label:"🏦 Loans"},
     {key:"charts",    label:"🥧 Charts"},
     {key:"insight",   label:"💡 Insights"},
   ];
@@ -509,7 +514,8 @@ function DashboardScreen(props) {
               remaining={remaining} dailyLimit={dailyLimit}
               incomeSources={incomeSources} fixedExpenses={fixedExpenses}
               savingsPlans={savingsPlans} futurePayments={futurePayments}
-              currentExpenses={currentExpenses} />
+              currentExpenses={currentExpenses}
+              loans={loans} />
           </>
         )}
 
@@ -575,6 +581,16 @@ function DashboardScreen(props) {
         )}
 
         {/* Check-In tab removed — Fix #1 */}
+
+        {/* ══ LOANS ══ */}
+        {tab==="loans"&&(
+          <LoansTab
+            loans={loans}
+            onAdd={addLoan}
+            onUpdate={updateLoan}
+            onDelete={deleteLoan}
+          />
+        )}
 
         {/* ══ CHARTS ══ */}
         {tab==="charts"&&(
