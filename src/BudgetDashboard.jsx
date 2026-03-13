@@ -9,16 +9,27 @@ const C = {ink:"#1C1917",muted:"#78716C",border:"#E7E5E0",bg:"#F7F5F0",red:"#DC2
 const fmt = (n) => `₹${Math.abs(Math.round(n)).toLocaleString("en-IN")}`;
 
 const DASH_CSS = `
-  /* Summary cards: vertical stack on mobile, single row on desktop */
+  /* ── Summary cards ──────────────────────────────────────────
+     Mobile  (<480px) : 1 col — full-width stack
+     Tablet  (480-860): 2 cols — 2-2-1 wrap
+     Desktop (>860px) : 5 cols — single row
+  ────────────────────────────────────────────────────────── */
   .mc-summary-row {
     display: grid;
     grid-template-columns: 1fr;
     gap: 8px;
     margin-bottom: 12px;
   }
-  @media(min-width:600px){
+  @media(min-width:480px){
+    .mc-summary-row { grid-template-columns: repeat(2,1fr); }
+  }
+  @media(min-width:860px){
     .mc-summary-row { grid-template-columns: repeat(5,1fr); }
   }
+  .mc-summary-card { padding:10px 12px; }
+  @media(min-width:480px){ .mc-summary-card { padding:11px 12px; } }
+  .mc-summary-amt { font-size:15px; }
+  @media(min-width:860px){ .mc-summary-amt { font-size:14px; } }
   .mc-alloc-row { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
   @media(min-width:600px){ .mc-alloc-row { grid-template-columns:repeat(3,1fr); } }
 `;
@@ -124,14 +135,12 @@ export default function BudgetDashboard({
           {label:"Remaining Budget",      value:remaining>=0?fmt(remaining):`−${fmt(remaining)}`,         color:remColor, icon:"✅"},
           {label:"Loan EMI",              value:loans.length>0?`${fmt(totalLoanEmi)}/mo`:"₹0",            color:C.purple, icon:"🏦"},
         ].map(t => (
-          <div key={t.label} style={{
+        <div key={t.label} className="mc-summary-card" style={{
             background:"#fff", borderRadius:11,
             border:`1px solid ${C.border}`,
             boxShadow:"0 1px 3px rgba(0,0,0,0.05)",
-            padding:"11px 12px",
             display:"flex", flexDirection:"column", gap:0,
           }}>
-            {/* Icon + label row */}
             <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:5}}>
               <span style={{fontSize:13,lineHeight:1}}>{t.icon}</span>
               <p style={{
@@ -140,12 +149,9 @@ export default function BudgetDashboard({
                 fontWeight:700, lineHeight:1.3,
               }}>{t.label}</p>
             </div>
-            {/* Amount */}
-            <p style={{
+            <p className="mc-summary-amt" style={{
               margin:0, fontWeight:700, color:t.color,
               fontFamily:"Georgia,serif", lineHeight:1.1,
-              /* Scale font down if value is long to stay on one line */
-              fontSize: t.value.length > 9 ? 14 : 17,
             }}>{t.value}</p>
           </div>
         ))}
