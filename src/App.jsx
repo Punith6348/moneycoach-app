@@ -520,6 +520,9 @@ function DashboardScreen(props) {
 
   const [moreOpen,   setMoreOpen]   = useState(false);
   const [isMobile,   setIsMobile]   = useState(() => window.innerWidth <= 640);
+
+  // Inject APP_CSS into <head> once — guaranteed to work unlike JSX <style>
+  useEffect(() => {
     const el = document.createElement("style");
     el.setAttribute("data-mc", "1");
     el.textContent = APP_CSS;
