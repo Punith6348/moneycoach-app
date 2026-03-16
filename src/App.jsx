@@ -42,7 +42,7 @@ const APP_CSS = `
   .mc-app    { display:flex; flex-direction:column; min-height:100vh; background:#F7F5F0; }
   .mc-body   { display:flex; flex:1; }
   .mc-main   { flex:1; min-width:0; display:flex; flex-direction:column; }
-  .mc-content{ flex:1; padding:20px 20px 80px; max-width:960px; width:100%; margin:0 auto; }
+  .mc-content{ flex:1; padding:18px 18px 80px; max-width:960px; width:100%; margin:0 auto; }
 
   /* ── Sidebar — desktop + tablet ─────────────────────────── */
   .mc-sidebar {
@@ -51,59 +51,90 @@ const APP_CSS = `
     position:sticky; top:0; height:100vh;
     overflow-y:auto; flex-shrink:0;
   }
-  @media(max-width:900px){
-    .mc-sidebar { width:180px; min-width:180px; }
-  }
+  @media(max-width:900px){ .mc-sidebar { width:180px; min-width:180px; } }
 
-  /* ── Mobile (≤640px): hide sidebar, show bottom nav ──────── */
+  /* ── Mobile ≤640px ───────────────────────────────────────── */
   @media(max-width:640px){
-    .mc-sidebar  { display:none; }
-    .mc-content  { padding:14px 14px 90px; }
+    .mc-sidebar { display:none; }
+    .mc-content { padding:12px 14px 76px; }
 
-    /* Bottom navigation bar */
+    /* ── Compact header on mobile ── */
+    .mc-header-mobile {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:9px 14px;
+      background:#fff; border-bottom:1px solid #E7E5E0;
+      position:sticky; top:0; z-index:100;
+    }
+    .mc-header-greeting  { font-size:14px; font-weight:700; color:#1C1917; font-family:Georgia,serif; margin:0; line-height:1.2; }
+    .mc-header-date      { font-size:10px; color:#78716C; font-weight:500; margin:0 0 1px; }
+    .mc-header-reset     {
+      background:#FFF1F2; border:1px solid #FCA5A5; border-radius:7px;
+      padding:5px 10px; font-size:11px; color:#DC2626;
+      cursor:pointer; font-family:inherit; font-weight:600; white-space:nowrap;
+    }
+
+    /* ── Bottom navigation ── */
     .mc-bottom-nav {
-      display:flex;
-      position:fixed; bottom:0; left:0; right:0; z-index:200;
-      background:#1C1917;
-      border-top:1px solid rgba(255,255,255,0.08);
-      padding:0;
-      height:60px;
+      display:flex; position:fixed; bottom:0; left:0; right:0; z-index:300;
+      background:#1C1917; border-top:1px solid rgba(255,255,255,0.08);
+      height:58px; padding:0;
     }
-    .mc-bottom-nav-item {
+    .mc-bnav-item {
       flex:1; display:flex; flex-direction:column;
-      align-items:center; justify-content:center;
-      gap:2px; border:none; background:transparent;
-      cursor:pointer; padding:4px 0;
-      font-family:inherit;
-      transition:background 0.12s;
+      align-items:center; justify-content:center; gap:2px;
+      border:none; background:transparent; cursor:pointer;
+      padding:6px 2px; font-family:inherit; position:relative;
+      -webkit-tap-highlight-color:transparent;
     }
-    .mc-bottom-nav-item.active  { background:rgba(255,255,255,0.10); }
-    .mc-bottom-nav-item .bn-icon{ font-size:18px; line-height:1; }
-    .mc-bottom-nav-item .bn-lbl {
-      font-size:9px; font-weight:600; letter-spacing:0.3px;
-      color:#78716C; line-height:1;
-    }
-    .mc-bottom-nav-item.active .bn-lbl { color:#E7E5E0; }
-    /* Active indicator line at top of bar item */
-    .mc-bottom-nav-item.active::before {
-      content:""; position:absolute; top:0;
-      width:24px; height:2px; border-radius:0 0 2px 2px;
+    .mc-bnav-item.active { background:rgba(255,255,255,0.09); }
+    .mc-bnav-item.active::after {
+      content:""; position:absolute; top:0; left:50%;
+      transform:translateX(-50%);
+      width:20px; height:2px; border-radius:0 0 3px 3px;
       background:#E7E5E0;
     }
-    .mc-bottom-nav-item { position:relative; }
+    .mc-bnav-icon { font-size:17px; line-height:1; }
+    .mc-bnav-lbl  { font-size:9px; font-weight:600; letter-spacing:0.2px; color:#57534E; line-height:1; }
+    .mc-bnav-item.active .mc-bnav-lbl { color:#D6D3D1; }
+
+    /* ── More dropdown (floats up from bottom bar) ── */
+    .mc-more-dropdown {
+      position:fixed; bottom:58px; right:0;
+      background:#2C2623; border:1px solid rgba(255,255,255,0.10);
+      border-radius:12px 12px 0 0; padding:6px 0 4px;
+      min-width:160px; z-index:400;
+      box-shadow:0 -8px 30px rgba(0,0,0,0.35);
+      animation:slideUp 0.18s ease;
+    }
+    .mc-more-item {
+      display:flex; align-items:center; gap:10;
+      width:100%; padding:11px 18px; border:none;
+      background:transparent; color:#A8A29E;
+      font-size:13px; font-family:inherit; cursor:pointer;
+      text-align:left;
+    }
+    .mc-more-item.active { color:#F7F5F0; background:rgba(255,255,255,0.08); }
+    .mc-more-item:hover  { background:rgba(255,255,255,0.05); color:#D6D3D1; }
+    .mc-more-backdrop    {
+      position:fixed; inset:0; z-index:350;
+      background:rgba(0,0,0,0.2);
+    }
   }
 
-  /* ── Hide bottom nav on desktop ─────────────────────────── */
-  .mc-bottom-nav { display:none; }
+  /* ── Hide mobile elements on desktop ────────────────────── */
+  .mc-bottom-nav    { display:none; }
+  .mc-header-mobile { display:none; }
+
+  /* ── Desktop header stays visible ───────────────────────── */
+  .mc-header-desktop { display:flex; }
+  @media(max-width:640px){ .mc-header-desktop { display:none; } }
 
   /* ── Plan tab grid ───────────────────────────────────────── */
   .mc-plan-top  { display:grid; grid-template-columns:1fr; gap:0; }
   .mc-plan-full { width:100%; }
-  @media(min-width:768px){
-    .mc-plan-top { grid-template-columns:1fr 1fr; gap:12px; }
-  }
+  @media(min-width:768px){ .mc-plan-top { grid-template-columns:1fr 1fr; gap:12px; } }
 
-  /* ── Misc ────────────────────────────────────────────────── */
+  /* ── Misc ─────────────────────────────────────────────────── */
   .mc-expense-row { display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px solid #F7F5F0; gap:8px; }
   .mc-expense-row:last-child { border-bottom:none; }
   ::-webkit-scrollbar { display:none; }
@@ -116,6 +147,10 @@ const APP_CSS = `
   @keyframes slideIn {
     from { opacity:0; transform:translateX(-4px); }
     to   { opacity:1; transform:translateX(0); }
+  }
+  @keyframes slideUp {
+    from { opacity:0; transform:translateY(10px); }
+    to   { opacity:1; transform:translateY(0); }
   }
 `;
 
@@ -524,6 +559,7 @@ function DashboardScreen(props) {
     showToast(`${fmt(amount)} saved under ${label} ✓`);
   };
 
+  // ── All tabs (used by desktop sidebar + More dropdown) ──────────────────
   const TABS = [
     { key:"budget",  icon:"📊", label:"Dashboard" },
     { key:"plan",    icon:"🗂",  label:"Plan"      },
@@ -533,6 +569,12 @@ function DashboardScreen(props) {
     { key:"insight", icon:"💡",  label:"Insights"  },
   ];
 
+  // ── Mobile bottom nav: 4 primary + "More" (contains Charts + Insights) ───
+  const PRIMARY_TABS = TABS.slice(0, 4);   // Dashboard, Plan, Expenses, Loans
+  const MORE_TABS    = TABS.slice(4);      // Charts, Insights
+  const moreActive   = MORE_TABS.some(t => t.key === tab);
+
+  const [moreOpen, setMoreOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const MonthBar=()=><MonthSelector selectedMonth={selectedMonth} onChange={setSelectedMonth} allExpenses={allExpenses}/>;
 
@@ -550,6 +592,29 @@ function DashboardScreen(props) {
         </div>
       )}
 
+      {/* ── More-menu backdrop (mobile) ── */}
+      {moreOpen && (
+        <div className="mc-more-backdrop" onClick={()=>setMoreOpen(false)} />
+      )}
+
+      {/* ── More dropdown (mobile) ── */}
+      {moreOpen && (
+        <div className="mc-more-dropdown">
+          <p style={{margin:"0 18px 4px",fontSize:9,color:"#57534E",
+                     textTransform:"uppercase",letterSpacing:"1px",fontWeight:700}}>
+            More sections
+          </p>
+          {MORE_TABS.map(({key,icon,label}) => (
+            <button key={key}
+              className={`mc-more-item${tab===key?" active":""}`}
+              onClick={()=>{ setTab(key); setMoreOpen(false); }}>
+              <span style={{fontSize:17}}>{icon}</span>
+              <span>{label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="mc-body">
 
         {/* ════════ SIDEBAR — desktop + tablet only ════════ */}
@@ -561,7 +626,6 @@ function DashboardScreen(props) {
               {new Date().toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"short"})}
             </p>
           </div>
-
           <nav style={{flex:1,padding:"10px 8px"}}>
             {TABS.map(({key,icon,label}) => {
               const active = tab === key;
@@ -571,9 +635,9 @@ function DashboardScreen(props) {
                     display:"flex",alignItems:"center",gap:10,
                     width:"100%",padding:"10px 12px",marginBottom:2,
                     borderRadius:9,border:"none",
-                    background: active?"rgba(255,255,255,0.10)":"transparent",
+                    background:active?"rgba(255,255,255,0.10)":"transparent",
                     borderLeft:`3px solid ${active?"#E7E5E0":"transparent"}`,
-                    color: active?"#F7F5F0":"#78716C",
+                    color:active?"#F7F5F0":"#78716C",
                     fontSize:13,fontFamily:"inherit",fontWeight:active?700:400,
                     cursor:"pointer",textAlign:"left",
                     transition:"background 0.15s,color 0.15s",
@@ -587,7 +651,6 @@ function DashboardScreen(props) {
               );
             })}
           </nav>
-
           {streak > 0 && (
             <div style={{padding:"12px 18px",borderTop:"1px solid rgba(255,255,255,0.07)"}}>
               <div style={{display:"flex",alignItems:"center",gap:7}}>
@@ -604,11 +667,11 @@ function DashboardScreen(props) {
         {/* ════════ MAIN AREA ════════ */}
         <div className="mc-main">
 
-          {/* ── Header ── */}
-          <header style={{
+          {/* ── Desktop header (hidden on mobile via CSS) ── */}
+          <header className="mc-header-desktop" style={{
             background:"#fff",borderBottom:`1px solid ${C.border}`,
-            padding:"11px 16px",
-            display:"flex",justifyContent:"space-between",alignItems:"center",
+            padding:"11px 18px",
+            justifyContent:"space-between",alignItems:"center",
             position:"sticky",top:0,zIndex:100,
           }}>
             <div>
@@ -626,6 +689,30 @@ function DashboardScreen(props) {
                       fontFamily:"inherit",fontWeight:600}}>
               🗑 Reset
             </button>
+          </header>
+
+          {/* ── Mobile header (hidden on desktop via CSS) ── */}
+          <header className="mc-header-mobile">
+            <div>
+              <p className="mc-header-date">
+                {new Date().toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"})}
+              </p>
+              <p className="mc-header-greeting">{getGreeting(name)} 👋</p>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              {streak > 0 && (
+                <div style={{display:"flex",alignItems:"center",gap:4,
+                             background:"#FFF7ED",border:"1px solid #FDBA74",
+                             borderRadius:99,padding:"3px 8px"}}>
+                  <span style={{fontSize:12}}>🔥</span>
+                  <span style={{fontSize:11,fontWeight:700,color:"#EA580C"}}>{streak}</span>
+                </div>
+              )}
+              <button className="mc-header-reset"
+                onClick={()=>{if(window.confirm("Delete ALL data permanently?"))resetAll();}}>
+                Reset
+              </button>
+            </div>
           </header>
 
           {/* ── Page content ── */}
@@ -750,16 +837,23 @@ function DashboardScreen(props) {
         </div>{/* /mc-main */}
       </div>{/* /mc-body */}
 
-      {/* ════════ BOTTOM NAV — mobile only (CSS hides on desktop) ════════ */}
+      {/* ════════ BOTTOM NAV — mobile only ════════ */}
       <nav className="mc-bottom-nav">
-        {TABS.map(({key,icon,label}) => (
+        {PRIMARY_TABS.map(({key,icon,label}) => (
           <button key={key}
-            className={`mc-bottom-nav-item${tab===key?" active":""}`}
-            onClick={()=>setTab(key)}>
-            <span className="bn-icon">{icon}</span>
-            <span className="bn-lbl">{label}</span>
+            className={`mc-bnav-item${tab===key?" active":""}`}
+            onClick={()=>{ setTab(key); setMoreOpen(false); }}>
+            <span className="mc-bnav-icon">{icon}</span>
+            <span className="mc-bnav-lbl">{label}</span>
           </button>
         ))}
+        {/* More button — active when Charts or Insights is selected */}
+        <button
+          className={`mc-bnav-item${moreActive?" active":""}`}
+          onClick={()=>setMoreOpen(p=>!p)}>
+          <span className="mc-bnav-icon">{moreActive ? TABS.find(t=>t.key===tab)?.icon : "⋯"}</span>
+          <span className="mc-bnav-lbl">{moreActive ? TABS.find(t=>t.key===tab)?.label : "More"}</span>
+        </button>
       </nav>
 
     </div>
