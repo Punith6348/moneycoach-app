@@ -38,39 +38,74 @@ const C = {ink:"#1C1917",muted:"#78716C",border:"#E7E5E0",bg:"#F7F5F0",red:"#DC2
 
 // Responsive CSS injected once into <head> equivalent via a style tag in the app shell
 const APP_CSS = `
-  /* ── Sidebar layout ──────────────────────────────────────── */
-  .mc-app          { display:flex; flex-direction:column; min-height:100vh; background:#F7F5F0; }
-  .mc-body         { display:flex; flex:1; }
-  .mc-sidebar      { width:220px; min-width:220px; background:#1C1917; display:flex; flex-direction:column; position:sticky; top:0; height:100vh; overflow-y:auto; flex-shrink:0; }
-  .mc-main         { flex:1; min-width:0; display:flex; flex-direction:column; }
-  .mc-content      { flex:1; padding:20px 20px 80px; max-width:960px; width:100%; margin:0 auto; }
+  /* ── App shell ───────────────────────────────────────────── */
+  .mc-app    { display:flex; flex-direction:column; min-height:100vh; background:#F7F5F0; }
+  .mc-body   { display:flex; flex:1; }
+  .mc-main   { flex:1; min-width:0; display:flex; flex-direction:column; }
+  .mc-content{ flex:1; padding:20px 20px 80px; max-width:960px; width:100%; margin:0 auto; }
 
-  /* Tablet: narrower sidebar */
+  /* ── Sidebar — desktop + tablet ─────────────────────────── */
+  .mc-sidebar {
+    width:220px; min-width:220px; background:#1C1917;
+    display:flex; flex-direction:column;
+    position:sticky; top:0; height:100vh;
+    overflow-y:auto; flex-shrink:0;
+  }
   @media(max-width:900px){
     .mc-sidebar { width:180px; min-width:180px; }
   }
 
-  /* Mobile: sidebar collapses — triggered via data-open attribute */
+  /* ── Mobile (≤640px): hide sidebar, show bottom nav ──────── */
   @media(max-width:640px){
-    .mc-sidebar {
-      position:fixed; top:0; left:0; z-index:200;
-      transform:translateX(-100%); transition:transform 0.25s ease;
-      height:100%; width:240px; min-width:0;
+    .mc-sidebar  { display:none; }
+    .mc-content  { padding:14px 14px 90px; }
+
+    /* Bottom navigation bar */
+    .mc-bottom-nav {
+      display:flex;
+      position:fixed; bottom:0; left:0; right:0; z-index:200;
+      background:#1C1917;
+      border-top:1px solid rgba(255,255,255,0.08);
+      padding:0;
+      height:60px;
     }
-    .mc-sidebar[data-open="true"] { transform:translateX(0); }
-    .mc-content { padding:16px 14px 80px; }
+    .mc-bottom-nav-item {
+      flex:1; display:flex; flex-direction:column;
+      align-items:center; justify-content:center;
+      gap:2px; border:none; background:transparent;
+      cursor:pointer; padding:4px 0;
+      font-family:inherit;
+      transition:background 0.12s;
+    }
+    .mc-bottom-nav-item.active  { background:rgba(255,255,255,0.10); }
+    .mc-bottom-nav-item .bn-icon{ font-size:18px; line-height:1; }
+    .mc-bottom-nav-item .bn-lbl {
+      font-size:9px; font-weight:600; letter-spacing:0.3px;
+      color:#78716C; line-height:1;
+    }
+    .mc-bottom-nav-item.active .bn-lbl { color:#E7E5E0; }
+    /* Active indicator line at top of bar item */
+    .mc-bottom-nav-item.active::before {
+      content:""; position:absolute; top:0;
+      width:24px; height:2px; border-radius:0 0 2px 2px;
+      background:#E7E5E0;
+    }
+    .mc-bottom-nav-item { position:relative; }
   }
 
-  /* Plan tab: 2-col desktop, 1-col mobile */
+  /* ── Hide bottom nav on desktop ─────────────────────────── */
+  .mc-bottom-nav { display:none; }
+
+  /* ── Plan tab grid ───────────────────────────────────────── */
   .mc-plan-top  { display:grid; grid-template-columns:1fr; gap:0; }
   .mc-plan-full { width:100%; }
   @media(min-width:768px){
     .mc-plan-top { grid-template-columns:1fr 1fr; gap:12px; }
   }
-  /* Expense rows: compact */
+
+  /* ── Misc ────────────────────────────────────────────────── */
   .mc-expense-row { display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px solid #F7F5F0; gap:8px; }
   .mc-expense-row:last-child { border-bottom:none; }
-  /* Hide scrollbars */
   ::-webkit-scrollbar { display:none; }
   * { scrollbar-width:none; }
 
@@ -79,7 +114,7 @@ const APP_CSS = `
     to   { opacity:1; transform:translateX(-50%) translateY(0); }
   }
   @keyframes slideIn {
-    from { opacity:0; transform:translateX(-6px); }
+    from { opacity:0; transform:translateX(-4px); }
     to   { opacity:1; transform:translateX(0); }
   }
 `;
@@ -515,18 +550,10 @@ function DashboardScreen(props) {
         </div>
       )}
 
-      {/* ── Mobile overlay backdrop ── */}
-      {sidebarOpen && (
-        <div onClick={()=>setSidebarOpen(false)}
-          style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:190}} />
-      )}
-
       <div className="mc-body">
 
-        {/* ════════════════════════ SIDEBAR ════════════════════════ */}
-        <aside className="mc-sidebar" data-open={String(sidebarOpen)}>
-
-          {/* Brand / logo area */}
+        {/* ════════ SIDEBAR — desktop + tablet only ════════ */}
+        <aside className="mc-sidebar">
           <div style={{padding:"20px 18px 16px",borderBottom:"1px solid rgba(255,255,255,0.07)"}}>
             <p style={{margin:0,fontSize:9,color:"#57534E",textTransform:"uppercase",
                        letterSpacing:"1.4px",fontWeight:700,marginBottom:4}}>Money Coach</p>
@@ -535,26 +562,24 @@ function DashboardScreen(props) {
             </p>
           </div>
 
-          {/* Nav items */}
           <nav style={{flex:1,padding:"10px 8px"}}>
             {TABS.map(({key,icon,label}) => {
               const active = tab === key;
               return (
-                <button key={key}
-                  onClick={() => { setTab(key); setSidebarOpen(false); }}
+                <button key={key} onClick={()=>setTab(key)}
                   style={{
-                    display:"flex", alignItems:"center", gap:10,
-                    width:"100%", padding:"10px 12px", marginBottom:2,
-                    borderRadius:9, border:"none",
-                    background: active ? "rgba(255,255,255,0.10)" : "transparent",
-                    borderLeft: `3px solid ${active ? "#E7E5E0" : "transparent"}`,
-                    color: active ? "#F7F5F0" : "#78716C",
-                    fontSize:13, fontFamily:"inherit", fontWeight: active ? 700 : 400,
-                    cursor:"pointer", textAlign:"left",
-                    transition:"background 0.15s, color 0.15s",
+                    display:"flex",alignItems:"center",gap:10,
+                    width:"100%",padding:"10px 12px",marginBottom:2,
+                    borderRadius:9,border:"none",
+                    background: active?"rgba(255,255,255,0.10)":"transparent",
+                    borderLeft:`3px solid ${active?"#E7E5E0":"transparent"}`,
+                    color: active?"#F7F5F0":"#78716C",
+                    fontSize:13,fontFamily:"inherit",fontWeight:active?700:400,
+                    cursor:"pointer",textAlign:"left",
+                    transition:"background 0.15s,color 0.15s",
                   }}
-                  onMouseEnter={e => { if(!active) e.currentTarget.style.background="rgba(255,255,255,0.05)"; e.currentTarget.style.color="#D6D3D1"; }}
-                  onMouseLeave={e => { if(!active) { e.currentTarget.style.background="transparent"; e.currentTarget.style.color="#78716C"; }}}
+                  onMouseEnter={e=>{if(!active){e.currentTarget.style.background="rgba(255,255,255,0.05)";e.currentTarget.style.color="#D6D3D1";}}}
+                  onMouseLeave={e=>{if(!active){e.currentTarget.style.background="transparent";e.currentTarget.style.color="#78716C";}}}
                 >
                   <span style={{fontSize:16,width:20,textAlign:"center",flexShrink:0}}>{icon}</span>
                   <span>{label}</span>
@@ -563,7 +588,6 @@ function DashboardScreen(props) {
             })}
           </nav>
 
-          {/* Streak badge at bottom */}
           {streak > 0 && (
             <div style={{padding:"12px 18px",borderTop:"1px solid rgba(255,255,255,0.07)"}}>
               <div style={{display:"flex",alignItems:"center",gap:7}}>
@@ -577,54 +601,32 @@ function DashboardScreen(props) {
           )}
         </aside>
 
-        {/* ════════════════════════ MAIN AREA ════════════════════════ */}
+        {/* ════════ MAIN AREA ════════ */}
         <div className="mc-main">
 
-          {/* ── Top header bar ── */}
+          {/* ── Header ── */}
           <header style={{
-            background:"#fff", borderBottom:`1px solid ${C.border}`,
-            padding:"11px 20px",
-            display:"flex", justifyContent:"space-between", alignItems:"center",
-            position:"sticky", top:0, zIndex:100,
+            background:"#fff",borderBottom:`1px solid ${C.border}`,
+            padding:"11px 16px",
+            display:"flex",justifyContent:"space-between",alignItems:"center",
+            position:"sticky",top:0,zIndex:100,
           }}>
-            {/* Left: hamburger (mobile only) + greeting */}
-            <div style={{display:"flex",alignItems:"center",gap:12}}>
-              {/* Hamburger — hidden on desktop via inline media workaround */}
-              <button
-                onClick={()=>setSidebarOpen(p=>!p)}
-                style={{
-                  display:"none", // overridden by inline style on mobile
-                  background:"none", border:`1px solid ${C.border}`,
-                  borderRadius:7, padding:"6px 8px", cursor:"pointer",
-                  fontSize:15, color:C.muted, lineHeight:1,
-                  // CSS media query can't apply here inline; we use a wrapper trick below
-                }}
-                className="mc-hamburger">
-                ☰
-              </button>
-              <div>
-                <p style={{margin:0,fontSize:11,color:C.muted,textTransform:"uppercase",
-                           letterSpacing:"1.1px",fontWeight:600,marginBottom:2}}>
-                  {new Date().toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"short"})}
-                </p>
-                <h1 style={{fontSize:16,fontWeight:700,color:C.ink,fontFamily:"Georgia,serif",margin:0}}>
-                  {getGreeting(name)} 👋
-                </h1>
-              </div>
+            <div>
+              <p style={{margin:0,fontSize:11,color:C.muted,textTransform:"uppercase",
+                         letterSpacing:"1.1px",fontWeight:600,marginBottom:2}}>
+                {new Date().toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"short"})}
+              </p>
+              <h1 style={{fontSize:16,fontWeight:700,color:C.ink,fontFamily:"Georgia,serif",margin:0}}>
+                {getGreeting(name)} 👋
+              </h1>
             </div>
-            {/* Right: reset */}
-            <button onClick={()=>{ if(window.confirm("Delete ALL data permanently?")) resetAll(); }}
+            <button onClick={()=>{if(window.confirm("Delete ALL data permanently?"))resetAll();}}
               style={{background:"#FFF1F2",border:"1px solid #FCA5A5",borderRadius:8,
                       padding:"6px 12px",fontSize:12,color:C.red,cursor:"pointer",
                       fontFamily:"inherit",fontWeight:600}}>
               🗑 Reset
             </button>
           </header>
-
-          {/* Extra CSS to show hamburger on mobile */}
-          <style>{`
-            @media(max-width:640px){ .mc-hamburger{ display:flex !important; align-items:center; } }
-          `}</style>
 
           {/* ── Page content ── */}
           <div className="mc-content">
@@ -747,6 +749,19 @@ function DashboardScreen(props) {
           </div>{/* /mc-content */}
         </div>{/* /mc-main */}
       </div>{/* /mc-body */}
+
+      {/* ════════ BOTTOM NAV — mobile only (CSS hides on desktop) ════════ */}
+      <nav className="mc-bottom-nav">
+        {TABS.map(({key,icon,label}) => (
+          <button key={key}
+            className={`mc-bottom-nav-item${tab===key?" active":""}`}
+            onClick={()=>setTab(key)}>
+            <span className="bn-icon">{icon}</span>
+            <span className="bn-lbl">{label}</span>
+          </button>
+        ))}
+      </nav>
+
     </div>
   );
 }
