@@ -43,11 +43,11 @@ export function calcTotalSavings(plans) {
 export function calcMonthlyReserve(payment) {
   const months = { yearly: 12, halfyearly: 6, quarterly: 3 };
   const divisor = months[payment.frequency] || 12;
-  // How many months until next payment date?
   const now  = new Date();
-  const due  = new Date(payment.nextDate);
-  const diff = Math.max(1, Math.round((due - now) / (1000 * 60 * 60 * 24 * 30)));
-  const mUntilDue = Math.min(diff, divisor);
+  const due  = new Date(payment.nextDate + "T00:00:00"); // local midnight, not UTC
+  const diff = Math.round((due - now) / (1000 * 60 * 60 * 24 * 30));
+  // If already overdue or due this month, reserve full amount; cap at cycle length
+  const mUntilDue = Math.max(1, Math.min(diff, divisor));
   return Math.ceil(payment.totalAmount / mUntilDue);
 }
 export function calcTotalReserve(payments) {
@@ -187,7 +187,19 @@ export const getActiveMonthKeys = (allExpenses) => {
 export function useAppData() {
   const [data, setData] = useState(() => {
     const saved = load();
-    return saved ? {...DEFAULT_STATE, ...saved} : {...DEFAULT_STATE};
+    if (!saved) return {...DEFAULT_STATE};
+    // Ensure all array fields exist even in old saved states that predate them
+    return {
+      ...DEFAULT_STATE,
+      ...saved,
+      loans:          Array.isArray(saved.loans)          ? saved.loans          : [],
+      incomeSources:  Array.isArray(saved.incomeSources)  ? saved.incomeSources  : [],
+      fixedExpenses:  Array.isArray(saved.fixedExpenses)  ? saved.fixedExpenses  : [],
+      savingsPlans:   Array.isArray(saved.savingsPlans)   ? saved.savingsPlans   : [],
+      futurePayments: Array.isArray(saved.futurePayments) ? saved.futurePayments : [],
+      checkIns:       Array.isArray(saved.checkIns)       ? saved.checkIns       : [],
+      allExpenses:    (saved.allExpenses && typeof saved.allExpenses==="object") ? saved.allExpenses : {},
+    };
   });
 
   const commit = (fn) => {

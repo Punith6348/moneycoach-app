@@ -114,6 +114,10 @@ function LoanForm({initial, onSave, onCancel}) {
   const today    = new Date().toISOString().split("T")[0];
   const initYrs  = initial?.tenureMonths ? Math.floor(initial.tenureMonths/12) : "";
   const initMos  = initial?.tenureMonths ? initial.tenureMonths%12 : "";
+  // When editing, pre-fill emiOverride only if it differs from the calculated EMI
+  // so the user sees their actual stored EMI, not a blank field
+  const initAutoEmi = initial ? calcEMI(initial.principal, initial.rate, initial.tenureMonths) : 0;
+  const initOverride = (initial?.emi && initial.emi !== initAutoEmi) ? String(initial.emi) : "";
 
   const [f, setF] = useState({
     name:        initial?.name      || "Home Loan",
@@ -121,12 +125,12 @@ function LoanForm({initial, onSave, onCancel}) {
     rate:        initial?.rate      || "",
     tenureYears: String(initYrs),
     tenureMos:   String(initMos),
-    emiOverride: "",
+    emiOverride: initOverride,
     startDate:   initial?.startDate || today,
   });
+  const [tried, setTried] = useState(false);
   const set = (k,v) => setF(p=>({...p,[k]:v}));
 
-  // FIX: blank months → treat as 0
   const totalMonths = (parseInt(f.tenureYears)||0)*12 + (parseInt(f.tenureMos)||0);
   const autoEmi  = calcEMI(+f.principal, +f.rate, totalMonths);
   const useEmi   = +f.emiOverride > 0 ? +f.emiOverride : autoEmi;
@@ -136,6 +140,7 @@ function LoanForm({initial, onSave, onCancel}) {
   const totalInt = Math.max(0, useEmi*totalMonths - +f.principal);
 
   const save = () => {
+    setTried(true);
     if (!valid) return;
     onSave({ name:f.name, principal:+f.principal, rate:+f.rate,
              tenureMonths:totalMonths, emi:useEmi, startDate:f.startDate });
@@ -228,11 +233,18 @@ function LoanForm({initial, onSave, onCancel}) {
 
         <div>
           <Lbl>Loan Start Date</Lbl>
-          <input type="date" value={f.startDate} max={today}
+          <input type="date" value={f.startDate}
             onChange={e=>set("startDate",e.target.value)} style={inp()}/>
           {endDate&&<p style={{margin:"4px 0 0",fontSize:11,color:C.purple}}>📅 Finishes: {endDate}</p>}
         </div>
       </div>
+
+      {/* Validation hint — shown after first save attempt */}
+      {tried && !valid && (
+        <p style={{margin:"10px 0 0",fontSize:11,color:C.red,fontWeight:600}}>
+          ⚠ Please fill in Loan Amount, Interest Rate, and Tenure to continue.
+        </p>
+      )}
 
       {/* Live summary */}
       {valid&&useEmi>0&&(
@@ -256,10 +268,11 @@ function LoanForm({initial, onSave, onCancel}) {
           style={{flex:1,padding:"9px",borderRadius:10,border:`1px solid ${C.border}`,
                   background:"#fff",color:C.muted,fontFamily:"inherit",fontSize:13,cursor:"pointer"}}>
           Cancel</button>
-        <button onClick={save} disabled={!valid}
+        <button onClick={save}
           style={{flex:2,padding:"9px",borderRadius:10,border:"none",
-                  background:valid?C.ink:"#9CA3AF",color:"#fff",fontFamily:"inherit",
-                  fontSize:13,fontWeight:700,cursor:valid?"pointer":"not-allowed"}}>
+                  background: tried&&!valid ? "#9CA3AF" : C.ink,
+                  color:"#fff",fontFamily:"inherit",
+                  fontSize:13,fontWeight:700,cursor: tried&&!valid ? "not-allowed":"pointer"}}>
           Save Loan ✓</button>
       </div>
     </div>

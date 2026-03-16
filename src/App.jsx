@@ -181,7 +181,9 @@ function ExpenseList({expenses, monthKey, onEdit, onDelete, isCurrentMonth}) {
   const dayTotal = filtered.reduce((s,e) => s+e.amount, 0);
 
   const allDates = [...new Set(expenses.map(e=>e.date.split("T")[0]))].sort();
-  const minDate  = allDates[0] || todayStr;
+  // If no expenses, allow picking any date in the last 90 days
+  const fallbackMin = (() => { const d=new Date(); d.setDate(d.getDate()-90); return d.toISOString().split("T")[0]; })();
+  const minDate  = allDates[0] || fallbackMin;
 
   const dateLabel =
     activeDate === todayStr     ? "Today" :
@@ -316,19 +318,36 @@ function LogExpenseForm({onAdd,disabled}) {
   const [amount,setAmount]=useState("");
   const [label,setLabel]=useState("Food");
   const [note,setNote]=useState("");
-  const submit=()=>{const v=parseFloat(amount.replace(/,/g,""));if(!v||v<=0||disabled)return;onAdd({amount:v,label,note:note.trim()});setAmount("");setNote("");};
+  const [err,setErr]=useState("");
+
+  const submit=()=>{
+    if(disabled) return;
+    const v=parseFloat(amount);
+    if(!v || v<=0 || !isFinite(v)) { setErr("Enter a valid amount greater than ₹0"); return; }
+    if(v>10000000) { setErr("Amount seems unusually large — please check"); return; }
+    setErr("");
+    onAdd({amount:v,label,note:note.trim()});
+    setAmount("");
+    setNote("");
+  };
+
   const chip=(cat)=><button key={cat.name} onClick={()=>!disabled&&setLabel(cat.name)} disabled={disabled}
     style={{padding:"5px 11px",borderRadius:99,border:`1.5px solid ${label===cat.name?C.ink:C.border}`,background:label===cat.name?C.ink:"#fff",color:label===cat.name?"#fff":C.ink,fontSize:11,fontFamily:"inherit",fontWeight:600,cursor:"pointer",whiteSpace:"nowrap",opacity:disabled?0.5:1}}>
     {cat.icon} {cat.name}</button>;
+
   return (
     <div style={{background:"#fff",borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 3px rgba(0,0,0,0.06)",padding:18,opacity:disabled?0.65:1}}>
       <p style={{fontSize:15,fontWeight:700,color:C.ink,margin:"0 0 14px"}}>+ Log Daily Expense</p>
       {disabled&&<div style={{marginBottom:10,padding:"7px 11px",borderRadius:8,background:"#FFFBEB",border:"1px solid #FCD34D",fontSize:12,color:C.amber}}>⚠️ Switch to current month to add expenses.</div>}
       <Label>Amount (₹) *</Label>
-      <input type="number" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="e.g. 250" disabled={disabled}
+      <input type="number" value={amount} min="0.01" step="any"
+        onChange={e=>{setAmount(e.target.value);if(err)setErr("");}}
+        placeholder="e.g. 250" disabled={disabled}
         onKeyDown={e=>e.key==="Enter"&&submit()}
-        style={{width:"100%",padding:"10px 12px",borderRadius:8,border:`1.5px solid ${C.border}`,fontFamily:"Georgia,serif",fontSize:20,background:C.bg,outline:"none",marginTop:6,marginBottom:12,boxSizing:"border-box"}} />
-      {/* Fix #2: Only daily/variable categories — fixed expenses managed in Plan tab */}
+        style={{width:"100%",padding:"10px 12px",borderRadius:8,
+          border:`1.5px solid ${err?C.red:C.border}`,
+          fontFamily:"Georgia,serif",fontSize:20,background:C.bg,outline:"none",marginTop:6,marginBottom:err?4:12,boxSizing:"border-box"}} />
+      {err&&<p style={{margin:"0 0 10px",fontSize:11,color:C.red,fontWeight:600}}>{err}</p>}
       <Label>Category</Label>
       <p style={{fontSize:11,color:C.muted,margin:"2px 0 6px"}}>For fixed bills like Rent or EMI, use the <strong>Plan tab</strong>.</p>
       <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>{VARIABLE_CATS.map(chip)}</div>
@@ -486,11 +505,21 @@ function DashboardScreen(props) {
   const MORE_TABS    = TABS.slice(4);
   const moreActive   = MORE_TABS.some(t => t.key === tab);
 
+  // Two-step reset: first tap shows warning, second tap executes
+  const [resetArmed, setResetArmed] = useState(false);
+  const handleReset = () => {
+    if (!resetArmed) {
+      setResetArmed(true);
+      // Auto-disarm after 4 seconds
+      setTimeout(() => setResetArmed(false), 4000);
+    } else {
+      setResetArmed(false);
+      resetAll();
+    }
+  };
+
   const [moreOpen,   setMoreOpen]   = useState(false);
   const [isMobile,   setIsMobile]   = useState(() => window.innerWidth <= 640);
-
-  // Inject APP_CSS into <head> once — guaranteed to work unlike JSX <style>
-  useEffect(() => {
     const el = document.createElement("style");
     el.setAttribute("data-mc", "1");
     el.textContent = APP_CSS;
@@ -645,12 +674,16 @@ function DashboardScreen(props) {
                     <span style={{fontSize:10,fontWeight:700,color:"#EA580C"}}>{streak}</span>
                   </div>
                 )}
-                <button
-                  onClick={()=>{if(window.confirm("Delete ALL data permanently?"))resetAll();}}
-                  style={{background:"#FFF1F2",border:"1px solid #FCA5A5",borderRadius:6,
-                          padding:"3px 8px",fontSize:10,color:"#DC2626",cursor:"pointer",
-                          fontFamily:"inherit",fontWeight:600,whiteSpace:"nowrap"}}>
-                  Reset
+                <button onClick={handleReset}
+                  style={{
+                    background: resetArmed ? C.red : "#FFF1F2",
+                    border:`1px solid ${resetArmed ? C.red : "#FCA5A5"}`,
+                    borderRadius:6, padding:"3px 8px", fontSize:10,
+                    color: resetArmed ? "#fff" : "#DC2626",
+                    cursor:"pointer", fontFamily:"inherit", fontWeight:700, whiteSpace:"nowrap",
+                    transition:"all 0.15s",
+                  }}>
+                  {resetArmed ? "Tap again to confirm" : "Reset"}
                 </button>
               </div>
             </header>
@@ -672,11 +705,16 @@ function DashboardScreen(props) {
                   {getGreeting(name)} 👋
                 </h1>
               </div>
-              <button onClick={()=>{if(window.confirm("Delete ALL data permanently?"))resetAll();}}
-                style={{background:"#FFF1F2",border:"1px solid #FCA5A5",borderRadius:8,
-                        padding:"6px 12px",fontSize:12,color:C.red,cursor:"pointer",
-                        fontFamily:"inherit",fontWeight:600}}>
-                🗑 Reset
+              <button onClick={handleReset}
+                style={{
+                  background: resetArmed ? C.red : "#FFF1F2",
+                  border:`1px solid ${resetArmed ? C.red : "#FCA5A5"}`,
+                  borderRadius:8, padding:"6px 12px", fontSize:12,
+                  color: resetArmed ? "#fff" : C.red,
+                  cursor:"pointer", fontFamily:"inherit", fontWeight:700,
+                  transition:"all 0.15s",
+                }}>
+                {resetArmed ? "⚠ Tap again — this will delete all data" : "🗑 Reset"}
               </button>
             </header>
           )}

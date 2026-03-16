@@ -62,15 +62,15 @@ function DotMenu({onEdit, onDelete}) {
           <button
             onClick={() => { setOpen(false); onEdit(); }}
             style={{display:"block",width:"100%",padding:"10px 14px",textAlign:"left",background:"none",border:"none",fontSize:13,color:C.ink,cursor:"pointer",fontFamily:"inherit",fontWeight:500}}
-            onMouseEnter={e=>e.target.style.background=C.bg}
-            onMouseLeave={e=>e.target.style.background="none"}
+            onMouseEnter={e=>e.currentTarget.style.background=C.bg}
+            onMouseLeave={e=>e.currentTarget.style.background="none"}
           >✏️ Edit</button>
           <div style={{height:1,background:C.border,margin:"0 8px"}} />
           <button
             onClick={() => { setOpen(false); onDelete(); }}
             style={{display:"block",width:"100%",padding:"10px 14px",textAlign:"left",background:"none",border:"none",fontSize:13,color:C.red,cursor:"pointer",fontFamily:"inherit",fontWeight:500}}
-            onMouseEnter={e=>e.target.style.background="#FFF1F2"}
-            onMouseLeave={e=>e.target.style.background="none"}
+            onMouseEnter={e=>e.currentTarget.style.background="#FFF1F2"}
+            onMouseLeave={e=>e.currentTarget.style.background="none"}
           >🗑 Delete</button>
         </div>
       )}
@@ -109,26 +109,30 @@ function AddButton({onClick, label}) {
 // ── Fix #3: InlineForm with key prop so it reinitialises on edit switch ───
 // key={editId||"new"} is set by each section — forces fresh useState per item
 function InlineForm({fields, onSave, onCancel, title}) {
-  // For select fields with no explicit default, seed from first option so the
-  // visible selection always matches the stored value (fixes Mutual Fund SIP save bug)
   const init = Object.fromEntries(fields.map(f => {
     if (f.default !== undefined && f.default !== "") return [f.key, f.default];
     if (f.type === "select" && f.options?.length) return [f.key, f.options[0].value];
     return [f.key, f.default ?? ""];
   }));
   const [vals, setVals] = useState(init);
+  const [tried, setTried] = useState(false);  // track if user attempted save
   const set = (k,v) => setVals(p => ({...p,[k]:v}));
 
+  const missingRequired = fields.filter(f => f.required && !String(vals[f.key]).trim());
+  const canSave = missingRequired.length === 0;
+
   const save = () => {
-    if (fields.filter(f=>f.required).some(f=>!vals[f.key])) return;
+    setTried(true);
+    if (!canSave) return;
     onSave(vals);
   };
 
-  const inputStyle = {
+  const inputStyle = (k, required) => ({
     width:"100%", marginTop:4, padding:"8px 10px", borderRadius:8,
-    border:`1.5px solid ${C.border}`, fontFamily:"inherit", fontSize:13,
+    border:`1.5px solid ${tried && required && !String(vals[k]).trim() ? C.red : C.border}`,
+    fontFamily:"inherit", fontSize:13,
     background:"#fff", outline:"none", boxSizing:"border-box",
-  };
+  });
 
   return (
     <div style={{background:C.bg,borderRadius:12,padding:16,marginTop:12,border:`1px solid ${C.border}`}}>
@@ -138,21 +142,32 @@ function InlineForm({fields, onSave, onCancel, title}) {
           <div key={f.key}>
             <Label>{f.label}{f.required?" *":""}</Label>
             {f.type==="select" ? (
-              <select value={vals[f.key]} onChange={e=>set(f.key,e.target.value)} style={inputStyle}>
+              <select value={vals[f.key]} onChange={e=>set(f.key,e.target.value)} style={inputStyle(f.key, f.required)}>
                 {f.options.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             ) : f.type==="date" ? (
-              <input type="date" value={vals[f.key]} onChange={e=>set(f.key,e.target.value)} style={inputStyle} />
+              <input type="date" value={vals[f.key]} onChange={e=>set(f.key,e.target.value)} style={inputStyle(f.key, f.required)} />
             ) : (
               <input type={f.type||"text"} value={vals[f.key]} onChange={e=>set(f.key,e.target.value)}
-                placeholder={f.placeholder||""} style={inputStyle} />
+                placeholder={f.placeholder||""} style={inputStyle(f.key, f.required)} />
+            )}
+            {tried && f.required && !String(vals[f.key]).trim() && (
+              <p style={{margin:"2px 0 0",fontSize:10,color:C.red}}>Required</p>
             )}
           </div>
         ))}
       </div>
-      <div style={{display:"flex",gap:10,marginTop:14}}>
+      <div style={{display:"flex",gap:10,marginTop:14,alignItems:"center"}}>
         <button onClick={onCancel} style={{flex:1,padding:"9px",borderRadius:10,border:`1px solid ${C.border}`,background:"#fff",color:C.muted,fontFamily:"inherit",fontSize:13,cursor:"pointer"}}>Cancel</button>
-        <button onClick={save}     style={{flex:2,padding:"9px",borderRadius:10,border:"none",background:C.ink,color:"#fff",fontFamily:"inherit",fontSize:13,fontWeight:700,cursor:"pointer"}}>Save ✓</button>
+        <button onClick={save}
+          disabled={tried && !canSave}
+          style={{flex:2,padding:"9px",borderRadius:10,border:"none",
+                  background: tried && !canSave ? C.muted : C.ink,
+                  color:"#fff",fontFamily:"inherit",fontSize:13,fontWeight:700,
+                  cursor: tried && !canSave ? "not-allowed" : "pointer",
+                  opacity: tried && !canSave ? 0.7 : 1}}>
+          Save ✓
+        </button>
       </div>
     </div>
   );
@@ -347,7 +362,7 @@ export function FuturePaymentsSection({payments,totalReserve,onAdd,onUpdate,onDe
   };
 
   const freqLabel  = (f) => ({yearly:"Yearly",halfyearly:"Half-Yearly",quarterly:"Quarterly"}[f]||f);
-  const daysUntil  = (ds) => Math.max(0, Math.round((new Date(ds)-new Date())/(1000*60*60*24)));
+  const daysUntil  = (ds) => Math.max(0, Math.round((new Date(ds+"T00:00:00")-new Date())/(1000*60*60*24)));
 
   return (
     <SectionCard icon="📅" title="Future Payment Reserve" color={C.purple}>
