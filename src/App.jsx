@@ -38,13 +38,12 @@ const C = {ink:"#1C1917",muted:"#78716C",border:"#E7E5E0",bg:"#F7F5F0",red:"#DC2
 
 // Responsive CSS injected once into <head> equivalent via a style tag in the app shell
 const APP_CSS = `
-  /* ── App shell ───────────────────────────────────────────── */
-  .mc-app    { display:flex; flex-direction:column; min-height:100vh; background:#F7F5F0; }
-  .mc-body   { display:flex; flex:1; }
-  .mc-main   { flex:1; min-width:0; display:flex; flex-direction:column; }
-  .mc-content{ flex:1; padding:18px 18px 80px; max-width:960px; width:100%; margin:0 auto; }
+  .mc-app  { display:flex; flex-direction:column; min-height:100vh; background:#F7F5F0; }
+  .mc-body { display:flex; flex:1; min-height:0; }
+  .mc-main { flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden; }
+  .mc-scroll { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  .mc-content { padding:18px 18px 24px; max-width:960px; width:100%; margin:0 auto; }
 
-  /* ── Sidebar — desktop + tablet ─────────────────────────── */
   .mc-sidebar {
     width:220px; min-width:220px; background:#1C1917;
     display:flex; flex-direction:column;
@@ -53,105 +52,20 @@ const APP_CSS = `
   }
   @media(max-width:900px){ .mc-sidebar { width:180px; min-width:180px; } }
 
-  /* ── Mobile ≤640px ───────────────────────────────────────── */
-  @media(max-width:640px){
-    .mc-sidebar { display:none; }
-    .mc-content { padding:12px 14px 76px; }
-
-    /* ── Compact header on mobile ── */
-    .mc-header-mobile {
-      display:flex; align-items:center; justify-content:space-between;
-      padding:9px 14px;
-      background:#fff; border-bottom:1px solid #E7E5E0;
-      position:sticky; top:0; z-index:100;
-    }
-    .mc-header-greeting  { font-size:14px; font-weight:700; color:#1C1917; font-family:Georgia,serif; margin:0; line-height:1.2; }
-    .mc-header-date      { font-size:10px; color:#78716C; font-weight:500; margin:0 0 1px; }
-    .mc-header-reset     {
-      background:#FFF1F2; border:1px solid #FCA5A5; border-radius:7px;
-      padding:5px 10px; font-size:11px; color:#DC2626;
-      cursor:pointer; font-family:inherit; font-weight:600; white-space:nowrap;
-    }
-
-    /* ── Bottom navigation ── */
-    .mc-bottom-nav {
-      display:flex; position:fixed; bottom:0; left:0; right:0; z-index:300;
-      background:#1C1917; border-top:1px solid rgba(255,255,255,0.08);
-      height:58px; padding:0;
-    }
-    .mc-bnav-item {
-      flex:1; display:flex; flex-direction:column;
-      align-items:center; justify-content:center; gap:2px;
-      border:none; background:transparent; cursor:pointer;
-      padding:6px 2px; font-family:inherit; position:relative;
-      -webkit-tap-highlight-color:transparent;
-    }
-    .mc-bnav-item.active { background:rgba(255,255,255,0.09); }
-    .mc-bnav-item.active::after {
-      content:""; position:absolute; top:0; left:50%;
-      transform:translateX(-50%);
-      width:20px; height:2px; border-radius:0 0 3px 3px;
-      background:#E7E5E0;
-    }
-    .mc-bnav-icon { font-size:17px; line-height:1; }
-    .mc-bnav-lbl  { font-size:9px; font-weight:600; letter-spacing:0.2px; color:#57534E; line-height:1; }
-    .mc-bnav-item.active .mc-bnav-lbl { color:#D6D3D1; }
-
-    /* ── More dropdown (floats up from bottom bar) ── */
-    .mc-more-dropdown {
-      position:fixed; bottom:58px; right:0;
-      background:#2C2623; border:1px solid rgba(255,255,255,0.10);
-      border-radius:12px 12px 0 0; padding:6px 0 4px;
-      min-width:160px; z-index:400;
-      box-shadow:0 -8px 30px rgba(0,0,0,0.35);
-      animation:slideUp 0.18s ease;
-    }
-    .mc-more-item {
-      display:flex; align-items:center; gap:10;
-      width:100%; padding:11px 18px; border:none;
-      background:transparent; color:#A8A29E;
-      font-size:13px; font-family:inherit; cursor:pointer;
-      text-align:left;
-    }
-    .mc-more-item.active { color:#F7F5F0; background:rgba(255,255,255,0.08); }
-    .mc-more-item:hover  { background:rgba(255,255,255,0.05); color:#D6D3D1; }
-    .mc-more-backdrop    {
-      position:fixed; inset:0; z-index:350;
-      background:rgba(0,0,0,0.2);
-    }
-  }
-
-  /* ── Hide mobile elements on desktop ────────────────────── */
-  .mc-bottom-nav    { display:none; }
-  .mc-header-mobile { display:none; }
-
-  /* ── Desktop header stays visible ───────────────────────── */
-  .mc-header-desktop { display:flex; }
-  @media(max-width:640px){ .mc-header-desktop { display:none; } }
-
-  /* ── Plan tab grid ───────────────────────────────────────── */
   .mc-plan-top  { display:grid; grid-template-columns:1fr; gap:0; }
   .mc-plan-full { width:100%; }
   @media(min-width:768px){ .mc-plan-top { grid-template-columns:1fr 1fr; gap:12px; } }
 
-  /* ── Misc ─────────────────────────────────────────────────── */
   .mc-expense-row { display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px solid #F7F5F0; gap:8px; }
   .mc-expense-row:last-child { border-bottom:none; }
   ::-webkit-scrollbar { display:none; }
   * { scrollbar-width:none; }
 
-  @keyframes fadeUp {
-    from { opacity:0; transform:translateX(-50%) translateY(-8px); }
-    to   { opacity:1; transform:translateX(-50%) translateY(0); }
-  }
-  @keyframes slideIn {
-    from { opacity:0; transform:translateX(-4px); }
-    to   { opacity:1; transform:translateX(0); }
-  }
-  @keyframes slideUp {
-    from { opacity:0; transform:translateY(10px); }
-    to   { opacity:1; transform:translateY(0); }
-  }
+  @keyframes fadeUp  { from{opacity:0;transform:translateX(-50%) translateY(-8px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
+  @keyframes slideIn { from{opacity:0;transform:translateX(-4px)} to{opacity:1;transform:translateX(0)} }
+  @keyframes slideUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+
+  .mc-bnav-item:active { opacity:0.7; }
 `;
 
 // ─── SHARED UI ────────────────────────────────────────────────────────────
@@ -559,7 +473,7 @@ function DashboardScreen(props) {
     showToast(`${fmt(amount)} saved under ${label} ✓`);
   };
 
-  // ── All tabs (used by desktop sidebar + More dropdown) ──────────────────
+  // ── All tabs ──────────────────────────────────────────────────────────────
   const TABS = [
     { key:"budget",  icon:"📊", label:"Dashboard" },
     { key:"plan",    icon:"🗂",  label:"Plan"      },
@@ -568,19 +482,41 @@ function DashboardScreen(props) {
     { key:"charts",  icon:"🥧",  label:"Charts"    },
     { key:"insight", icon:"💡",  label:"Insights"  },
   ];
-
-  // ── Mobile bottom nav: 4 primary + "More" (contains Charts + Insights) ───
-  const PRIMARY_TABS = TABS.slice(0, 4);   // Dashboard, Plan, Expenses, Loans
-  const MORE_TABS    = TABS.slice(4);      // Charts, Insights
+  const PRIMARY_TABS = TABS.slice(0, 4);
+  const MORE_TABS    = TABS.slice(4);
   const moreActive   = MORE_TABS.some(t => t.key === tab);
 
-  const [moreOpen, setMoreOpen] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [moreOpen,   setMoreOpen]   = useState(false);
+  const [isMobile,   setIsMobile]   = useState(() => window.innerWidth <= 640);
+
+  // Inject APP_CSS into <head> once — guaranteed to work unlike JSX <style>
+  useEffect(() => {
+    const el = document.createElement("style");
+    el.setAttribute("data-mc", "1");
+    el.textContent = APP_CSS;
+    // Remove any previous injection to avoid duplicates on HMR
+    document.head.querySelectorAll("[data-mc]").forEach(n => n.remove());
+    document.head.appendChild(el);
+    return () => el.remove();
+  }, []);
+
+  // Track viewport width for mobile/desktop switching
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth <= 640);
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
   const MonthBar=()=><MonthSelector selectedMonth={selectedMonth} onChange={setSelectedMonth} allExpenses={allExpenses}/>;
+
+  // ── Shared inline style tokens ─────────────────────────────────────────
+  const NAV_BG      = "#1C1917";
+  const NAV_HEIGHT  = 56;
+  const NAV_BORDER  = "1.5px solid rgba(255,255,255,0.14)";
 
   return (
     <div className="mc-app">
-      <style>{APP_CSS}</style>
+      <style>{APP_CSS}</style>{/* fallback for environments where useEffect head injection isn't immediate */}
 
       {/* ── Toast ── */}
       {toast && (
@@ -592,149 +528,179 @@ function DashboardScreen(props) {
         </div>
       )}
 
-      {/* ── More-menu backdrop (mobile) ── */}
-      {moreOpen && (
-        <div className="mc-more-backdrop" onClick={()=>setMoreOpen(false)} />
-      )}
-
-      {/* ── More dropdown (mobile) ── */}
-      {moreOpen && (
-        <div className="mc-more-dropdown">
-          <p style={{margin:"0 18px 4px",fontSize:9,color:"#57534E",
-                     textTransform:"uppercase",letterSpacing:"1px",fontWeight:700}}>
-            More sections
-          </p>
-          {MORE_TABS.map(({key,icon,label}) => (
-            <button key={key}
-              className={`mc-more-item${tab===key?" active":""}`}
-              onClick={()=>{ setTab(key); setMoreOpen(false); }}>
-              <span style={{fontSize:17}}>{icon}</span>
-              <span>{label}</span>
-            </button>
-          ))}
-        </div>
+      {/* ══════════════ MOBILE MORE OVERLAY ══════════════ */}
+      {isMobile && moreOpen && (
+        <>
+          {/* Backdrop */}
+          <div onClick={()=>setMoreOpen(false)}
+            style={{position:"fixed",inset:0,zIndex:9998,background:"rgba(0,0,0,0.3)"}} />
+          {/* Dropdown */}
+          <div style={{
+            position:"fixed", bottom:NAV_HEIGHT, left:0, right:0, zIndex:10000,
+            background:"#272220", borderTop:"1px solid rgba(255,255,255,0.12)",
+            borderRadius:"16px 16px 0 0", padding:"12px 0 10px",
+            boxShadow:"0 -8px 32px rgba(0,0,0,0.5)", animation:"slideUp 0.2s ease",
+          }}>
+            <p style={{margin:"0 16px 8px",fontSize:9,color:"#57534E",
+                       textTransform:"uppercase",letterSpacing:"1px",fontWeight:700}}>
+              More sections
+            </p>
+            {MORE_TABS.map(({key,icon,label}) => (
+              <button key={key}
+                onClick={()=>{ setTab(key); setMoreOpen(false); }}
+                style={{
+                  display:"flex", alignItems:"center", gap:12,
+                  width:"100%", padding:"13px 20px", border:"none",
+                  background: tab===key ? "rgba(255,255,255,0.09)" : "transparent",
+                  color: tab===key ? "#F7F5F0" : "#A8A29E",
+                  fontSize:15, fontFamily:"inherit",
+                  fontWeight: tab===key ? 700 : 400,
+                  cursor:"pointer", textAlign:"left",
+                }}>
+                <span style={{fontSize:20}}>{icon}</span>
+                <span>{label}</span>
+              </button>
+            ))}
+          </div>
+        </>
       )}
 
       <div className="mc-body">
 
         {/* ════════ SIDEBAR — desktop + tablet only ════════ */}
-        <aside className="mc-sidebar">
-          <div style={{padding:"20px 18px 16px",borderBottom:"1px solid rgba(255,255,255,0.07)"}}>
-            <p style={{margin:0,fontSize:9,color:"#57534E",textTransform:"uppercase",
-                       letterSpacing:"1.4px",fontWeight:700,marginBottom:4}}>Money Coach</p>
-            <p style={{margin:0,fontSize:11,color:"#A8A29E",lineHeight:1.4}}>
-              {new Date().toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"short"})}
-            </p>
-          </div>
-          <nav style={{flex:1,padding:"10px 8px"}}>
-            {TABS.map(({key,icon,label}) => {
-              const active = tab === key;
-              return (
-                <button key={key} onClick={()=>setTab(key)}
-                  style={{
-                    display:"flex",alignItems:"center",gap:10,
-                    width:"100%",padding:"10px 12px",marginBottom:2,
-                    borderRadius:9,border:"none",
-                    background:active?"rgba(255,255,255,0.10)":"transparent",
-                    borderLeft:`3px solid ${active?"#E7E5E0":"transparent"}`,
-                    color:active?"#F7F5F0":"#78716C",
-                    fontSize:13,fontFamily:"inherit",fontWeight:active?700:400,
-                    cursor:"pointer",textAlign:"left",
-                    transition:"background 0.15s,color 0.15s",
-                  }}
-                  onMouseEnter={e=>{if(!active){e.currentTarget.style.background="rgba(255,255,255,0.05)";e.currentTarget.style.color="#D6D3D1";}}}
-                  onMouseLeave={e=>{if(!active){e.currentTarget.style.background="transparent";e.currentTarget.style.color="#78716C";}}}
-                >
-                  <span style={{fontSize:16,width:20,textAlign:"center",flexShrink:0}}>{icon}</span>
-                  <span>{label}</span>
-                </button>
-              );
-            })}
-          </nav>
-          {streak > 0 && (
-            <div style={{padding:"12px 18px",borderTop:"1px solid rgba(255,255,255,0.07)"}}>
-              <div style={{display:"flex",alignItems:"center",gap:7}}>
-                <span style={{fontSize:16}}>🔥</span>
-                <div>
-                  <p style={{margin:0,fontSize:11,fontWeight:700,color:"#FDBA74"}}>{streak} day streak</p>
-                  <p style={{margin:0,fontSize:9,color:"#78716C"}}>Keep it up!</p>
+        {!isMobile && (
+          <aside className="mc-sidebar">
+            <div style={{padding:"20px 18px 16px",borderBottom:"1px solid rgba(255,255,255,0.07)"}}>
+              <p style={{margin:0,fontSize:9,color:"#57534E",textTransform:"uppercase",
+                         letterSpacing:"1.4px",fontWeight:700,marginBottom:4}}>Money Coach</p>
+              <p style={{margin:0,fontSize:11,color:"#A8A29E",lineHeight:1.4}}>
+                {new Date().toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"short"})}
+              </p>
+            </div>
+            <nav style={{flex:1,padding:"10px 8px"}}>
+              {TABS.map(({key,icon,label}) => {
+                const active = tab === key;
+                return (
+                  <button key={key} onClick={()=>setTab(key)}
+                    style={{
+                      display:"flex",alignItems:"center",gap:10,
+                      width:"100%",padding:"10px 12px",marginBottom:2,
+                      borderRadius:9,border:"none",
+                      background:active?"rgba(255,255,255,0.10)":"transparent",
+                      borderLeft:`3px solid ${active?"#E7E5E0":"transparent"}`,
+                      color:active?"#F7F5F0":"#78716C",
+                      fontSize:13,fontFamily:"inherit",fontWeight:active?700:400,
+                      cursor:"pointer",textAlign:"left",
+                      transition:"background 0.15s,color 0.15s",
+                    }}
+                    onMouseEnter={e=>{if(!active){e.currentTarget.style.background="rgba(255,255,255,0.05)";e.currentTarget.style.color="#D6D3D1";}}}
+                    onMouseLeave={e=>{if(!active){e.currentTarget.style.background="transparent";e.currentTarget.style.color="#78716C";}}}
+                  >
+                    <span style={{fontSize:16,width:20,textAlign:"center",flexShrink:0}}>{icon}</span>
+                    <span>{label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+            {streak > 0 && (
+              <div style={{padding:"12px 18px",borderTop:"1px solid rgba(255,255,255,0.07)"}}>
+                <div style={{display:"flex",alignItems:"center",gap:7}}>
+                  <span style={{fontSize:16}}>🔥</span>
+                  <div>
+                    <p style={{margin:0,fontSize:11,fontWeight:700,color:"#FDBA74"}}>{streak} day streak</p>
+                    <p style={{margin:0,fontSize:9,color:"#78716C"}}>Keep it up!</p>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-        </aside>
+            )}
+          </aside>
+        )}
 
         {/* ════════ MAIN AREA ════════ */}
         <div className="mc-main">
 
-          {/* ── Desktop header (hidden on mobile via CSS) ── */}
-          <header className="mc-header-desktop" style={{
-            background:"#fff",borderBottom:`1px solid ${C.border}`,
-            padding:"11px 18px",
-            justifyContent:"space-between",alignItems:"center",
-            position:"sticky",top:0,zIndex:100,
-          }}>
-            <div>
-              <p style={{margin:0,fontSize:11,color:C.muted,textTransform:"uppercase",
-                         letterSpacing:"1.1px",fontWeight:600,marginBottom:2}}>
-                {new Date().toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"short"})}
-              </p>
-              <h1 style={{fontSize:16,fontWeight:700,color:C.ink,fontFamily:"Georgia,serif",margin:0}}>
-                {getGreeting(name)} 👋
-              </h1>
-            </div>
-            <button onClick={()=>{if(window.confirm("Delete ALL data permanently?"))resetAll();}}
-              style={{background:"#FFF1F2",border:"1px solid #FCA5A5",borderRadius:8,
-                      padding:"6px 12px",fontSize:12,color:C.red,cursor:"pointer",
-                      fontFamily:"inherit",fontWeight:600}}>
-              🗑 Reset
-            </button>
-          </header>
+          {/* ── MOBILE HEADER — pure inline styles, no CSS class dependency ── */}
+          {isMobile && (
+            <header style={{
+              display:"flex", alignItems:"center", justifyContent:"space-between",
+              gap:8, padding:"9px 14px", flexShrink:0,
+              background:"#fff", borderBottom:"1px solid #E7E5E0",
+              position:"sticky", top:0, zIndex:100,
+            }}>
+              <div>
+                <p style={{margin:0,fontSize:10,color:"#78716C",fontWeight:500,marginBottom:2}}>
+                  {new Date().toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"})}
+                </p>
+                <p style={{margin:0,fontSize:15,fontWeight:700,color:"#1C1917",fontFamily:"Georgia,serif",lineHeight:1.2}}>
+                  {getGreeting(name)} 👋
+                </p>
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+                {streak > 0 && (
+                  <div style={{display:"flex",alignItems:"center",gap:4,
+                               background:"#FFF7ED",border:"1px solid #FDBA74",
+                               borderRadius:99,padding:"3px 8px"}}>
+                    <span style={{fontSize:12}}>🔥</span>
+                    <span style={{fontSize:11,fontWeight:700,color:"#EA580C"}}>{streak}</span>
+                  </div>
+                )}
+                <button
+                  onClick={()=>{if(window.confirm("Delete ALL data permanently?"))resetAll();}}
+                  style={{background:"#FFF1F2",border:"1px solid #FCA5A5",borderRadius:7,
+                          padding:"5px 10px",fontSize:11,color:"#DC2626",cursor:"pointer",
+                          fontFamily:"inherit",fontWeight:600,whiteSpace:"nowrap"}}>
+                  Reset
+                </button>
+              </div>
+            </header>
+          )}
 
-          {/* ── Mobile header (hidden on desktop via CSS) ── */}
-          <header className="mc-header-mobile">
-            <div>
-              <p className="mc-header-date">
-                {new Date().toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"})}
-              </p>
-              <p className="mc-header-greeting">{getGreeting(name)} 👋</p>
-            </div>
-            <div style={{display:"flex",alignItems:"center",gap:8}}>
-              {streak > 0 && (
-                <div style={{display:"flex",alignItems:"center",gap:4,
-                             background:"#FFF7ED",border:"1px solid #FDBA74",
-                             borderRadius:99,padding:"3px 8px"}}>
-                  <span style={{fontSize:12}}>🔥</span>
-                  <span style={{fontSize:11,fontWeight:700,color:"#EA580C"}}>{streak}</span>
-                </div>
-              )}
-              <button className="mc-header-reset"
-                onClick={()=>{if(window.confirm("Delete ALL data permanently?"))resetAll();}}>
-                Reset
+          {/* ── DESKTOP HEADER ── */}
+          {!isMobile && (
+            <header style={{
+              display:"flex", background:"#fff", borderBottom:`1px solid ${C.border}`,
+              padding:"11px 18px", justifyContent:"space-between", alignItems:"center",
+              position:"sticky", top:0, zIndex:100,
+            }}>
+              <div>
+                <p style={{margin:0,fontSize:11,color:C.muted,textTransform:"uppercase",
+                           letterSpacing:"1.1px",fontWeight:600,marginBottom:2}}>
+                  {new Date().toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"short"})}
+                </p>
+                <h1 style={{fontSize:16,fontWeight:700,color:C.ink,fontFamily:"Georgia,serif",margin:0}}>
+                  {getGreeting(name)} 👋
+                </h1>
+              </div>
+              <button onClick={()=>{if(window.confirm("Delete ALL data permanently?"))resetAll();}}
+                style={{background:"#FFF1F2",border:"1px solid #FCA5A5",borderRadius:8,
+                        padding:"6px 12px",fontSize:12,color:C.red,cursor:"pointer",
+                        fontFamily:"inherit",fontWeight:600}}>
+                🗑 Reset
               </button>
-            </div>
-          </header>
+            </header>
+          )}
 
-          {/* ── Page content ── */}
-          <div className="mc-content">
-            <div style={{animation:"slideIn 0.18s ease"}}>
+          {/* ── SCROLLABLE PAGE CONTENT ── */}
+          <div className="mc-scroll">
+            <div className="mc-content" style={{paddingBottom: isMobile ? `${NAV_HEIGHT + 16}px` : "40px"}}>
+              <div style={{animation:"slideIn 0.18s ease"}}>
 
-              {/* ══ BUDGET DASHBOARD ══ */}
-              {tab==="budget"&&(
-                <>
-                  <p style={{fontSize:12,color:C.muted,marginBottom:14,lineHeight:1.6}}>
-                    Financial overview for {new Date().toLocaleDateString("en-IN",{month:"long",year:"numeric"})}.
-                  </p>
-                  <BudgetDashboard
-                    totalIncome={totalIncome} totalFixed={totalFixed}
-                    totalSavings={totalSavings} totalReserve={totalReserve}
-                    remaining={remaining} dailyLimit={dailyLimit}
-                    incomeSources={incomeSources} fixedExpenses={fixedExpenses}
-                    savingsPlans={savingsPlans} futurePayments={futurePayments}
-                    currentExpenses={currentExpenses}
-                    loans={loans} />
-                </>
-              )}
+                {/* ══ BUDGET DASHBOARD ══ */}
+                {tab==="budget"&&(
+                  <>
+                    <p style={{fontSize:12,color:C.muted,marginBottom:14,lineHeight:1.6}}>
+                      Financial overview for {new Date().toLocaleDateString("en-IN",{month:"long",year:"numeric"})}.
+                    </p>
+                    <BudgetDashboard
+                      totalIncome={totalIncome} totalFixed={totalFixed}
+                      totalSavings={totalSavings} totalReserve={totalReserve}
+                      remaining={remaining} dailyLimit={dailyLimit}
+                      incomeSources={incomeSources} fixedExpenses={fixedExpenses}
+                      savingsPlans={savingsPlans} futurePayments={futurePayments}
+                      currentExpenses={currentExpenses}
+                      loans={loans} />
+                  </>
+                )}
 
         {/* ══ PLAN ══ */}
         {tab==="plan"&&(
@@ -832,30 +798,72 @@ function DashboardScreen(props) {
           }
         )()}
 
-            </div>{/* /slideIn */}
-          </div>{/* /mc-content */}
+              </div>{/* /slideIn */}
+            </div>{/* /mc-content */}
+          </div>{/* /mc-scroll */}
+
+          {/* ════════ MOBILE BOTTOM NAV — fully inline, no CSS class dependency ════════ */}
+          {isMobile && (
+            <nav style={{
+              position:"fixed", bottom:0, left:0, right:0,
+              zIndex:9999,
+              display:"flex",
+              background:NAV_BG,
+              borderTop:NAV_BORDER,
+              height:`${NAV_HEIGHT}px`,
+            }}>
+              {PRIMARY_TABS.map(({key,icon,label}) => {
+                const active = tab === key;
+                return (
+                  <button key={key}
+                    onClick={()=>{ setTab(key); setMoreOpen(false); }}
+                    style={{
+                      flex:1, display:"flex", flexDirection:"column",
+                      alignItems:"center", justifyContent:"center", gap:3,
+                      border:"none", cursor:"pointer", padding:"4px 2px",
+                      fontFamily:"inherit", minWidth:0,
+                      background: active ? "rgba(255,255,255,0.11)" : "transparent",
+                      borderTop: active ? "2.5px solid #E7E5E0" : "2.5px solid transparent",
+                      WebkitTapHighlightColor:"transparent",
+                    }}>
+                    <span style={{fontSize:19,lineHeight:1}}>{icon}</span>
+                    <span style={{
+                      fontSize:9, fontWeight:600,
+                      color: active ? "#D6D3D1" : "#57534E",
+                      lineHeight:1, maxWidth:52,
+                      overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap",
+                    }}>{label}</span>
+                  </button>
+                );
+              })}
+              {/* More button */}
+              <button
+                onClick={()=>setMoreOpen(p=>!p)}
+                style={{
+                  flex:1, display:"flex", flexDirection:"column",
+                  alignItems:"center", justifyContent:"center", gap:3,
+                  border:"none", cursor:"pointer", padding:"4px 2px",
+                  fontFamily:"inherit", minWidth:0,
+                  background: moreActive ? "rgba(255,255,255,0.11)" : "transparent",
+                  borderTop: moreActive ? "2.5px solid #E7E5E0" : "2.5px solid transparent",
+                  WebkitTapHighlightColor:"transparent",
+                }}>
+                <span style={{fontSize:19,lineHeight:1}}>
+                  {moreActive ? TABS.find(t=>t.key===tab)?.icon : "⋯"}
+                </span>
+                <span style={{
+                  fontSize:9, fontWeight:600,
+                  color: moreActive ? "#D6D3D1" : "#57534E",
+                  lineHeight:1,
+                }}>
+                  {moreActive ? TABS.find(t=>t.key===tab)?.label : "More"}
+                </span>
+              </button>
+            </nav>
+          )}
+
         </div>{/* /mc-main */}
       </div>{/* /mc-body */}
-
-      {/* ════════ BOTTOM NAV — mobile only ════════ */}
-      <nav className="mc-bottom-nav">
-        {PRIMARY_TABS.map(({key,icon,label}) => (
-          <button key={key}
-            className={`mc-bnav-item${tab===key?" active":""}`}
-            onClick={()=>{ setTab(key); setMoreOpen(false); }}>
-            <span className="mc-bnav-icon">{icon}</span>
-            <span className="mc-bnav-lbl">{label}</span>
-          </button>
-        ))}
-        {/* More button — active when Charts or Insights is selected */}
-        <button
-          className={`mc-bnav-item${moreActive?" active":""}`}
-          onClick={()=>setMoreOpen(p=>!p)}>
-          <span className="mc-bnav-icon">{moreActive ? TABS.find(t=>t.key===tab)?.icon : "⋯"}</span>
-          <span className="mc-bnav-lbl">{moreActive ? TABS.find(t=>t.key===tab)?.label : "More"}</span>
-        </button>
-      </nav>
-
     </div>
   );
 }
