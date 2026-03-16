@@ -180,6 +180,7 @@ export function IncomeSources({sources,totalIncome,onAdd,onUpdate,onDelete}) {
   };
 
   return (
+    <div id="plan-income">
     <SectionCard icon="💰" title="Income Sources" color={C.green}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
         <p style={{fontSize:10,color:"#78716C",textTransform:"uppercase",letterSpacing:"0.9px",fontWeight:600,margin:0}}>Total Monthly Income</p>
@@ -203,6 +204,7 @@ export function IncomeSources({sources,totalIncome,onAdd,onUpdate,onDelete}) {
       )}
       {mode===null && <AddButton onClick={()=>setMode("add")} label="Add Income Source" />}
     </SectionCard>
+    </div>
   );
 }
 
@@ -228,6 +230,7 @@ export function FixedExpensesSection({items,totalFixed,onAdd,onUpdate,onDelete})
   };
 
   return (
+    <div id="plan-fixed">
     <SectionCard icon="🏠" title="Fixed Monthly Expenses" color={C.red}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
         <p style={{fontSize:10,color:C.muted,textTransform:"uppercase",letterSpacing:"0.9px",fontWeight:600,margin:0}}>Total Fixed</p>
@@ -253,6 +256,7 @@ export function FixedExpensesSection({items,totalFixed,onAdd,onUpdate,onDelete})
       )}
       {mode===null && <AddButton onClick={()=>setMode("add")} label="Add Fixed Expense" />}
     </SectionCard>
+    </div>
   );
 }
 
@@ -278,6 +282,7 @@ export function SavingsSection({plans,totalSavings,onAdd,onUpdate,onDelete}) {
   };
 
   return (
+    <div id="plan-savings">
     <SectionCard icon="📈" title="Savings & Investments" color={C.blue}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
         <p style={{fontSize:10,color:C.muted,textTransform:"uppercase",letterSpacing:"0.9px",fontWeight:600,margin:0}}>Total Monthly Savings</p>
@@ -303,6 +308,7 @@ export function SavingsSection({plans,totalSavings,onAdd,onUpdate,onDelete}) {
       )}
       {mode===null && <AddButton onClick={()=>setMode("add")} label="Add Savings Plan" />}
     </SectionCard>
+    </div>
   );
 }
 

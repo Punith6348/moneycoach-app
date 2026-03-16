@@ -699,7 +699,22 @@ function DashboardScreen(props) {
                       incomeSources={incomeSources} fixedExpenses={fixedExpenses}
                       savingsPlans={savingsPlans} futurePayments={futurePayments}
                       currentExpenses={currentExpenses}
-                      loans={loans} />
+                      loans={loans}
+                      onNavigate={(targetTab, sectionId) => {
+                        setTab(targetTab);
+                        if (sectionId) {
+                          // After React re-renders the new tab, scroll to + flash the section
+                          setTimeout(() => {
+                            const el = document.getElementById(sectionId);
+                            if (!el) return;
+                            el.scrollIntoView({ behavior:"smooth", block:"start" });
+                            // Pulse highlight
+                            el.classList.add("mc-section-flash");
+                            setTimeout(() => el.classList.remove("mc-section-flash"), 1200);
+                          }, 120);
+                        }
+                      }}
+                    />
                   </>
                 )}
 

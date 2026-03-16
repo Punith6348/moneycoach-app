@@ -3,17 +3,13 @@
 // "Monthly Budget Flow" removed — numbers already in summary cards above.
 // No calculation changes.
 
+import { useState } from "react";
 import { calcMonthlyReserve, calcLoanTotals } from "./useAppData";
 
 const C = {ink:"#1C1917",muted:"#78716C",border:"#E7E5E0",bg:"#F7F5F0",red:"#DC2626",green:"#16A34A",amber:"#D97706",blue:"#2563EB",purple:"#7C3AED"};
 const fmt = (n) => `₹${Math.abs(Math.round(n)).toLocaleString("en-IN")}`;
 
 const DASH_CSS = `
-  /* ── Summary cards ──────────────────────────────────────────
-     Mobile  (<480px) : 2 cols — 2-2-1 wrap (more above-fold)
-     Tablet  (480-860): 2 cols
-     Desktop (>860px) : 5 cols — single row
-  ────────────────────────────────────────────────────────── */
   .mc-summary-row {
     display: grid;
     grid-template-columns: repeat(2,1fr);
@@ -23,28 +19,37 @@ const DASH_CSS = `
   @media(min-width:860px){
     .mc-summary-row { grid-template-columns: repeat(5,1fr); gap:8px; margin-bottom:12px; }
   }
-
-  /* Compact card padding: mobile first */
   .mc-summary-card { padding:8px 10px; }
   @media(min-width:480px){ .mc-summary-card { padding:9px 11px; } }
   @media(min-width:860px){ .mc-summary-card { padding:11px 12px; } }
-
-  /* Amount font size */
   .mc-summary-amt { font-size:14px; }
   @media(min-width:480px){ .mc-summary-amt { font-size:15px; } }
   @media(min-width:860px){ .mc-summary-amt { font-size:14px; } }
-
-  /* Label font — even tighter on mobile */
   .mc-summary-lbl { font-size:8px; }
   @media(min-width:480px){ .mc-summary-lbl { font-size:9px; } }
-
-  /* Icon size */
   .mc-summary-icon { font-size:12px; }
   @media(min-width:480px){ .mc-summary-icon { font-size:13px; } }
-
-  /* Allocation tiles */
   .mc-alloc-row { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
   @media(min-width:600px){ .mc-alloc-row { grid-template-columns:repeat(3,1fr); } }
+
+  /* Clickable card hover / press */
+  .mc-card-btn {
+    text-align:left; font-family:inherit; cursor:pointer;
+    transition: box-shadow 0.15s, transform 0.1s, background 0.15s;
+  }
+  .mc-card-btn:hover {
+    box-shadow: 0 3px 10px rgba(0,0,0,0.10) !important;
+    transform: translateY(-1px);
+  }
+  .mc-card-btn:active { transform: scale(0.97); opacity:0.9; }
+
+  /* Flash highlight animation for scroll target */
+  @keyframes sectionFlash {
+    0%   { box-shadow: 0 0 0 3px #2563EB66; }
+    60%  { box-shadow: 0 0 0 5px #2563EB44; }
+    100% { box-shadow: 0 0 0 0px transparent; }
+  }
+  .mc-section-flash { animation: sectionFlash 1.1s ease forwards; border-radius:12px; }
 `;
 
 const ICONS_MAP = {
@@ -63,7 +68,9 @@ export default function BudgetDashboard({
   remaining, dailyLimit,
   incomeSources, fixedExpenses, savingsPlans, futurePayments,
   currentExpenses, loans = [],
+  onNavigate,   // (tab, sectionId?) => void
 }) {
+  const [hoveredCard, setHoveredCard] = useState(null);
   const now        = new Date();
   const lastDay    = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
   const daysLeft   = Math.max(1, lastDay - now.getDate() + 1);
@@ -142,32 +149,72 @@ export default function BudgetDashboard({
       {/* ══ 2. SUMMARY CARDS ══ */}
       <div className="mc-summary-row">
         {[
-          {label:"Total Income",         value:fmt(totalIncome),                                          color:C.green,  icon:"💰"},
-          {label:"Fixed Expenses",        value:fmt(totalFixed),                                           color:C.red,    icon:"🏠"},
-          {label:"Savings & Investments", value:fmt(totalSavings),                                        color:C.blue,   icon:"📈"},
-          {label:"Remaining Budget",      value:remaining>=0?fmt(remaining):`−${fmt(remaining)}`,         color:remColor, icon:"✅"},
-          {label:"Loan EMI",              value:loans.length>0?`${fmt(totalLoanEmi)}/mo`:"₹0",            color:C.purple, icon:"🏦"},
-        ].map(t => (
-        <div key={t.label} className="mc-summary-card" style={{
-            background:"#fff", borderRadius:10,
-            border:`1px solid ${C.border}`,
-            boxShadow:"0 1px 2px rgba(0,0,0,0.04)",
+          // navTo: {tab, section} for editable cards — null for computed/derived cards
+          { label:"Total Income",         value:fmt(totalIncome),                                   color:C.green,  icon:"💰", navTo:{tab:"plan",    section:"plan-income"} },
+          { label:"Fixed Expenses",       value:fmt(totalFixed),                                    color:C.red,    icon:"🏠", navTo:{tab:"plan",    section:"plan-fixed"}  },
+          { label:"Savings & Inv.",       value:fmt(totalSavings),                                  color:C.blue,   icon:"📈", navTo:{tab:"plan",    section:"plan-savings"} },
+          { label:"Remaining Budget",     value:remaining>=0?fmt(remaining):`−${fmt(remaining)}`,  color:remColor, icon:"✅", navTo:null },
+          { label:"Loan EMI",             value:loans.length>0?`${fmt(totalLoanEmi)}/mo`:"₹0",     color:C.purple, icon:"🏦", navTo:{tab:"loans",   section:null} },
+        ].map(t => {
+          const clickable = !!t.navTo && !!onNavigate;
+          const hovered   = hoveredCard === t.label;
+          const sharedStyle = {
+            background: hovered && clickable ? "#FAFAF9" : "#fff",
+            borderRadius:10,
+            border:`1px solid ${hovered && clickable ? C.ink+"44" : C.border}`,
+            boxShadow: hovered && clickable
+              ? "0 3px 10px rgba(0,0,0,0.10)"
+              : "0 1px 2px rgba(0,0,0,0.04)",
             display:"flex", flexDirection:"column", gap:0,
-          }}>
-            <div style={{display:"flex",alignItems:"center",gap:4,marginBottom:4}}>
-              <span className="mc-summary-icon" style={{lineHeight:1}}>{t.icon}</span>
-              <p className="mc-summary-lbl" style={{
-                margin:0, color:C.muted,
-                textTransform:"uppercase", letterSpacing:"0.7px",
-                fontWeight:700, lineHeight:1.3,
-              }}>{t.label}</p>
+          };
+          const inner = (
+            <>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}}>
+                <div style={{display:"flex",alignItems:"center",gap:4}}>
+                  <span className="mc-summary-icon" style={{lineHeight:1}}>{t.icon}</span>
+                  <p className="mc-summary-lbl" style={{
+                    margin:0, color:C.muted,
+                    textTransform:"uppercase", letterSpacing:"0.7px",
+                    fontWeight:700, lineHeight:1.3,
+                  }}>{t.label}</p>
+                </div>
+                {/* Chevron — only on clickable cards */}
+                {clickable && (
+                  <span style={{
+                    fontSize:9, color: hovered ? C.ink : C.border,
+                    transition:"color 0.15s", lineHeight:1, flexShrink:0,
+                  }}>›</span>
+                )}
+              </div>
+              <p className="mc-summary-amt" style={{
+                margin:0, fontWeight:700, color:t.color,
+                fontFamily:"Georgia,serif", lineHeight:1.1,
+              }}>{t.value}</p>
+            </>
+          );
+
+          return clickable ? (
+            <button
+              key={t.label}
+              className="mc-summary-card mc-card-btn"
+              style={sharedStyle}
+              onClick={() => onNavigate(t.navTo.tab, t.navTo.section)}
+              onMouseEnter={() => setHoveredCard(t.label)}
+              onMouseLeave={() => setHoveredCard(null)}
+              title={`Edit ${t.label}`}
+            >
+              {inner}
+            </button>
+          ) : (
+            <div
+              key={t.label}
+              className="mc-summary-card"
+              style={sharedStyle}
+            >
+              {inner}
             </div>
-            <p className="mc-summary-amt" style={{
-              margin:0, fontWeight:700, color:t.color,
-              fontFamily:"Georgia,serif", lineHeight:1.1,
-            }}>{t.value}</p>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* ══ 3. INCOME ALLOCATION — replaces duplicate "Monthly Budget Flow" ══ */}
@@ -178,9 +225,22 @@ export default function BudgetDashboard({
             <p style={{margin:0,fontSize:12,fontWeight:700,color:C.ink}}>Income Allocation</p>
             <p style={{margin:0,fontSize:10,color:C.muted}}>How your {fmt(totalIncome)} is distributed</p>
           </div>
-          {/* Spent this month — the one metric not in summary cards */}
-          <div style={{textAlign:"right"}}>
-            <p style={{margin:0,fontSize:9,color:C.muted,textTransform:"uppercase",letterSpacing:"0.8px"}}>Spent this month</p>
+          {/* Spent this month — clickable → Expenses tab */}
+          <div
+            onClick={() => onNavigate && onNavigate("home", null)}
+            style={{
+              textAlign:"right",
+              cursor: onNavigate ? "pointer" : "default",
+              padding:"4px 6px", borderRadius:8,
+              transition:"background 0.12s",
+            }}
+            onMouseEnter={e=>{ if(onNavigate) e.currentTarget.style.background=C.bg; }}
+            onMouseLeave={e=>{ e.currentTarget.style.background="transparent"; }}
+            title={onNavigate ? "View Expenses" : undefined}
+          >
+            <p style={{margin:0,fontSize:9,color:C.muted,textTransform:"uppercase",letterSpacing:"0.8px"}}>
+              Spent this month {onNavigate && <span style={{color:C.muted}}>›</span>}
+            </p>
             <p style={{margin:0,fontSize:13,fontWeight:700,color:barColor,fontFamily:"Georgia,serif"}}>{fmt(monthSpent)}</p>
           </div>
         </div>
