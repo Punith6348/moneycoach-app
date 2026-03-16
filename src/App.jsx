@@ -7,6 +7,7 @@ import { useAppData, currentMonthKey, monthKeyToLabel, getActiveMonthKeys } from
 import BudgetDashboard  from "./BudgetDashboard";
 import { IncomeSources, FixedExpensesSection, SavingsSection, FuturePaymentsSection } from "./FinancialPlan";
 import LoansTab         from "./LoansTab";
+import MonthlyReview    from "./MonthlyReview";
 import { calcLoanTotals } from "./useAppData";
 
 const fmt = (n) => `₹${Math.abs(Math.round(n)).toLocaleString("en-IN")}`;
@@ -494,15 +495,16 @@ function DashboardScreen(props) {
 
   // ── All tabs ──────────────────────────────────────────────────────────────
   const TABS = [
-    { key:"budget",  icon:"📊", label:"Dashboard" },
-    { key:"plan",    icon:"🗂",  label:"Plan"      },
-    { key:"home",    icon:"🏠",  label:"Expenses"  },
-    { key:"loans",   icon:"🏦",  label:"Loans"     },
-    { key:"charts",  icon:"🥧",  label:"Charts"    },
-    { key:"insight", icon:"💡",  label:"Insights"  },
+    { key:"budget",  icon:"📊", label:"Dashboard"  },
+    { key:"plan",    icon:"🗂",  label:"Plan"       },
+    { key:"home",    icon:"🏠",  label:"Expenses"   },
+    { key:"loans",   icon:"🏦",  label:"Loans"      },
+    { key:"review",  icon:"📅",  label:"Review"     },
+    { key:"charts",  icon:"🥧",  label:"Charts"     },
+    { key:"insight", icon:"💡",  label:"Insights"   },
   ];
-  const PRIMARY_TABS = TABS.slice(0, 4);
-  const MORE_TABS    = TABS.slice(4);
+  const PRIMARY_TABS = TABS.slice(0, 4);          // Dashboard Plan Expenses Loans
+  const MORE_TABS    = TABS.slice(4);             // Review Charts Insights
   const moreActive   = MORE_TABS.some(t => t.key === tab);
 
   // Two-step reset: first tap shows warning, second tap executes
@@ -829,6 +831,21 @@ function DashboardScreen(props) {
             onAdd={addLoan}
             onUpdate={updateLoan}
             onDelete={deleteLoan}
+          />
+        )}
+
+        {/* ══ MONTHLY REVIEW ══ */}
+        {tab==="review"&&(
+          <MonthlyReview
+            selectedMonth={selectedMonth}
+            onMonthChange={setSelectedMonth}
+            allExpenses={allExpenses}
+            totalIncome={totalIncome}
+            totalFixed={totalFixed}
+            totalSavings={totalSavings}
+            totalReserve={totalReserve}
+            loans={loans}
+            futurePayments={futurePayments}
           />
         )}
 
