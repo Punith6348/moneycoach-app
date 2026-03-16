@@ -17,7 +17,7 @@ const DASH_CSS = `
     margin-bottom: 10px;
   }
   @media(min-width:860px){
-    .mc-summary-row { grid-template-columns: repeat(5,1fr); gap:8px; margin-bottom:12px; }
+    .mc-summary-row { grid-template-columns: repeat(4,1fr); gap:8px; margin-bottom:12px; }
   }
   .mc-summary-card { padding:8px 10px; }
   @media(min-width:480px){ .mc-summary-card { padding:9px 11px; } }
@@ -152,9 +152,8 @@ export default function BudgetDashboard({
           // navTo: {tab, section} for editable cards — null for computed/derived cards
           { label:"Total Income",         value:fmt(totalIncome),                                   color:C.green,  icon:"💰", navTo:{tab:"plan",    section:"plan-income"} },
           { label:"Fixed Expenses",       value:fmt(totalFixed),                                    color:C.red,    icon:"🏠", navTo:{tab:"plan",    section:"plan-fixed"}  },
-          { label:"Savings & Inv.",       value:fmt(totalSavings),                                  color:C.blue,   icon:"📈", navTo:{tab:"plan",    section:"plan-savings"} },
-          { label:"Remaining Budget",     value:remaining>=0?fmt(remaining):`−${fmt(remaining)}`,  color:remColor, icon:"✅", navTo:null },
-          { label:"Loan EMI",             value:loans.length>0?`${fmt(totalLoanEmi)}/mo`:"₹0",     color:C.purple, icon:"🏦", navTo:{tab:"loans",   section:null} },
+          { label:"Savings & Inv.",       value:fmt(totalSavings),                              color:C.blue,   icon:"📈", navTo:{tab:"plan",  section:"plan-savings"} },
+          { label:"Loan EMI",             value:loans.length>0?`${fmt(totalLoanEmi)}/mo`:"₹0", color:C.purple, icon:"🏦", navTo:{tab:"loans", section:null} },
         ].map(t => {
           const clickable = !!t.navTo && !!onNavigate;
           const hovered   = hoveredCard === t.label;
