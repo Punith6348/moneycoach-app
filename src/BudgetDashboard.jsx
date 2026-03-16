@@ -10,26 +10,39 @@ const fmt = (n) => `₹${Math.abs(Math.round(n)).toLocaleString("en-IN")}`;
 
 const DASH_CSS = `
   /* ── Summary cards ──────────────────────────────────────────
-     Mobile  (<480px) : 1 col — full-width stack
-     Tablet  (480-860): 2 cols — 2-2-1 wrap
+     Mobile  (<480px) : 2 cols — 2-2-1 wrap (more above-fold)
+     Tablet  (480-860): 2 cols
      Desktop (>860px) : 5 cols — single row
   ────────────────────────────────────────────────────────── */
   .mc-summary-row {
     display: grid;
-    grid-template-columns: 1fr;
-    gap: 8px;
-    margin-bottom: 12px;
-  }
-  @media(min-width:480px){
-    .mc-summary-row { grid-template-columns: repeat(2,1fr); }
+    grid-template-columns: repeat(2,1fr);
+    gap: 6px;
+    margin-bottom: 10px;
   }
   @media(min-width:860px){
-    .mc-summary-row { grid-template-columns: repeat(5,1fr); }
+    .mc-summary-row { grid-template-columns: repeat(5,1fr); gap:8px; margin-bottom:12px; }
   }
-  .mc-summary-card { padding:10px 12px; }
-  @media(min-width:480px){ .mc-summary-card { padding:11px 12px; } }
-  .mc-summary-amt { font-size:15px; }
+
+  /* Compact card padding: mobile first */
+  .mc-summary-card { padding:8px 10px; }
+  @media(min-width:480px){ .mc-summary-card { padding:9px 11px; } }
+  @media(min-width:860px){ .mc-summary-card { padding:11px 12px; } }
+
+  /* Amount font size */
+  .mc-summary-amt { font-size:14px; }
+  @media(min-width:480px){ .mc-summary-amt { font-size:15px; } }
   @media(min-width:860px){ .mc-summary-amt { font-size:14px; } }
+
+  /* Label font — even tighter on mobile */
+  .mc-summary-lbl { font-size:8px; }
+  @media(min-width:480px){ .mc-summary-lbl { font-size:9px; } }
+
+  /* Icon size */
+  .mc-summary-icon { font-size:12px; }
+  @media(min-width:480px){ .mc-summary-icon { font-size:13px; } }
+
+  /* Allocation tiles */
   .mc-alloc-row { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
   @media(min-width:600px){ .mc-alloc-row { grid-template-columns:repeat(3,1fr); } }
 `;
@@ -87,39 +100,39 @@ export default function BudgetDashboard({
 
       {/* ══ 1. HERO CARD ══ */}
       <div style={{
-        background:"#1C1917", borderRadius:13, padding:"14px 16px",
-        marginBottom:12, display:"flex", justifyContent:"space-between", alignItems:"flex-end", gap:12,
+        background:"#1C1917", borderRadius:12, padding:"11px 14px",
+        marginBottom:10, display:"flex", justifyContent:"space-between", alignItems:"flex-end", gap:12,
       }}>
         <div style={{flex:1, minWidth:0}}>
-          <p style={{margin:0, fontSize:9, color:"#78716C", textTransform:"uppercase", letterSpacing:"1.3px", fontWeight:700}}>
+          <p style={{margin:0, fontSize:8, color:"#78716C", textTransform:"uppercase", letterSpacing:"1.3px", fontWeight:700}}>
             Remaining Balance
           </p>
           <p style={{
             margin:"2px 0 0", lineHeight:1, fontWeight:700, fontFamily:"Georgia,serif",
-            fontSize: remaining >= 1000000 ? 30 : remaining >= 100000 ? 34 : 38,
+            fontSize: remaining >= 1000000 ? 28 : remaining >= 100000 ? 32 : 34,
             color: remaining >= 0 ? "#fff" : "#F87171",
           }}>
             {remaining >= 0 ? fmt(remaining) : `−${fmt(remaining)}`}
           </p>
-          <div style={{height:1, background:"rgba(255,255,255,0.08)", margin:"9px 0 8px", maxWidth:280}} />
-          <div style={{display:"flex", alignItems:"baseline", gap:5, flexWrap:"wrap"}}>
-            <p style={{margin:0, fontSize:10, color:"#A8A29E"}}>Suggested daily spend</p>
-            <p style={{margin:0, fontSize:15, fontWeight:700, fontFamily:"Georgia,serif", color: dailyLimit>0?"#E7E5E0":"#F87171"}}>
+          <div style={{height:1, background:"rgba(255,255,255,0.08)", margin:"7px 0 6px", maxWidth:260}} />
+          <div style={{display:"flex", alignItems:"baseline", gap:4, flexWrap:"wrap"}}>
+            <p style={{margin:0, fontSize:9, color:"#A8A29E"}}>Daily spend</p>
+            <p style={{margin:0, fontSize:13, fontWeight:700, fontFamily:"Georgia,serif", color: dailyLimit>0?"#E7E5E0":"#F87171"}}>
               {dailyLimit > 0 ? fmt(dailyLimit) : "₹0"}
             </p>
           </div>
-          <p style={{margin:"3px 0 0", fontSize:10, color:"#57534E"}}>
-            {daysLeft} days remaining in {monthName}
+          <p style={{margin:"2px 0 0", fontSize:9, color:"#57534E"}}>
+            {daysLeft} days left in {monthName}
           </p>
         </div>
         {todaySpent > 0 && (
           <div style={{textAlign:"right", flexShrink:0}}>
-            <p style={{margin:0, fontSize:9, color:"#57534E", textTransform:"uppercase", letterSpacing:"0.8px"}}>Today</p>
-            <p style={{margin:"2px 0 0", fontSize:14, fontWeight:700, fontFamily:"Georgia,serif",
+            <p style={{margin:0, fontSize:8, color:"#57534E", textTransform:"uppercase", letterSpacing:"0.8px"}}>Today</p>
+            <p style={{margin:"1px 0 0", fontSize:13, fontWeight:700, fontFamily:"Georgia,serif",
               color: todaySpent <= dailyLimit ? "#86EFAC" : "#F87171"}}>
               {fmt(todaySpent)}
             </p>
-            <p style={{margin:"1px 0 0", fontSize:9, color: todaySpent<=dailyLimit?"#86EFAC":"#F87171"}}>
+            <p style={{margin:"1px 0 0", fontSize:8, color: todaySpent<=dailyLimit?"#86EFAC":"#F87171"}}>
               {todaySpent<=dailyLimit?"✓ within limit":"⚠ over limit"}
             </p>
           </div>
@@ -136,16 +149,16 @@ export default function BudgetDashboard({
           {label:"Loan EMI",              value:loans.length>0?`${fmt(totalLoanEmi)}/mo`:"₹0",            color:C.purple, icon:"🏦"},
         ].map(t => (
         <div key={t.label} className="mc-summary-card" style={{
-            background:"#fff", borderRadius:11,
+            background:"#fff", borderRadius:10,
             border:`1px solid ${C.border}`,
-            boxShadow:"0 1px 3px rgba(0,0,0,0.05)",
+            boxShadow:"0 1px 2px rgba(0,0,0,0.04)",
             display:"flex", flexDirection:"column", gap:0,
           }}>
-            <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:5}}>
-              <span style={{fontSize:13,lineHeight:1}}>{t.icon}</span>
-              <p style={{
-                margin:0, fontSize:9, color:C.muted,
-                textTransform:"uppercase", letterSpacing:"0.8px",
+            <div style={{display:"flex",alignItems:"center",gap:4,marginBottom:4}}>
+              <span className="mc-summary-icon" style={{lineHeight:1}}>{t.icon}</span>
+              <p className="mc-summary-lbl" style={{
+                margin:0, color:C.muted,
+                textTransform:"uppercase", letterSpacing:"0.7px",
                 fontWeight:700, lineHeight:1.3,
               }}>{t.label}</p>
             </div>

@@ -511,8 +511,8 @@ function DashboardScreen(props) {
 
   // ── Shared inline style tokens ─────────────────────────────────────────
   const NAV_BG      = "#1C1917";
-  const NAV_HEIGHT  = 56;
-  const NAV_BORDER  = "1.5px solid rgba(255,255,255,0.14)";
+  const NAV_HEIGHT  = 48;
+  const NAV_BORDER  = "1px solid rgba(255,255,255,0.12)";
 
   return (
     <div className="mc-app">
@@ -619,35 +619,36 @@ function DashboardScreen(props) {
         {/* ════════ MAIN AREA ════════ */}
         <div className="mc-main">
 
-          {/* ── MOBILE HEADER — pure inline styles, no CSS class dependency ── */}
+          {/* ── MOBILE HEADER ── */}
           {isMobile && (
             <header style={{
               display:"flex", alignItems:"center", justifyContent:"space-between",
-              gap:8, padding:"9px 14px", flexShrink:0,
+              gap:6, padding:"6px 12px", flexShrink:0,
               background:"#fff", borderBottom:"1px solid #E7E5E0",
               position:"sticky", top:0, zIndex:100,
             }}>
               <div>
-                <p style={{margin:0,fontSize:10,color:"#78716C",fontWeight:500,marginBottom:2}}>
+                <p style={{margin:0,fontSize:9,color:"#78716C",fontWeight:500,marginBottom:1,
+                           textTransform:"uppercase",letterSpacing:"0.8px"}}>
                   {new Date().toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"})}
                 </p>
-                <p style={{margin:0,fontSize:15,fontWeight:700,color:"#1C1917",fontFamily:"Georgia,serif",lineHeight:1.2}}>
+                <p style={{margin:0,fontSize:14,fontWeight:700,color:"#1C1917",fontFamily:"Georgia,serif",lineHeight:1.15}}>
                   {getGreeting(name)} 👋
                 </p>
               </div>
-              <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+              <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
                 {streak > 0 && (
-                  <div style={{display:"flex",alignItems:"center",gap:4,
+                  <div style={{display:"flex",alignItems:"center",gap:3,
                                background:"#FFF7ED",border:"1px solid #FDBA74",
-                               borderRadius:99,padding:"3px 8px"}}>
-                    <span style={{fontSize:12}}>🔥</span>
-                    <span style={{fontSize:11,fontWeight:700,color:"#EA580C"}}>{streak}</span>
+                               borderRadius:99,padding:"2px 7px"}}>
+                    <span style={{fontSize:11}}>🔥</span>
+                    <span style={{fontSize:10,fontWeight:700,color:"#EA580C"}}>{streak}</span>
                   </div>
                 )}
                 <button
                   onClick={()=>{if(window.confirm("Delete ALL data permanently?"))resetAll();}}
-                  style={{background:"#FFF1F2",border:"1px solid #FCA5A5",borderRadius:7,
-                          padding:"5px 10px",fontSize:11,color:"#DC2626",cursor:"pointer",
+                  style={{background:"#FFF1F2",border:"1px solid #FCA5A5",borderRadius:6,
+                          padding:"3px 8px",fontSize:10,color:"#DC2626",cursor:"pointer",
                           fontFamily:"inherit",fontWeight:600,whiteSpace:"nowrap"}}>
                   Reset
                 </button>
@@ -688,8 +689,8 @@ function DashboardScreen(props) {
                 {/* ══ BUDGET DASHBOARD ══ */}
                 {tab==="budget"&&(
                   <>
-                    <p style={{fontSize:12,color:C.muted,marginBottom:14,lineHeight:1.6}}>
-                      Financial overview for {new Date().toLocaleDateString("en-IN",{month:"long",year:"numeric"})}.
+                    <p style={{fontSize:11,color:C.muted,marginBottom:10,lineHeight:1.5}}>
+                      Financial overview · {new Date().toLocaleDateString("en-IN",{month:"long",year:"numeric"})}
                     </p>
                     <BudgetDashboard
                       totalIncome={totalIncome} totalFixed={totalFixed}
@@ -819,18 +820,18 @@ function DashboardScreen(props) {
                     onClick={()=>{ setTab(key); setMoreOpen(false); }}
                     style={{
                       flex:1, display:"flex", flexDirection:"column",
-                      alignItems:"center", justifyContent:"center", gap:3,
-                      border:"none", cursor:"pointer", padding:"4px 2px",
+                      alignItems:"center", justifyContent:"center", gap:2,
+                      border:"none", cursor:"pointer", padding:"3px 1px",
                       fontFamily:"inherit", minWidth:0,
-                      background: active ? "rgba(255,255,255,0.11)" : "transparent",
-                      borderTop: active ? "2.5px solid #E7E5E0" : "2.5px solid transparent",
+                      background: active ? "rgba(255,255,255,0.10)" : "transparent",
+                      borderTop: active ? "2px solid #D6D3D1" : "2px solid transparent",
                       WebkitTapHighlightColor:"transparent",
                     }}>
-                    <span style={{fontSize:19,lineHeight:1}}>{icon}</span>
+                    <span style={{fontSize:17,lineHeight:1}}>{icon}</span>
                     <span style={{
-                      fontSize:9, fontWeight:600,
+                      fontSize:8, fontWeight:600,
                       color: active ? "#D6D3D1" : "#57534E",
-                      lineHeight:1, maxWidth:52,
+                      lineHeight:1, maxWidth:50,
                       overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap",
                     }}>{label}</span>
                   </button>
@@ -841,18 +842,18 @@ function DashboardScreen(props) {
                 onClick={()=>setMoreOpen(p=>!p)}
                 style={{
                   flex:1, display:"flex", flexDirection:"column",
-                  alignItems:"center", justifyContent:"center", gap:3,
-                  border:"none", cursor:"pointer", padding:"4px 2px",
+                  alignItems:"center", justifyContent:"center", gap:2,
+                  border:"none", cursor:"pointer", padding:"3px 1px",
                   fontFamily:"inherit", minWidth:0,
-                  background: moreActive ? "rgba(255,255,255,0.11)" : "transparent",
-                  borderTop: moreActive ? "2.5px solid #E7E5E0" : "2.5px solid transparent",
+                  background: moreActive ? "rgba(255,255,255,0.10)" : "transparent",
+                  borderTop: moreActive ? "2px solid #D6D3D1" : "2px solid transparent",
                   WebkitTapHighlightColor:"transparent",
                 }}>
-                <span style={{fontSize:19,lineHeight:1}}>
+                <span style={{fontSize:17,lineHeight:1}}>
                   {moreActive ? TABS.find(t=>t.key===tab)?.icon : "⋯"}
                 </span>
                 <span style={{
-                  fontSize:9, fontWeight:600,
+                  fontSize:8, fontWeight:600,
                   color: moreActive ? "#D6D3D1" : "#57534E",
                   lineHeight:1,
                 }}>
