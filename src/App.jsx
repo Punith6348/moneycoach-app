@@ -7,6 +7,7 @@ import { useAppData, currentMonthKey, monthKeyToLabel, getActiveMonthKeys } from
 import BudgetDashboard  from "./BudgetDashboard";
 import { IncomeSources, FixedExpensesSection, SavingsSection, FuturePaymentsSection } from "./FinancialPlan";
 import LoansTab         from "./LoansTab";
+import CategoryBudgets, { BudgetAlertWidget } from "./CategoryBudgets";
 import { calcLoanTotals } from "./useAppData";
 
 const fmt = (n) => `₹${Math.abs(Math.round(n)).toLocaleString("en-IN")}`;
@@ -463,6 +464,7 @@ function DashboardScreen(props) {
     name, totalIncome, totalFixed, totalSavings, totalReserve, remaining, dailyLimit,
     incomeSources, fixedExpenses, savingsPlans, futurePayments,
     loans,
+    categoryBudgets, setCategoryBudget,
     allExpenses, checkIns,
     addIncomeSource, updateIncomeSource, deleteIncomeSource,
     addFixedExpense,  updateFixedExpense,  deleteFixedExpense,
@@ -494,15 +496,16 @@ function DashboardScreen(props) {
 
   // ── All tabs ──────────────────────────────────────────────────────────────
   const TABS = [
-    { key:"budget",  icon:"📊", label:"Dashboard" },
-    { key:"plan",    icon:"🗂",  label:"Plan"      },
-    { key:"home",    icon:"🏠",  label:"Expenses"  },
-    { key:"loans",   icon:"🏦",  label:"Loans"     },
-    { key:"charts",  icon:"📈",  label:"Charts"    },
-    { key:"insight", icon:"💡",  label:"Insights"  },
+    { key:"budget",    icon:"📊", label:"Dashboard" },
+    { key:"plan",      icon:"🗂",  label:"Plan"      },
+    { key:"home",      icon:"🏠",  label:"Expenses"  },
+    { key:"loans",     icon:"🏦",  label:"Loans"     },
+    { key:"catbudget", icon:"🎯",  label:"Budgets"   },
+    { key:"charts",    icon:"📈",  label:"Charts"    },
+    { key:"insight",   icon:"💡",  label:"Insights"  },
   ];
   const PRIMARY_TABS = TABS.slice(0, 4);   // Dashboard Plan Expenses Loans
-  const MORE_TABS    = TABS.slice(4);      // Charts Insights
+  const MORE_TABS    = TABS.slice(4);      // Budgets Charts Insights
   const moreActive   = MORE_TABS.some(t => t.key === tab);
 
   // Two-step reset: first tap shows warning, second tap executes
@@ -727,12 +730,17 @@ function DashboardScreen(props) {
             <div className="mc-content" style={{paddingBottom: isMobile ? `${NAV_HEIGHT + 16}px` : "40px"}}>
               <div style={{animation:"slideIn 0.18s ease"}}>
 
-                {/* ══ BUDGET DASHBOARD ══ */}
+              {/* ══ BUDGET DASHBOARD ══ */}
                 {tab==="budget"&&(
                   <>
                     <p style={{fontSize:11,color:C.muted,marginBottom:10,lineHeight:1.5}}>
                       Financial overview · {new Date().toLocaleDateString("en-IN",{month:"long",year:"numeric"})}
                     </p>
+                    <BudgetAlertWidget
+                      categoryBudgets={categoryBudgets}
+                      currentExpenses={currentExpenses}
+                      onNavigate={setTab}
+                    />
                     <BudgetDashboard
                       totalIncome={totalIncome} totalFixed={totalFixed}
                       totalSavings={totalSavings} totalReserve={totalReserve}
@@ -741,15 +749,14 @@ function DashboardScreen(props) {
                       savingsPlans={savingsPlans} futurePayments={futurePayments}
                       currentExpenses={currentExpenses}
                       loans={loans}
+                      categoryBudgets={categoryBudgets}
                       onNavigate={(targetTab, sectionId) => {
                         setTab(targetTab);
                         if (sectionId) {
-                          // After React re-renders the new tab, scroll to + flash the section
                           setTimeout(() => {
                             const el = document.getElementById(sectionId);
                             if (!el) return;
                             el.scrollIntoView({ behavior:"smooth", block:"start" });
-                            // Pulse highlight
                             el.classList.add("mc-section-flash");
                             setTimeout(() => el.classList.remove("mc-section-flash"), 1200);
                           }, 120);
@@ -829,6 +836,15 @@ function DashboardScreen(props) {
             onAdd={addLoan}
             onUpdate={updateLoan}
             onDelete={deleteLoan}
+          />
+        )}
+
+        {/* ══ CATEGORY BUDGETS ══ */}
+        {tab==="catbudget"&&(
+          <CategoryBudgets
+            categoryBudgets={categoryBudgets}
+            setCategoryBudget={setCategoryBudget}
+            allExpenses={allExpenses}
           />
         )}
 

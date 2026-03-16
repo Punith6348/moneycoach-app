@@ -11,6 +11,7 @@ const DEFAULT_STATE = {
   savingsPlans:     [],
   futurePayments:   [],
   loans:            [],  // [{id, name, principal, rate, tenureMonths, emi, startDate}]
+  categoryBudgets:  {},  // { "Food": 3000, "Travel": 1500, ... }
   allExpenses:   {},
   checkIns:      [],
 };
@@ -199,6 +200,7 @@ export function useAppData() {
       futurePayments: Array.isArray(saved.futurePayments) ? saved.futurePayments : [],
       checkIns:       Array.isArray(saved.checkIns)       ? saved.checkIns       : [],
       allExpenses:    (saved.allExpenses && typeof saved.allExpenses==="object") ? saved.allExpenses : {},
+      categoryBudgets:(saved.categoryBudgets && typeof saved.categoryBudgets==="object") ? saved.categoryBudgets : {},
     };
   });
 
@@ -251,6 +253,14 @@ export function useAppData() {
   const updateLoan = (id,upd) => commit(prev=>({...prev, loans:(prev.loans||[]).map(x=>x.id===id?{...x,...upd}:x)}));
   const deleteLoan = (id)     => commit(prev=>({...prev, loans:(prev.loans||[]).filter(x=>x.id!==id)}));
 
+  // Category budgets  — value of 0 or undefined means "no budget set"
+  const setCategoryBudget = (category, amount) => commit(prev => {
+    const next = { ...(prev.categoryBudgets || {}) };
+    if (!amount || amount <= 0) { delete next[category]; }
+    else { next[category] = Math.round(amount); }
+    return { ...prev, categoryBudgets: next };
+  });
+
   const resetAll = () => { localStorage.removeItem(STORAGE_KEY); setData({...DEFAULT_STATE}); };
 
   // Derived financials (computed here so all consumers get same values)
@@ -266,6 +276,7 @@ export function useAppData() {
     incomeSources:data.incomeSources, fixedExpenses:data.fixedExpenses,
     savingsPlans:data.savingsPlans, futurePayments:data.futurePayments,
     loans: data.loans || [],
+    categoryBudgets: data.categoryBudgets || {},
     allExpenses:data.allExpenses, checkIns:data.checkIns,
     totalIncome, totalFixed, totalSavings, totalReserve, remaining, dailyLimit,
     completeOnboarding,
@@ -275,5 +286,6 @@ export function useAppData() {
     addFuturePayment, updateFuturePayment, deleteFuturePayment,
     addExpense, editExpense, deleteExpense, addCheckIn, resetAll,
     addLoan, updateLoan, deleteLoan,
+    setCategoryBudget,
   };
 }
