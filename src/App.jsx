@@ -498,7 +498,7 @@ function DashboardScreen(props) {
     { key:"plan",    icon:"🗂",  label:"Plan"      },
     { key:"home",    icon:"🏠",  label:"Expenses"  },
     { key:"loans",   icon:"🏦",  label:"Loans"     },
-    { key:"charts",  icon:"🥧",  label:"Charts"    },
+    { key:"charts",  icon:"📈",  label:"Charts"    },
     { key:"insight", icon:"💡",  label:"Insights"  },
   ];
   const PRIMARY_TABS = TABS.slice(0, 4);   // Dashboard Plan Expenses Loans
