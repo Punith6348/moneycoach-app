@@ -9,34 +9,27 @@
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#1E293B" />
 
-    <!-- Android / Chrome -->
+    <!-- Android / Chrome PWA -->
     <meta name="mobile-web-app-capable" content="yes" />
-    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
-    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
 
-    <!-- iOS Safari — these are the ONLY tags iOS reads for home screen icons -->
+    <!-- iOS Safari home screen icon — data URI so it NEVER fails due to file path issues -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Money Coach" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <link rel="apple-touch-icon" sizes="152x152" href="/apple-touch-icon-152.png" />
-    <link rel="apple-touch-icon" sizes="167x167" href="/apple-touch-icon-167.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAYAAAA9zQYyAAAFSElEQVR42u3dsY7kRBSFYduaV0BCSCzxIITIlxQSElIehKfgQUhJSCBl8hVCdMwgISQeYolWglUPjN3udt1zvz9uq11Vfx/fqi7b8zQAL+5fvp4QwePpYT7y+2cCI0nwmcRIknsmMZLknomMJLEXMiNpQWAmMpLSeiEzktJ6JjKS0nohM5LSeiEzkqReyIwkqRcyI0nqhcxIknohM5KkXsiMJKkXXYQkFumMpJReyIwkqZUcyC85pDOqpvRCZiRJreRAbskhnVE9pSU0orjTBftx+vrVpuPuv/lE5+3ErNy4nbhEvy6Pp4dZQg8m8VPfSW4lR0mJyb1DyaHcGFdkJQmhoyUmN6GjRSb2v2m9Dp0mc2qbViV0x3TuMugd03ohs7ZKaIMrrQmdL/NWafzzSOghZLmWIBXPmdAFRT5KhqS2EHoAAUYZ/NR2EfpGgz7qgHdoI6F3HOgqg9ytva2E3mNwqw5s57a/zULm+gO6x7mnrNO33w+dkkxv2tH9D6TyCX3JACbO8i9pU8KPYSGzq06S1AuZSZ0kdasautt2yo51dcmE7j7x0cdBQnuYy+3aXlHqxYCSWslRKJ3JfFlfVEvphcykTpLak5PO8NuvP5U4zw8+/NRgVUxo6SylW08Kydy3jzzwHIQeudyQztfrqwplh4RGFEPfsTJSOj+18pGw0pB0FZTQUEObtfeupQl9g8sgjE1MQktnfaiGhhraJQ2jj5GEhoRW+6mjR8X20TOs2T565FZT20eVHCA0QOibzJ7Vz8fW0SOudEhoSGhgVKxynOHc6sFzVzOsPEjoKKrcMU5okJrQpAahy9fbpCY0qUFoUoPQpCY0SE1oUpOa0KRGmNDVd3tVl7r6bkcJTWoJDVITmtSkJnT9OrqS1F5eD0lN6JqzZ1LXGCMJTWoJrY7OkzrleYLDCt3lEQUVk9orKSTM0FInPe1VDU1qNfSol7bqSXOE1GnvgZTQpJbQUjpD6sS39EpoSS2hRydl1n5NqVPfY1NC6C2XOlLv2zdV/hdQcig/JLSUHkfqtU87TU7naZqm+cX9y9fp9XHS3+j/TGQyNy05EpP6FjJXpFxCXzI4Xd/J0qm/Sia0lwXp46do9UqKN0nV5QfR8Z3pZWvoS6TsMNCXtLHyD770pJDUZI4SmtRkbl1DJ9fVHevlyITeS8bKQuxx7ikT5ZLr0NeWssrgdmtvO6H3TtpRB7pDGwl9xfJhlEFPbRehD6qJjxIgqS2EHniydy0pKp4zoUOk3kOW0c+P0I2lHpUu+1faCN1V7G47E9vdU9hpgDtus22X0B3SuvN+8dZ3fScOfPebH1ondFJau4uH0OXlJjGhI8QmMqHLy01iQpeXm8SELin6VnHf/+rHVZ///dvPCI0xWStzF6k9fRSEBggNEBogNAgNZHCnC27P5198uerzP3z/nU6T0Bkybz2G0AChAUIDhAaeg1WOFdx/9PGqz59++VmnSegMmbcegwuFfjw9zLoBEhogNEBo4NncTdM0PZ4eom/Feufd91Z9/q8//2BGQR5PD3N8Qq+VeesxUHIA1xPa8h2qlxsSGkoOoIzQyg5ULjckNPJLjrSU3rKmfO6YLTvnzh2z5f7Ac8dseaRX4mPA3vb1SXk98w7VZFZyIL/kMEFE1XT+34QmNSrJrORAn5JDSqNaOj87oUmNCjKvKjlIjdFlXl1Dkxojy7xpUkhqjCrzJqFJjVFl3iw0qTGizNP0H3s51mDfB44W+eKEltYYTebdElpaY5RAXEY+OZD58ISW1jgy+G6WpuTGLa7eh5QH5CbxtfgbfHnJbCJ0HGEAAAAASUVORK5CYII=" />
 
-    <!-- iOS splash screen background colour while app loads -->
-    <meta name="msapplication-TileColor" content="#1E293B" />
+    <!-- Favicon fallback -->
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
-
-    <!-- Register service worker for offline support -->
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js')
-            .then(reg => console.log('SW registered:', reg.scope))
-            .catch(err => console.warn('SW registration failed:', err));
+            .then(r => console.log('SW:', r.scope))
+            .catch(e => console.warn('SW failed:', e));
         });
       }
     </script>
