@@ -903,16 +903,18 @@ function DashboardScreen(props) {
                       alignItems:"center", justifyContent:"center", gap:2,
                       border:"none", cursor:"pointer", padding:"3px 1px",
                       fontFamily:"inherit", minWidth:0,
-                      background: active ? "rgba(255,255,255,0.10)" : "transparent",
-                      borderTop: active ? "2px solid #D6D3D1" : "2px solid transparent",
+                      background: active ? "rgba(255,255,255,0.12)" : "transparent",
+                      borderTop: active ? "2px solid #93C5FD" : "2px solid transparent",
                       WebkitTapHighlightColor:"transparent",
                     }}>
-                    <span style={{fontSize:17,lineHeight:1}}>{icon}</span>
                     <span style={{
-                      fontSize:8, fontWeight:600,
-                      color: active ? "#D6D3D1" : "#57534E",
-                      lineHeight:1, maxWidth:50,
-                      overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap",
+                      fontSize:19, lineHeight:1,
+                      opacity: active ? 1 : 0.75,
+                    }}>{icon}</span>
+                    <span style={{
+                      fontSize:8, fontWeight:600, lineHeight:1,
+                      maxWidth:50, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap",
+                      color: active ? "#fff" : "rgba(255,255,255,0.7)",
                     }}>{label}</span>
                   </button>
                 );
@@ -925,17 +927,20 @@ function DashboardScreen(props) {
                   alignItems:"center", justifyContent:"center", gap:2,
                   border:"none", cursor:"pointer", padding:"3px 1px",
                   fontFamily:"inherit", minWidth:0,
-                  background: moreActive ? "rgba(255,255,255,0.10)" : "transparent",
-                  borderTop: moreActive ? "2px solid #D6D3D1" : "2px solid transparent",
+                  background: moreActive ? "rgba(255,255,255,0.12)" : "transparent",
+                  borderTop: moreActive ? "2px solid #93C5FD" : "2px solid transparent",
                   WebkitTapHighlightColor:"transparent",
                 }}>
-                <span style={{fontSize:17,lineHeight:1}}>
-                  {moreActive ? TABS.find(t=>t.key===tab)?.icon : "⋯"}
+                <span style={{
+                  fontSize:19, lineHeight:1,
+                  opacity: moreActive ? 1 : 0.75,
+                  color:"#fff",
+                }}>
+                  {moreActive ? TABS.find(t=>t.key===tab)?.icon : "···"}
                 </span>
                 <span style={{
-                  fontSize:8, fontWeight:600,
-                  color: moreActive ? "#D6D3D1" : "#57534E",
-                  lineHeight:1,
+                  fontSize:8, fontWeight:600, lineHeight:1,
+                  color: moreActive ? "#fff" : "rgba(255,255,255,0.7)",
                 }}>
                   {moreActive ? TABS.find(t=>t.key===tab)?.label : "More"}
                 </span>
