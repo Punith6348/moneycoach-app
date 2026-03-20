@@ -3,7 +3,7 @@
 // "Monthly Budget Flow" removed — numbers already in summary cards above.
 // No calculation changes.
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { calcMonthlyReserve, calcLoanTotals } from "./useAppData";
 
 const C = {ink:"#1C1917",muted:"#78716C",border:"#E7E5E0",bg:"#F7F5F0",red:"#DC2626",green:"#16A34A",amber:"#D97706",blue:"#2563EB",purple:"#7C3AED"};
@@ -68,7 +68,8 @@ export default function BudgetDashboard({
   remaining, dailyLimit,
   incomeSources, fixedExpenses, savingsPlans, futurePayments,
   currentExpenses, loans = [],
-  onNavigate,   // (tab, sectionId?) => void
+  categoryBudgets = {},
+  onNavigate,
 }) {
   const [hoveredCard, setHoveredCard] = useState(null);
   const now        = new Date();
@@ -100,6 +101,133 @@ export default function BudgetDashboard({
 
   // ── Income allocation %s ─────────────────────────────────────────────
   const allocPct = (v) => totalIncome > 0 ? Math.round((v / totalIncome) * 100) : 0;
+
+  // ── Category spend map (for Action Center) ───────────────────────────
+  const catSpend = useMemo(() => {
+    const m = {};
+    currentExpenses.forEach(e => { m[e.label] = (m[e.label]||0) + e.amount; });
+    return m;
+  }, [currentExpenses]);
+
+  // ── ACTION CENTER — rule-based, priority-ordered, max 4 shown ─────────
+  const actions = useMemo(() => {
+    const list = [];
+    const savingsRate  = totalIncome > 0 ? Math.round((totalSavings/totalIncome)*100) : 0;
+    const fixedBurden  = totalIncome > 0 ? Math.round(((totalFixed+totalLoanEmi)/totalIncome)*100) : 0;
+    const daysInMonth  = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+    const daysPassed   = now.getDate();
+    const idealSpent   = totalIncome > 0 ? Math.round((daysPassed/daysInMonth)*totalIncome) : 0;
+
+    // 1. Over daily limit today
+    if (dailyLimit > 0 && todaySpent > dailyLimit) {
+      list.push({
+        icon:"🚨", type:"bad",
+        text:`Today's spending (${fmt(todaySpent)}) exceeded your ${fmt(dailyLimit)} daily limit.`,
+        action:"Log expenses carefully for the rest of today.",
+      });
+    }
+
+    // 2. Remaining balance critically low (< 10% of income, more than 7 days left)
+    if (remaining < totalIncome * 0.1 && remaining >= 0 && daysLeft > 7 && totalIncome > 0) {
+      list.push({
+        icon:"⚠️", type:"warn",
+        text:`Only ${fmt(remaining)} left with ${daysLeft} days to go in ${monthName}.`,
+        action:"Limit non-essential spending until next month.",
+      });
+    }
+
+    // 3. Remaining balance negative
+    if (remaining < 0 && totalIncome > 0) {
+      list.push({
+        icon:"🔴", type:"bad",
+        text:`Monthly budget is in deficit — commitments exceed income by ${fmt(Math.abs(remaining))}.`,
+        action:"Review fixed expenses or income sources in the Plan tab.",
+      });
+    }
+
+    // 4. Pace — spending faster than ideal this month
+    if (monthSpent > idealSpent * 1.2 && idealSpent > 0 && daysLeft > 5) {
+      const ahead = monthSpent - idealSpent;
+      list.push({
+        icon:"📉", type:"warn",
+        text:`You've spent ${fmt(ahead)} more than expected for day ${daysPassed} of the month.`,
+        action:"Slow down daily spending to stay on track.",
+      });
+    }
+
+    // 5. Category budget breached
+    const breachedCat = Object.entries(categoryBudgets)
+      .filter(([cat, budget]) => budget > 0 && (catSpend[cat]||0) > budget)
+      .sort((a,b) => (catSpend[b[0]]||0)/b[1] - (catSpend[a[0]]||0)/a[1])[0];
+    if (breachedCat) {
+      const [cat, budget] = breachedCat;
+      const icon = CAT_ICONS[cat] || "💸";
+      list.push({
+        icon, type:"warn",
+        text:`${cat} budget of ${fmt(budget)} is exceeded — spent ${fmt(catSpend[cat]||0)} so far.`,
+        action:`Tap Budgets to review your ${cat} limit.`,
+      });
+    }
+
+    // 6. High fixed burden
+    if (fixedBurden > 60 && totalIncome > 0) {
+      list.push({
+        icon:"🏦", type:"warn",
+        text:`Fixed costs + EMIs consume ${fixedBurden}% of income — very little room for daily spending.`,
+        action:"Consider reducing fixed subscriptions or prepaying a loan.",
+      });
+    } else if (fixedBurden > 45 && totalIncome > 0) {
+      list.push({
+        icon:"📋", type:"neutral",
+        text:`Fixed costs + EMIs are ${fixedBurden}% of income. Watch variable spending closely.`,
+        action:"Keep daily expenses lean this month.",
+      });
+    }
+
+    // 7. High debt ratio
+    if (debtRatio >= 40 && totalLoanEmi > 0) {
+      list.push({
+        icon:"⚠️", type:"warn",
+        text:`Loan EMIs are ${debtRatio}% of income — above the healthy 30% threshold.`,
+        action:"Check the Loans tab to explore early closure options.",
+      });
+    }
+
+    // 8. No savings set up
+    if (savingsRate === 0 && totalIncome > 0) {
+      list.push({
+        icon:"💡", type:"neutral",
+        text:`No savings or investments are set up yet.`,
+        action:"Add a SIP or recurring deposit in the Plan tab.",
+      });
+    }
+
+    // 9. Good savings rate — positive reinforcement
+    if (savingsRate >= 20 && totalIncome > 0) {
+      list.push({
+        icon:"✅", type:"good",
+        text:`Saving ${savingsRate}% of income this month — above the recommended 20% benchmark.`,
+        action:"Keep it up. Consider investing the surplus.",
+      });
+    }
+
+    // 10. Zero-spend days milestone
+    const daysWithSpend = new Set(currentExpenses.map(e=>e.date.split("T")[0])).size;
+    const noSpend = daysPassed - daysWithSpend;
+    if (noSpend >= 5 && daysPassed >= 10) {
+      list.push({
+        icon:"🌱", type:"good",
+        text:`${noSpend} no-spend days so far this month.`,
+        action:"Every zero-spend day improves your month-end balance.",
+      });
+    }
+
+    // Return: bad first, then warn, then neutral, then good — max 4
+    const order = { bad:0, warn:1, neutral:2, good:3 };
+    return list.sort((a,b) => order[a.type] - order[b.type]).slice(0, 4);
+  }, [dailyLimit, todaySpent, remaining, totalIncome, monthSpent, daysLeft,
+      totalFixed, totalLoanEmi, totalSavings, debtRatio, categoryBudgets,
+      catSpend, currentExpenses, monthName]);
 
   return (
     <div>
@@ -145,6 +273,67 @@ export default function BudgetDashboard({
           </div>
         )}
       </div>
+
+      {/* ══ 1b. ACTION CENTER — always visible ══ */}
+      {(() => {
+        // Determine which fallback to show when no rules fired
+        const lowData = totalIncome === 0 && currentExpenses.length === 0;
+        const displayItems = actions.length > 0 ? actions : lowData ? [{
+          icon:"💡", type:"neutral",
+          text:"Start tracking to get personalised recommendations.",
+          action:"Add income in Plan, then log your first expense.",
+        }] : [{
+          icon:"✅", type:"good",
+          text:"All good — you're on track this month. No issues detected.",
+          action:"Keep logging expenses to maintain this status.",
+        }];
+
+        const ITEM_STYLE = {
+          bad:     { bg:"#FFF1F2", border:"#FECACA", textColor:"#991B1B" },
+          warn:    { bg:"#FFFBEB", border:"#FDE68A", textColor:"#92400E" },
+          neutral: { bg:C.bg,      border:C.border,  textColor:C.muted   },
+          good:    { bg:"#F0FDF4", border:"#BBF7D0", textColor:"#166534" },
+        };
+
+        return (
+          <div style={{marginBottom:10}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:7}}>
+              <p style={{margin:0,fontSize:9,fontWeight:700,color:C.muted,
+                         textTransform:"uppercase",letterSpacing:"1px"}}>
+                Action Center
+              </p>
+              {actions.length > 0 && (
+                <p style={{margin:0,fontSize:9,color:C.muted}}>
+                  {actions.length} item{actions.length!==1?"s":""}
+                </p>
+              )}
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:6}}>
+              {displayItems.map((a,i) => {
+                const s = ITEM_STYLE[a.type] || ITEM_STYLE.neutral;
+                return (
+                  <div key={i} style={{
+                    background:s.bg, border:`1px solid ${s.border}`,
+                    borderRadius:10, padding:"9px 12px",
+                    display:"flex", alignItems:"flex-start", gap:10,
+                  }}>
+                    <span style={{fontSize:16,flexShrink:0,marginTop:1,lineHeight:1}}>{a.icon}</span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <p style={{margin:0,fontSize:12,fontWeight:600,color:C.ink,lineHeight:1.4}}>
+                        {a.text}
+                      </p>
+                      <p style={{margin:"3px 0 0",fontSize:10,color:s.textColor,
+                                 lineHeight:1.4,fontStyle:"italic"}}>
+                        → {a.action}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ══ 2. SUMMARY CARDS ══ */}
       <div className="mc-summary-row">
