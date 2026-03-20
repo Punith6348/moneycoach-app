@@ -239,7 +239,21 @@ export function useAppData() {
 
   // Daily expenses
   const addExpense    = (e)           => { const k=currentMonthKey(); commit(prev=>({...prev,allExpenses:{...prev.allExpenses,[k]:[...(prev.allExpenses[k]||[]),e]}})); };
-  const editExpense   = (mk,id,upd)   => commit(prev=>({...prev,allExpenses:{...prev.allExpenses,[mk]:(prev.allExpenses[mk]||[]).map(e=>e.id===id?{...e,...upd}:e)}}));
+  const editExpense   = (mk, id, upd) => commit(prev => {
+    const expense = (prev.allExpenses[mk] || []).find(e => e.id === id);
+    if (!expense) return prev;
+    const updated = { ...expense, ...upd };
+    // If date changed to a different month, move between month buckets
+    const newMonthKey = updated.date
+      ? `${new Date(updated.date).getFullYear()}-${String(new Date(updated.date).getMonth()+1).padStart(2,"0")}`
+      : mk;
+    if (newMonthKey !== mk) {
+      const fromBucket = (prev.allExpenses[mk] || []).filter(e => e.id !== id);
+      const toBucket   = [...(prev.allExpenses[newMonthKey] || []), updated];
+      return { ...prev, allExpenses: { ...prev.allExpenses, [mk]: fromBucket, [newMonthKey]: toBucket } };
+    }
+    return { ...prev, allExpenses: { ...prev.allExpenses, [mk]: (prev.allExpenses[mk]||[]).map(e=>e.id===id?updated:e) } };
+  });
   const deleteExpense = (mk,id)       => commit(prev=>({...prev,allExpenses:{...prev.allExpenses,[mk]:(prev.allExpenses[mk]||[]).filter(e=>e.id!==id)}}));
 
   // Check-ins

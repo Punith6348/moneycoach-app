@@ -222,12 +222,34 @@ export default function BudgetDashboard({
       });
     }
 
+    // 11. Upcoming future payment due within 7 days
+    if (futurePayments && futurePayments.length > 0) {
+      const urgent = futurePayments
+        .map(p => {
+          const days = Math.max(0, Math.round((new Date(p.nextDate+"T00:00:00") - now) / (1000*60*60*24)));
+          return { ...p, days };
+        })
+        .filter(p => p.days <= 7)
+        .sort((a, b) => a.days - b.days)[0];
+      if (urgent) {
+        list.push({
+          icon:"📅", type: urgent.days <= 2 ? "bad" : "warn",
+          text: urgent.days === 0
+            ? `${urgent.label} (${fmt(urgent.totalAmount)}) is due today.`
+            : urgent.days === 1
+            ? `${urgent.label} (${fmt(urgent.totalAmount)}) is due tomorrow.`
+            : `${urgent.label} (${fmt(urgent.totalAmount)}) is due in ${urgent.days} days.`,
+          action:"Check that you have enough reserved for this payment.",
+        });
+      }
+    }
+
     // Return: bad first, then warn, then neutral, then good — max 4
     const order = { bad:0, warn:1, neutral:2, good:3 };
     return list.sort((a,b) => order[a.type] - order[b.type]).slice(0, 4);
   }, [dailyLimit, todaySpent, remaining, totalIncome, monthSpent, daysLeft,
       totalFixed, totalLoanEmi, totalSavings, debtRatio, categoryBudgets,
-      catSpend, currentExpenses, monthName]);
+      catSpend, currentExpenses, monthName, futurePayments]);
 
   return (
     <div>

@@ -98,10 +98,23 @@ function MonthSelector({selectedMonth,onChange,allExpenses}) {
 
 // ─── EDIT MODAL ───────────────────────────────────────────────────────────
 function EditModal({expense,monthKey,onSave,onClose}) {
-  const [amount,setAmount]=useState(String(expense.amount));
-  const [label,setLabel]=useState(expense.label);
-  const [note,setNote]=useState(expense.note||"");
-  const save=()=>{const v=parseFloat(amount);if(!v||v<=0)return;onSave(monthKey,expense.id,{amount:v,label,note:note.trim()});onClose();};
+  const [amount,setAmount] = useState(String(expense.amount));
+  const [label,setLabel]   = useState(expense.label);
+  const [note,setNote]     = useState(expense.note||"");
+  // Preserve the time portion; only let user change the date part
+  const existingDate = expense.date.split("T")[0];
+  const [date,setDate]     = useState(existingDate);
+
+  const save = () => {
+    const v = parseFloat(amount);
+    if (!v || v <= 0) return;
+    // Reconstruct ISO string: keep original time, replace date portion
+    const origTime = expense.date.includes("T") ? expense.date.split("T")[1] : "00:00:00.000Z";
+    const newDate  = `${date}T${origTime}`;
+    onSave(monthKey, expense.id, { amount:v, label, note:note.trim(), date:newDate });
+    onClose();
+  };
+
   return (
     <div onClick={e=>e.target===e.currentTarget&&onClose()} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
       <div style={{background:"#fff",borderRadius:16,padding:24,width:"100%",maxWidth:420,boxShadow:"0 20px 60px rgba(0,0,0,0.2)"}}>
@@ -111,11 +124,15 @@ function EditModal({expense,monthKey,onSave,onClose}) {
         </div>
         <Label>Amount (₹) *</Label>
         <input type="number" value={amount} onChange={e=>setAmount(e.target.value)} autoFocus
-          style={{width:"100%",padding:"10px 12px",borderRadius:8,border:`1.5px solid ${C.border}`,fontFamily:"inherit",fontSize:20,fontFamily:"Georgia,serif",background:C.bg,outline:"none",marginTop:6,marginBottom:12,boxSizing:"border-box"}} />
+          style={{width:"100%",padding:"10px 12px",borderRadius:8,border:`1.5px solid ${C.border}`,fontFamily:"Georgia,serif",fontSize:20,background:C.bg,outline:"none",marginTop:6,marginBottom:12,boxSizing:"border-box"}} />
         <Label>Category</Label>
         <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:6,marginBottom:12}}>
           {VARIABLE_CATS.map(c=><button key={c.name} onClick={()=>setLabel(c.name)} style={{padding:"5px 11px",borderRadius:99,border:`1.5px solid ${label===c.name?C.ink:C.border}`,background:label===c.name?C.ink:"#fff",color:label===c.name?"#fff":C.ink,fontSize:11,fontFamily:"inherit",fontWeight:600,cursor:"pointer"}}>{c.icon} {c.name}</button>)}
         </div>
+        <Label>Date *</Label>
+        <input type="date" value={date} max={new Date().toISOString().split("T")[0]}
+          onChange={e=>setDate(e.target.value)}
+          style={{width:"100%",padding:"10px 12px",borderRadius:8,border:`1.5px solid ${C.border}`,fontFamily:"inherit",fontSize:14,background:C.bg,outline:"none",marginTop:6,marginBottom:12,boxSizing:"border-box"}} />
         <Label>Note (optional)</Label>
         <input type="text" value={note} onChange={e=>setNote(e.target.value)} placeholder="Optional note"
           style={{width:"100%",padding:"10px 12px",borderRadius:8,border:`1.5px solid ${C.border}`,fontFamily:"inherit",fontSize:14,background:C.bg,outline:"none",marginTop:6,marginBottom:14,boxSizing:"border-box"}} />
@@ -775,16 +792,28 @@ function DashboardScreen(props) {
             {/* Top row: Income (left) + Savings (right) — 2-col on desktop */}
             <div className="mc-plan-top">
               <div>
-                <IncomeSources sources={incomeSources} totalIncome={totalIncome} onAdd={addIncomeSource} onUpdate={updateIncomeSource} onDelete={deleteIncomeSource}/>
+                <IncomeSources sources={incomeSources} totalIncome={totalIncome}
+                  onAdd={src=>{addIncomeSource(src);showToast("Income source saved ✓");}}
+                  onUpdate={(id,upd)=>{updateIncomeSource(id,upd);showToast("Income updated ✓");}}
+                  onDelete={deleteIncomeSource}/>
               </div>
               <div>
-                <SavingsSection plans={savingsPlans} totalSavings={totalSavings} onAdd={addSavingsPlan} onUpdate={updateSavingsPlan} onDelete={deleteSavingsPlan}/>
+                <SavingsSection plans={savingsPlans} totalSavings={totalSavings}
+                  onAdd={p=>{addSavingsPlan(p);showToast("Savings plan saved ✓");}}
+                  onUpdate={(id,upd)=>{updateSavingsPlan(id,upd);showToast("Savings updated ✓");}}
+                  onDelete={deleteSavingsPlan}/>
               </div>
             </div>
             {/* Full-width below: Fixed Expenses + Future Payments */}
             <div className="mc-plan-full">
-              <FixedExpensesSection items={fixedExpenses} totalFixed={totalFixed} onAdd={addFixedExpense} onUpdate={updateFixedExpense} onDelete={deleteFixedExpense}/>
-              <FuturePaymentsSection payments={futurePayments} totalReserve={totalReserve} onAdd={addFuturePayment} onUpdate={updateFuturePayment} onDelete={deleteFuturePayment}/>
+              <FixedExpensesSection items={fixedExpenses} totalFixed={totalFixed}
+                onAdd={item=>{addFixedExpense(item);showToast("Fixed expense saved ✓");}}
+                onUpdate={(id,upd)=>{updateFixedExpense(id,upd);showToast("Fixed expense updated ✓");}}
+                onDelete={deleteFixedExpense}/>
+              <FuturePaymentsSection payments={futurePayments} totalReserve={totalReserve}
+                onAdd={p=>{addFuturePayment(p);showToast("Future payment saved ✓");}}
+                onUpdate={(id,upd)=>{updateFuturePayment(id,upd);showToast("Future payment updated ✓");}}
+                onDelete={deleteFuturePayment}/>
             </div>
           </>
         )}
