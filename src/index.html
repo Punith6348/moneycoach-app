@@ -5,31 +5,38 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Money Coach</title>
 
-    <!-- PWA -->
+    <!-- PWA manifest -->
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#1E293B" />
+
+    <!-- Android / Chrome -->
     <meta name="mobile-web-app-capable" content="yes" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
+
+    <!-- iOS Safari — these are the ONLY tags iOS reads for home screen icons -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Money Coach" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/apple-touch-icon-152.png" />
+    <link rel="apple-touch-icon" sizes="167x167" href="/apple-touch-icon-167.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
 
-    <!-- Apple touch icons (iOS doesn't use manifest icons) -->
-    <link rel="apple-touch-icon" href="/icon-192.png" />
-
-    <!-- Favicon -->
-    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <!-- iOS splash screen background colour while app loads -->
+    <meta name="msapplication-TileColor" content="#1E293B" />
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
 
-    <!-- Register service worker -->
+    <!-- Register service worker for offline support -->
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js')
             .then(reg => console.log('SW registered:', reg.scope))
-            .catch(err => console.warn('SW failed:', err));
+            .catch(err => console.warn('SW registration failed:', err));
         });
       }
     </script>
