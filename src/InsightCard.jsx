@@ -323,18 +323,25 @@ export default function InsightCard({
               invertGood={true}
             />
             <CmpRow
-              label="Savings & Investments"
-              curr={totalSavings}
-              prev={totalSavings}   // plan savings don't change month-to-month
-              invertGood={false}
-            />
-            <CmpRow
               label="Remaining Balance"
               curr={remaining}
               prev={prevRemaining}
               invertGood={false}
-              last
             />
+            <div style={{ padding:"10px 0" }}>
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                <p style={{ margin:0, fontSize:12, fontWeight:600, color:C.ink }}>Savings Rate</p>
+                <span style={{
+                  fontSize:13, fontWeight:700, fontFamily:"Georgia,serif",
+                  color: savingsRate >= 20 ? C.green : savingsRate >= 10 ? C.amber : C.red,
+                }}>
+                  {savingsRate}%
+                  <span style={{ fontSize:10, fontWeight:400, color:C.muted, marginLeft:6 }}>
+                    {savingsRate >= 20 ? "· above target" : savingsRate >= 10 ? "· below 20% target" : "· needs attention"}
+                  </span>
+                </span>
+              </div>
+            </div>
           </>
         )}
       </Section>

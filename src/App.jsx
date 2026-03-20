@@ -1,7 +1,7 @@
 // ─── App.jsx — Full financial planning integration ─────────────────────
 import { useState, useMemo, useRef, useEffect } from "react";
 import InsightCard      from "./InsightCard";
-import SpendingChart    from "./SpendingChart";
+import SpendingChart, { TrendChart } from "./SpendingChart";
 import { useStreak }    from "./useStreak";
 import { useAppData, currentMonthKey, monthKeyToLabel, getActiveMonthKeys } from "./useAppData";
 import BudgetDashboard  from "./BudgetDashboard";
@@ -477,11 +477,19 @@ function ExpenseList({expenses, monthKey, onEdit, onDelete, isCurrentMonth}) {
 }
 
 // ─── LOG EXPENSE FORM ─────────────────────────────────────────────────────
-function LogExpenseForm({onAdd,disabled}) {
+function LogExpenseForm({onAdd, disabled, currentExpenses=[], dailyLimit=0}) {
   const [amount,setAmount]=useState("");
   const [label,setLabel]=useState("Food");
   const [note,setNote]=useState("");
   const [err,setErr]=useState("");
+
+  // Today's running total
+  const todayStr   = new Date().toISOString().split("T")[0];
+  const todaySpent = currentExpenses
+    .filter(e => e.date.startsWith(todayStr))
+    .reduce((s,e) => s+e.amount, 0);
+  const limitLeft  = dailyLimit > 0 ? dailyLimit - todaySpent : null;
+  const overLimit  = limitLeft !== null && limitLeft < 0;
 
   const submit=()=>{
     if(disabled) return;
@@ -517,6 +525,28 @@ function LogExpenseForm({onAdd,disabled}) {
       <Label>Note (optional)</Label>
       <input type="text" value={note} onChange={e=>setNote(e.target.value)} placeholder={NOTE_PLACEHOLDER[label]||"e.g. Misc expense"} disabled={disabled}
         style={{width:"100%",padding:"8px 12px",borderRadius:8,border:`1.5px solid ${C.border}`,fontFamily:"inherit",fontSize:14,background:C.bg,outline:"none",marginTop:6,marginBottom:10,boxSizing:"border-box"}} />
+
+      {/* Today's spend indicator — only when current month and daily limit is set */}
+      {!disabled && dailyLimit > 0 && (
+        <div style={{
+          display:"flex", alignItems:"center", justifyContent:"space-between",
+          padding:"8px 11px", borderRadius:8, marginBottom:10,
+          background: overLimit ? "#FFF1F2" : todaySpent > 0 ? "#F0FDF4" : C.bg,
+          border: `1px solid ${overLimit ? "#FECACA" : todaySpent > 0 ? "#86EFAC" : C.border}`,
+        }}>
+          <p style={{margin:0,fontSize:11,color:C.muted,fontWeight:500}}>
+            {overLimit ? "⚠ Over daily limit" : "Today spent"}
+          </p>
+          <p style={{margin:0,fontSize:12,fontWeight:700,fontFamily:"Georgia,serif",
+            color: overLimit ? C.red : todaySpent > 0 ? C.green : C.muted}}>
+            {fmt(todaySpent)}
+            <span style={{fontSize:10,fontWeight:400,color:C.muted,marginLeft:4}}>
+              / {fmt(dailyLimit)}
+            </span>
+          </p>
+        </div>
+      )}
+
       <button onClick={submit} disabled={disabled} style={{width:"100%",padding:"10px",borderRadius:10,background:C.ink,color:"#fff",border:"none",fontSize:14,fontFamily:"inherit",fontWeight:700,cursor:"pointer",opacity:disabled?0.5:1}}>Save Expense ✓</button>
     </div>
   );
@@ -1025,7 +1055,8 @@ function DashboardScreen(props) {
                     handleAdd({amount,label,note});
                   }}
                 />
-                <LogExpenseForm onAdd={handleAdd} disabled={!isCurrentMonth}/>
+                <LogExpenseForm onAdd={handleAdd} disabled={!isCurrentMonth}
+                  currentExpenses={currentExpenses} dailyLimit={dailyLimit}/>
               </div>
               <ExpenseList expenses={expenses} monthKey={selectedMonth} onEdit={editExpense} onDelete={deleteExpense} isCurrentMonth={isCurrentMonth}/>
             </div>
@@ -1057,6 +1088,7 @@ function DashboardScreen(props) {
         {tab==="charts"&&(
           <>
             <MonthBar/>
+            <TrendChart allExpenses={allExpenses} monthlyIncome={totalIncome}/>
             <SpendingChart expenses={expenses} monthlyIncome={totalIncome}/>
           </>
         )}

@@ -9,7 +9,7 @@ export const CATEGORY_CONFIG = {
   Grocery:       { icon:"🛒", color:"#22C55E" },
   Medical:       { icon:"💊", color:"#EF4444" },
   Entertainment: { icon:"🎬", color:"#A855F7" },
-  Other:         { icon:"💸", color:"#78716C" },
+  Other:         { icon:"💸", color:"#6B7280" },
   Rent:          { icon:"🏠", color:"#0EA5E9" },
   Electricity:   { icon:"⚡", color:"#EAB308" },
   Water:         { icon:"💧", color:"#06B6D4" },
@@ -20,7 +20,7 @@ export const CATEGORY_CONFIG = {
   Maintenance:   { icon:"🔧", color:"#64748B" },
 };
 
-const C   = { ink:"#1C1917", muted:"#78716C", border:"#E7E5E0", bg:"#F7F5F0" };
+const C   = { ink:"#111827", muted:"#6B7280", border:"#E5E7EB", bg:"#F8FAFC" };
 const fmt = (n) => `₹${Math.abs(Math.round(n)).toLocaleString("en-IN")}`;
 
 // ── Aggregate expenses into per-category totals ──────────────────────────
@@ -38,7 +38,7 @@ function aggregate(expenses) {
   return Object.entries(map).map(([name,{total,count,items}]) => ({
     name,
     icon:  CATEGORY_CONFIG[name]?.icon  || "💸",
-    color: CATEGORY_CONFIG[name]?.color || "#78716C",
+    color: CATEGORY_CONFIG[name]?.color || "#6B7280",
     total: Math.round(total),
     pct:   Math.round((total/grand)*100),
     count,
@@ -95,7 +95,7 @@ function DonutChart({ data, grandTotal, selectedCat, onSelect }) {
               d={seg.path}
               fill={seg.color}
               opacity={dimmed ? 0.25 : 1}
-              stroke={active ? "#1C1917" : "#fff"}
+              stroke={active ? "#111827" : "#fff"}
               strokeWidth={active ? 2 : 1}
               style={{ cursor:"pointer", transition:"opacity 0.2s" }}
               onClick={() => onSelect(seg.name)}
@@ -177,6 +177,117 @@ function DrillDown({ cat, onClose }) {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+// ── Monthly Trend Chart — last 6 months bar chart ────────────────────────
+export function TrendChart({ allExpenses, monthlyIncome = 0 }) {
+  const months = useMemo(() => {
+    const result = [];
+    const now    = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d   = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+      const exps = allExpenses[key] || [];
+      const total = exps.reduce((s,e) => s+e.amount, 0);
+      const label = d.toLocaleDateString("en-IN",{month:"short"});
+      const isCurrent = i === 0;
+      result.push({ key, label, total: Math.round(total), isCurrent });
+    }
+    return result;
+  }, [allExpenses]);
+
+  const maxVal  = Math.max(...months.map(m => m.total), monthlyIncome || 1);
+  const hasData = months.some(m => m.total > 0);
+
+  if (!hasData) return null;
+
+  const fmt2 = (n) => n >= 100000
+    ? `₹${(n/100000).toFixed(1)}L`
+    : n >= 1000
+    ? `₹${(n/1000).toFixed(0)}k`
+    : `₹${n}`;
+
+  return (
+    <div style={{
+      background:"#fff", borderRadius:14, border:`1px solid ${C.border}`,
+      boxShadow:"0 1px 3px rgba(0,0,0,0.06)", padding:"14px 16px", marginBottom:12,
+    }}>
+      <div style={{ marginBottom:12 }}>
+        <p style={{ margin:0, fontSize:12, fontWeight:700, color:C.ink }}>Monthly Spending Trend</p>
+        <p style={{ margin:"1px 0 0", fontSize:10, color:C.muted }}>Last 6 months · variable expenses</p>
+      </div>
+
+      {/* Bar chart */}
+      <div style={{ display:"flex", alignItems:"flex-end", gap:6, height:100 }}>
+        {months.map(m => {
+          const barH    = maxVal > 0 ? Math.round((m.total / maxVal) * 100) : 0;
+          const isEmpty = m.total === 0;
+          return (
+            <div key={m.key} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}>
+              {/* Value label */}
+              <p style={{ margin:0, fontSize:8, color: m.isCurrent ? C.ink : C.muted,
+                          fontWeight: m.isCurrent ? 700 : 400, whiteSpace:"nowrap" }}>
+                {isEmpty ? "" : fmt2(m.total)}
+              </p>
+              {/* Bar */}
+              <div style={{ width:"100%", height:72, display:"flex", alignItems:"flex-end" }}>
+                <div style={{
+                  width:"100%",
+                  height: isEmpty ? 3 : `${Math.max(barH, 4)}%`,
+                  background: m.isCurrent
+                    ? "linear-gradient(180deg, #3B82F6 0%, #1D4ED8 100%)"
+                    : "#CBD5E1",
+                  borderRadius:"4px 4px 0 0",
+                  transition:"height 0.4s ease",
+                  position:"relative",
+                }}/>
+              </div>
+              {/* Month label */}
+              <p style={{ margin:0, fontSize:9, color: m.isCurrent ? C.ink : C.muted,
+                          fontWeight: m.isCurrent ? 700 : 400 }}>
+                {m.label}
+                {m.isCurrent && <span style={{ display:"block", fontSize:7, color:C.blue, textAlign:"center" }}>now</span>}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Income reference line label */}
+      {monthlyIncome > 0 && (
+        <div style={{ marginTop:8, display:"flex", alignItems:"center", gap:6 }}>
+          <div style={{ width:16, height:2, background:"#EF4444", borderRadius:99 }} />
+          <p style={{ margin:0, fontSize:9, color:C.muted }}>
+            Income: {fmt2(monthlyIncome)} — bars above this mean overspend
+          </p>
+        </div>
+      )}
+
+      {/* Month-on-month change summary */}
+      {(() => {
+        const last2 = months.filter(m => m.total > 0).slice(-2);
+        if (last2.length < 2) return null;
+        const [prev, curr] = last2;
+        const diff  = curr.total - prev.total;
+        const pctD  = Math.round((Math.abs(diff) / prev.total) * 100);
+        const up    = diff > 0;
+        return (
+          <div style={{
+            marginTop:10, padding:"7px 11px", borderRadius:8,
+            background: up ? "#FFF1F2" : "#F0FDF4",
+            border: `1px solid ${up ? "#FECACA" : "#86EFAC"}`,
+            display:"flex", alignItems:"center", gap:8,
+          }}>
+            <span style={{ fontSize:14 }}>{up ? "📈" : "📉"}</span>
+            <p style={{ margin:0, fontSize:11, color:C.ink }}>
+              Spending {up ? "up" : "down"} <strong>{pctD}%</strong> vs last month
+              <span style={{ color:C.muted }}> ({up ? "+" : "-"}₹{Math.abs(diff).toLocaleString("en-IN")})</span>
+            </p>
+          </div>
+        );
+      })()}
     </div>
   );
 }
