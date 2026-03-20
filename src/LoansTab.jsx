@@ -487,6 +487,293 @@ function LoanCard({loan, onEdit, onDelete}) {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
+// DEBT PAYOFF PLANNER
+// Shows avalanche vs snowball strategy comparison + priority order
+// ═════════════════════════════════════════════════════════════════════════════
+function DebtPayoffPlanner({ loans }) {
+  const [extra,    setExtra]    = useState("0");
+  const [strategy, setStrategy] = useState("avalanche"); // "avalanche" | "snowball"
+  const [open,     setOpen]     = useState(false);
+
+  // Compute totals per loan
+  const enriched = loans.map(l => {
+    const t = calcLoanTotals(l);
+    return { ...l, ...t, icon: LOAN_ICON[l.name] || "🏦" };
+  });
+
+  const totalOutstanding = enriched.reduce((s, l) => s + l.outstanding, 0);
+  const totalEmi         = enriched.reduce((s, l) => s + l.emi, 0);
+  const extraAmt         = Math.max(0, parseFloat(extra) || 0);
+
+  // Strategy ordering
+  const ordered = [...enriched].sort((a, b) =>
+    strategy === "avalanche"
+      ? b.rate - a.rate                    // highest rate first
+      : a.outstanding - b.outstanding      // lowest balance first
+  );
+
+  // Simulate payoff: allocate extra EMI to #1 priority, waterfall when paid off
+  function simulatePayoff(loanList, bonusEmi) {
+    if (!loanList.length) return { months: 0, totalInterest: 0, order: [] };
+
+    // Deep copy outstanding balances
+    let balances = loanList.map(l => ({
+      id: l.id, name: l.name, icon: l.icon,
+      balance: l.outstanding, rate: l.rate, emi: l.emi,
+      paidOff: false, paidOffMonth: null,
+    }));
+
+    let month = 0;
+    let totalInterest = 0;
+    const MAX = 600;
+
+    while (balances.some(b => !b.paidOff) && month < MAX) {
+      month++;
+      // Find first unpaid (priority target gets bonus)
+      const targetIdx = balances.findIndex(b => !b.paidOff);
+      // Apply interest + payments
+      let remaining = bonusEmi;
+      for (let i = 0; i < balances.length; i++) {
+        const b = balances[i];
+        if (b.paidOff) continue;
+        const r = b.rate / 12 / 100;
+        const interest = b.balance * r;
+        totalInterest += interest;
+        let payment = b.emi;
+        if (i === targetIdx) payment += remaining;
+        const principal = Math.min(payment - interest, b.balance);
+        if (principal <= 0) continue;
+        b.balance -= principal;
+        if (b.balance <= 1) {
+          const leftover = -b.balance; // overpaid amount
+          b.balance = 0;
+          b.paidOff = true;
+          b.paidOffMonth = month;
+          // Waterfall: carry leftover EMI + freed EMI to next priority
+          remaining += b.emi + leftover;
+        }
+      }
+    }
+
+    const order = [...balances]
+      .filter(b => b.paidOffMonth)
+      .sort((a, b) => a.paidOffMonth - b.paidOffMonth)
+      .map(b => ({ name: b.name, icon: b.icon, month: b.paidOffMonth }));
+
+    return { months: month, totalInterest: Math.round(totalInterest), order };
+  }
+
+  // Baseline (no extra) vs with extra
+  const baseline = simulatePayoff(ordered, 0);
+  const withExtra = extraAmt > 0 ? simulatePayoff(ordered, extraAmt) : null;
+
+  const savedMonths   = withExtra ? Math.max(0, baseline.months - withExtra.months) : 0;
+  const savedInterest = withExtra ? Math.max(0, baseline.totalInterest - withExtra.totalInterest) : 0;
+
+  const finishDate = (months) => {
+    const d = new Date();
+    d.setMonth(d.getMonth() + months);
+    return d.toLocaleDateString("en-IN", { month:"long", year:"numeric" });
+  };
+
+  if (loans.length < 2) return null; // Only useful with 2+ loans
+
+  return (
+    <div style={{ marginTop:16 }}>
+      {/* Toggle header */}
+      <button onClick={() => setOpen(p => !p)} style={{
+        width:"100%", padding:"11px 14px", borderRadius:12,
+        border:`1.5px solid ${C.purple}44`,
+        background: open ? `${C.purple}10` : `${C.purple}06`,
+        color:C.purple, fontFamily:"inherit", fontSize:13, fontWeight:700,
+        cursor:"pointer", display:"flex", alignItems:"center",
+        justifyContent:"space-between", gap:8,
+      }}>
+        <span>📊 Debt Payoff Planner</span>
+        <span style={{ fontSize:11, fontWeight:400, color:C.muted }}>
+          {open ? "Hide ▲" : "Which loan first? ▼"}
+        </span>
+      </button>
+
+      {open && (
+        <div style={{
+          background:"#fff", borderRadius:12, border:`1px solid ${C.border}`,
+          boxShadow:"0 1px 3px rgba(0,0,0,0.05)", padding:"14px",
+          marginTop:8,
+        }}>
+
+          {/* Strategy toggle */}
+          <div style={{ display:"flex", gap:8, marginBottom:14 }}>
+            {[
+              { key:"avalanche", label:"⚡ Avalanche", sub:"Highest interest first · saves most money" },
+              { key:"snowball",  label:"❄ Snowball",   sub:"Smallest balance first · builds momentum" },
+            ].map(s => (
+              <button key={s.key} onClick={() => setStrategy(s.key)} style={{
+                flex:1, padding:"9px 10px", borderRadius:10, cursor:"pointer",
+                fontFamily:"inherit", textAlign:"left",
+                border:`1.5px solid ${strategy===s.key ? C.purple : C.border}`,
+                background: strategy===s.key ? `${C.purple}10` : "#fff",
+              }}>
+                <p style={{ margin:0, fontSize:12, fontWeight:700,
+                             color: strategy===s.key ? C.purple : C.ink }}>{s.label}</p>
+                <p style={{ margin:"2px 0 0", fontSize:9, color:C.muted, lineHeight:1.4 }}>{s.sub}</p>
+              </button>
+            ))}
+          </div>
+
+          {/* Extra EMI input */}
+          <div style={{ marginBottom:14 }}>
+            <p style={{ margin:"0 0 6px", fontSize:10, fontWeight:700, color:C.muted,
+                        textTransform:"uppercase", letterSpacing:"0.8px" }}>
+              Extra payment per month (optional)
+            </p>
+            <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+              <span style={{ fontSize:12, color:C.muted }}>₹</span>
+              <input
+                type="number" value={extra} min="0"
+                onChange={e => setExtra(e.target.value)}
+                placeholder="e.g. 2000"
+                style={{
+                  flex:1, padding:"8px 10px", borderRadius:8,
+                  border:`1.5px solid ${C.border}`, fontFamily:"inherit",
+                  fontSize:13, background:C.bg, outline:"none",
+                }}
+              />
+              {[1000,2000,5000].map(v => (
+                <button key={v} onClick={() => setExtra(String(v))} style={{
+                  padding:"6px 10px", borderRadius:8, cursor:"pointer",
+                  fontFamily:"inherit", fontSize:11, fontWeight:600,
+                  border:`1px solid ${extra===String(v)?C.purple:C.border}`,
+                  background: extra===String(v) ? `${C.purple}10` : "#fff",
+                  color: extra===String(v) ? C.purple : C.muted,
+                }}>
+                  +{v >= 1000 ? `${v/1000}k` : v}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Priority order */}
+          <p style={{ margin:"0 0 8px", fontSize:10, fontWeight:700, color:C.muted,
+                      textTransform:"uppercase", letterSpacing:"0.8px" }}>
+            Recommended payoff order
+          </p>
+          <div style={{ display:"flex", flexDirection:"column", gap:6, marginBottom:14 }}>
+            {ordered.map((l, i) => (
+              <div key={l.id} style={{
+                display:"flex", alignItems:"center", gap:10,
+                padding:"9px 12px", borderRadius:9,
+                background: i === 0 ? `${C.purple}08` : C.bg,
+                border:`1px solid ${i === 0 ? `${C.purple}30` : C.border}`,
+              }}>
+                <div style={{
+                  width:24, height:24, borderRadius:99, flexShrink:0,
+                  background: i === 0 ? C.purple : C.border,
+                  color: "#fff", display:"flex", alignItems:"center",
+                  justifyContent:"center", fontSize:11, fontWeight:700,
+                }}>
+                  {i + 1}
+                </div>
+                <span style={{ fontSize:16, flexShrink:0 }}>{l.icon}</span>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <p style={{ margin:0, fontSize:12, fontWeight:700, color:C.ink }}>
+                    {l.name}
+                    {i === 0 && <span style={{ marginLeft:6, fontSize:9, color:C.purple,
+                                               fontWeight:700, background:`${C.purple}15`,
+                                               borderRadius:99, padding:"1px 7px" }}>
+                      FOCUS HERE
+                    </span>}
+                  </p>
+                  <p style={{ margin:"1px 0 0", fontSize:10, color:C.muted }}>
+                    {strategy === "avalanche"
+                      ? `${l.rate}% interest · ${fmt(l.outstanding)} outstanding`
+                      : `${fmt(l.outstanding)} outstanding · ${l.rate}% interest`}
+                  </p>
+                </div>
+                <p style={{ margin:0, fontSize:11, fontWeight:700, color:C.muted,
+                             fontFamily:"Georgia,serif", flexShrink:0 }}>
+                  {fmt(l.emi)}/mo
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {/* Payoff timeline */}
+          <div style={{
+            background: C.bg, borderRadius:10, padding:"12px 14px", marginBottom:12,
+            border:`1px solid ${C.border}`,
+          }}>
+            <p style={{ margin:"0 0 10px", fontSize:10, fontWeight:700, color:C.muted,
+                        textTransform:"uppercase", letterSpacing:"0.8px" }}>
+              Payoff Timeline
+            </p>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+              {[
+                { label:"Debt-free by",      value: finishDate(baseline.months),  color:C.ink   },
+                { label:"Total interest",     value: fmt(baseline.totalInterest),  color:C.amber },
+                ...(withExtra ? [
+                  { label:"With extra · done by", value: finishDate(withExtra.months), color:C.green },
+                  { label:"Interest saved",        value: fmt(savedInterest),          color:C.green },
+                ] : []),
+              ].map(t => (
+                <div key={t.label} style={{ background:"#fff", borderRadius:8,
+                                            padding:"8px 10px", border:`1px solid ${C.border}` }}>
+                  <p style={{ margin:0, fontSize:9, color:C.muted, fontWeight:600,
+                               textTransform:"uppercase", letterSpacing:"0.6px" }}>{t.label}</p>
+                  <p style={{ margin:"3px 0 0", fontSize:12, fontWeight:700,
+                               color:t.color, fontFamily:"Georgia,serif" }}>{t.value}</p>
+                </div>
+              ))}
+            </div>
+            {withExtra && savedMonths > 0 && (
+              <div style={{
+                marginTop:10, padding:"8px 11px", borderRadius:8,
+                background:"#F0FDF4", border:"1px solid #86EFAC",
+                display:"flex", alignItems:"center", gap:8,
+              }}>
+                <span style={{ fontSize:16 }}>🎉</span>
+                <p style={{ margin:0, fontSize:12, color:C.ink }}>
+                  Adding <strong>{fmt(extraAmt)}/month</strong> clears your debt{" "}
+                  <strong style={{ color:C.green }}>{savedMonths} months earlier</strong> and saves{" "}
+                  <strong style={{ color:C.green }}>{fmt(savedInterest)}</strong> in interest.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Payoff sequence */}
+          {baseline.order.length > 0 && (
+            <div>
+              <p style={{ margin:"0 0 6px", fontSize:10, fontWeight:700, color:C.muted,
+                          textTransform:"uppercase", letterSpacing:"0.8px" }}>
+                Sequence
+              </p>
+              <div style={{ display:"flex", alignItems:"center", flexWrap:"wrap", gap:4 }}>
+                {baseline.order.map((b, i) => (
+                  <span key={b.name} style={{ display:"flex", alignItems:"center", gap:4 }}>
+                    <span style={{
+                      padding:"3px 10px", borderRadius:99, fontSize:11,
+                      background:`${C.purple}10`, border:`1px solid ${C.purple}30`,
+                      color:C.purple, fontWeight:600,
+                    }}>
+                      {b.icon} {b.name} · mo {b.month}
+                    </span>
+                    {i < baseline.order.length - 1 && (
+                      <span style={{ fontSize:12, color:C.muted }}>→</span>
+                    )}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
 // MAIN
 // ═════════════════════════════════════════════════════════════════════════════
 export default function LoansTab({loans, onAdd, onUpdate, onDelete}) {
@@ -552,13 +839,16 @@ export default function LoansTab({loans, onAdd, onUpdate, onDelete}) {
           <p style={{color:C.muted,fontSize:12,margin:0}}>Track your home loan, car loan, personal loan and more.</p>
         </div>
       ) : (
-        <div className="mc-loan-grid">
-          {loans.map(loan=>(
-            <LoanCard key={loan.id} loan={loan}
-              onEdit={()=>{setEditId(loan.id);setShowForm(false);}}
-              onDelete={()=>{if(window.confirm(`Delete "${loan.name}"?`))onDelete(loan.id);}}/>
-          ))}
-        </div>
+        <>
+          <div className="mc-loan-grid">
+            {loans.map(loan=>(
+              <LoanCard key={loan.id} loan={loan}
+                onEdit={()=>{setEditId(loan.id);setShowForm(false);}}
+                onDelete={()=>{if(window.confirm(`Delete "${loan.name}"?`))onDelete(loan.id);}}/>
+            ))}
+          </div>
+          <DebtPayoffPlanner loans={loans} />
+        </>
       )}
     </div>
   );
