@@ -275,6 +275,9 @@ export function useAppData() {
     return { ...prev, categoryBudgets: next };
   });
 
+  // Profile
+  const updateName = (newName) => commit(prev => ({ ...prev, name: newName || "" }));
+
   const resetAll = () => { localStorage.removeItem(STORAGE_KEY); setData({...DEFAULT_STATE}); };
 
   // Derived financials (computed here so all consumers get same values)
@@ -301,5 +304,6 @@ export function useAppData() {
     addExpense, editExpense, deleteExpense, addCheckIn, resetAll,
     addLoan, updateLoan, deleteLoan,
     setCategoryBudget,
+    updateName,
   };
 }

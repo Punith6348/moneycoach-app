@@ -8,6 +8,7 @@ import BudgetDashboard  from "./BudgetDashboard";
 import { IncomeSources, FixedExpensesSection, SavingsSection, FuturePaymentsSection } from "./FinancialPlan";
 import LoansTab         from "./LoansTab";
 import CategoryBudgets, { BudgetAlertWidget } from "./CategoryBudgets";
+import SettingsPanel    from "./SettingsPanel";
 import { calcLoanTotals } from "./useAppData";
 
 const fmt = (n) => `₹${Math.abs(Math.round(n)).toLocaleString("en-IN")}`;
@@ -78,6 +79,150 @@ function ProgressBar({pct}) {
 function StreakBadge({streak}) {
   if(!streak) return null;
   return <div style={{display:"flex",alignItems:"center",gap:4,background:"#FFF7ED",border:"1px solid #FDBA74",borderRadius:99,padding:"4px 10px"}}><span style={{fontSize:14}}>🔥</span><span style={{fontSize:12,fontWeight:700,color:"#EA580C"}}>{streak}</span></div>;
+}
+
+// ─── SETUP CHECKLIST ─────────────────────────────────────────────────────────
+// Shows on Dashboard until all 3 items are complete OR user dismisses it.
+// Dismissed state stored in localStorage so it persists across sessions.
+function SetupChecklist({ totalIncome, fixedExpenses, savingsPlans, onNavigate }) {
+  const DISMISS_KEY = "mc_setup_dismissed";
+  const [dismissed, setDismissed] = useState(() => !!localStorage.getItem(DISMISS_KEY));
+
+  const items = [
+    { id:"income",  done: totalIncome > 0,           label:"Add your income",       tab:"plan",   section:"plan-income"  },
+    { id:"fixed",   done: fixedExpenses.length > 0,  label:"Add fixed bills",       tab:"plan",   section:"plan-fixed"   },
+    { id:"savings", done: savingsPlans.length > 0,   label:"Add savings or SIP",    tab:"plan",   section:"plan-savings"  },
+  ];
+  const doneCount = items.filter(i => i.done).length;
+  const allDone   = doneCount === items.length;
+
+  // Auto-dismiss once all done
+  if (allDone && !dismissed) {
+    localStorage.setItem(DISMISS_KEY, "1");
+    return null;
+  }
+  if (dismissed) return null;
+
+  const dismiss = () => { localStorage.setItem(DISMISS_KEY, "1"); setDismissed(true); };
+
+  return (
+    <div style={{
+      background:"#fff", borderRadius:12, border:`1px solid ${C.border}`,
+      boxShadow:"0 1px 3px rgba(0,0,0,0.05)", marginBottom:12, overflow:"hidden",
+    }}>
+      <div style={{
+        padding:"10px 14px", borderBottom:`1px solid ${C.bg}`,
+        background:"#EFF6FF", display:"flex", alignItems:"center", justifyContent:"space-between",
+      }}>
+        <div>
+          <p style={{ margin:0, fontSize:13, fontWeight:700, color:C.ink }}>
+            🚀 Complete your setup
+          </p>
+          <p style={{ margin:"1px 0 0", fontSize:10, color:C.muted }}>
+            {doneCount} of {items.length} done · Tap any item to go there
+          </p>
+        </div>
+        <button onClick={dismiss}
+          style={{ background:"none", border:"none", fontSize:16, cursor:"pointer", color:C.muted, padding:4 }}>
+          ✕
+        </button>
+      </div>
+      <div style={{ padding:"8px 14px 10px" }}>
+        {items.map((item, i) => (
+          <div key={item.id}
+            onClick={() => !item.done && onNavigate && onNavigate(item.tab, item.section)}
+            style={{
+              display:"flex", alignItems:"center", gap:10,
+              padding:"7px 0",
+              borderBottom: i < items.length-1 ? `1px solid ${C.bg}` : "none",
+              cursor: item.done ? "default" : "pointer",
+              opacity: item.done ? 0.7 : 1,
+            }}>
+            <span style={{
+              width:20, height:20, borderRadius:99, flexShrink:0,
+              display:"flex", alignItems:"center", justifyContent:"center",
+              background: item.done ? C.green : "#E5E7EB",
+              fontSize:11, fontWeight:700,
+              color: item.done ? "#fff" : C.muted,
+            }}>
+              {item.done ? "✓" : (i + 1)}
+            </span>
+            <p style={{
+              margin:0, fontSize:12, fontWeight: item.done ? 400 : 600,
+              color: item.done ? C.muted : C.ink,
+              textDecoration: item.done ? "line-through" : "none",
+            }}>
+              {item.label}
+            </p>
+            {!item.done && (
+              <span style={{ marginLeft:"auto", fontSize:11, color:C.blue, fontWeight:600 }}>
+                Go →
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── QUICK-ADD TEMPLATES ──────────────────────────────────────────────────────
+// Derives top 5 most-repeated expense entries from the last 60 days.
+// Shows as tappable chips above the log form — pre-fills form on tap.
+function QuickAddTemplates({ allExpenses, onQuickAdd, disabled }) {
+  const templates = useMemo(() => {
+    const now     = new Date();
+    const cutoff  = new Date(now - 60 * 24 * 60 * 60 * 1000);
+    const counts  = {};
+    Object.values(allExpenses).flat().forEach(e => {
+      if (new Date(e.date) < cutoff) return;
+      if (!e.note) return; // only entries with a note are useful as templates
+      const key = `${e.label}||${e.note}||${e.amount}`;
+      counts[key] = (counts[key] || { label:e.label, note:e.note, amount:e.amount, count:0 });
+      counts[key].count++;
+    });
+    return Object.values(counts)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+  }, [allExpenses]);
+
+  if (templates.length === 0 || disabled) return null;
+
+  const ICONS = { Food:"🍽",Travel:"🚗",Coffee:"☕",Grocery:"🛒",Medical:"💊",Entertainment:"🎬",Other:"💸" };
+
+  return (
+    <div style={{ marginBottom:10 }}>
+      <p style={{ margin:"0 0 6px", fontSize:9, color:C.muted, fontWeight:700,
+                  textTransform:"uppercase", letterSpacing:"0.8px" }}>
+        Quick Add
+      </p>
+      <div style={{ display:"flex", gap:6, overflowX:"auto", scrollbarWidth:"none", paddingBottom:2 }}>
+        {templates.map((t, i) => (
+          <button key={i}
+            onClick={() => onQuickAdd({ amount:t.amount, label:t.label, note:t.note })}
+            style={{
+              flexShrink:0, display:"flex", alignItems:"center", gap:5,
+              padding:"5px 10px", borderRadius:99,
+              border:`1.5px solid ${C.border}`, background:"#fff",
+              cursor:"pointer", fontFamily:"inherit",
+              transition:"border-color 0.12s, background 0.12s",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor=C.ink; e.currentTarget.style.background=C.bg; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor=C.border; e.currentTarget.style.background="#fff"; }}
+            title={`Add ${t.label} · ${t.note} · ₹${t.amount}`}
+          >
+            <span style={{ fontSize:13 }}>{ICONS[t.label] || "💸"}</span>
+            <span style={{ fontSize:11, fontWeight:600, color:C.ink }}>
+              {t.note.length > 14 ? t.note.slice(0,13)+"…" : t.note}
+            </span>
+            <span style={{ fontSize:10, color:C.muted, fontFamily:"Georgia,serif" }}>
+              ₹{Math.round(t.amount).toLocaleString("en-IN")}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 // ─── MONTH SELECTOR ───────────────────────────────────────────────────────
@@ -489,6 +634,7 @@ function DashboardScreen(props) {
     addFuturePayment, updateFuturePayment, deleteFuturePayment,
     addExpense, editExpense, deleteExpense, addCheckIn, resetAll,
     addLoan, updateLoan, deleteLoan,
+    setCategoryBudget, updateName,
   } = props;
 
   const [selectedMonth,setSelectedMonth] = useState(currentMonthKey());
@@ -538,8 +684,9 @@ function DashboardScreen(props) {
     }
   };
 
-  const [moreOpen,   setMoreOpen]   = useState(false);
-  const [isMobile,   setIsMobile]   = useState(() => window.innerWidth <= 640);
+  const [moreOpen,     setMoreOpen]     = useState(false);
+  const [isMobile,     setIsMobile]     = useState(() => window.innerWidth <= 640);
+  const [showSettings, setShowSettings] = useState(false);
 
   // Inject APP_CSS into <head> once — guaranteed to work unlike JSX <style>
   useEffect(() => {
@@ -578,6 +725,16 @@ function DashboardScreen(props) {
                      boxShadow:"0 4px 20px rgba(0,0,0,0.18)",animation:"fadeUp 0.2s ease"}}>
           {toast}
         </div>
+      )}
+
+      {/* ── Settings Panel ── */}
+      {showSettings && (
+        <SettingsPanel
+          name={name}
+          onClose={() => setShowSettings(false)}
+          onResetAll={resetAll}
+          onNameChange={n => { updateName(n); setShowSettings(false); showToast("Name updated ✓"); }}
+        />
       )}
 
       {/* ══════════════ MOBILE MORE OVERLAY ══════════════ */}
@@ -697,16 +854,15 @@ function DashboardScreen(props) {
                     <span style={{fontSize:10,fontWeight:700,color:"#EA580C"}}>{streak}</span>
                   </div>
                 )}
-                <button onClick={handleReset}
+                <button onClick={() => setShowSettings(true)}
                   style={{
-                    background: resetArmed ? C.red : "#FFF1F2",
-                    border:`1px solid ${resetArmed ? C.red : "#FCA5A5"}`,
-                    borderRadius:6, padding:"3px 8px", fontSize:10,
-                    color: resetArmed ? "#fff" : "#DC2626",
-                    cursor:"pointer", fontFamily:"inherit", fontWeight:700, whiteSpace:"nowrap",
-                    transition:"all 0.15s",
-                  }}>
-                  {resetArmed ? "Tap again to confirm" : "Reset"}
+                    background:"none", border:`1px solid ${C.border}`,
+                    borderRadius:7, padding:"4px 9px", fontSize:16,
+                    color:C.muted, cursor:"pointer", lineHeight:1,
+                    flexShrink:0,
+                  }}
+                  title="Settings">
+                  ⚙️
                 </button>
               </div>
             </header>
@@ -728,16 +884,15 @@ function DashboardScreen(props) {
                   {getGreeting(name)} 👋
                 </h1>
               </div>
-              <button onClick={handleReset}
+              <button onClick={() => setShowSettings(true)}
                 style={{
-                  background: resetArmed ? C.red : "#FFF1F2",
-                  border:`1px solid ${resetArmed ? C.red : "#FCA5A5"}`,
-                  borderRadius:8, padding:"6px 12px", fontSize:12,
-                  color: resetArmed ? "#fff" : C.red,
-                  cursor:"pointer", fontFamily:"inherit", fontWeight:700,
-                  transition:"all 0.15s",
-                }}>
-                {resetArmed ? "⚠ Tap again — this will delete all data" : "🗑 Reset"}
+                  background:"none", border:`1px solid ${C.border}`,
+                  borderRadius:8, padding:"6px 14px", fontSize:14,
+                  color:C.muted, cursor:"pointer", lineHeight:1,
+                  display:"flex", alignItems:"center", gap:6,
+                }}
+                title="Settings">
+                ⚙️ <span style={{fontSize:12,fontWeight:600}}>Settings</span>
               </button>
             </header>
           )}
@@ -753,6 +908,18 @@ function DashboardScreen(props) {
                     <p style={{fontSize:11,color:C.muted,marginBottom:10,lineHeight:1.5}}>
                       Financial overview · {new Date().toLocaleDateString("en-IN",{month:"long",year:"numeric"})}
                     </p>
+                    <SetupChecklist
+                      totalIncome={totalIncome}
+                      fixedExpenses={fixedExpenses}
+                      savingsPlans={savingsPlans}
+                      onNavigate={(t, s) => {
+                        setTab(t);
+                        if (s) setTimeout(() => {
+                          const el = document.getElementById(s);
+                          if (el) { el.scrollIntoView({behavior:"smooth",block:"start"}); el.classList.add("mc-section-flash"); setTimeout(()=>el.classList.remove("mc-section-flash"),1200); }
+                        }, 120);
+                      }}
+                    />
                     <BudgetAlertWidget
                       categoryBudgets={categoryBudgets}
                       currentExpenses={currentExpenses}
@@ -850,7 +1017,16 @@ function DashboardScreen(props) {
 
             <MonthBar/>
             <div style={{display:"grid",gridTemplateColumns:"1fr",gap:14}}>
-              <LogExpenseForm onAdd={handleAdd} disabled={!isCurrentMonth}/>
+              <div>
+                <QuickAddTemplates
+                  allExpenses={allExpenses}
+                  disabled={!isCurrentMonth}
+                  onQuickAdd={({amount,label,note}) => {
+                    handleAdd({amount,label,note});
+                  }}
+                />
+                <LogExpenseForm onAdd={handleAdd} disabled={!isCurrentMonth}/>
+              </div>
               <ExpenseList expenses={expenses} monthKey={selectedMonth} onEdit={editExpense} onDelete={deleteExpense} isCurrentMonth={isCurrentMonth}/>
             </div>
           </>
