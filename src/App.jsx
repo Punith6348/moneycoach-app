@@ -650,6 +650,173 @@ function SummaryStrip({totalIncome,remaining,expenses,dailyLimit}) {
   );
 }
 
+// ─── RECURRING EXPENSES TAB ───────────────────────────────────────────────
+function RecurringTab({ recurringExpenses, allExpenses, onAdd, onUpdate, onDelete, onToggle, showToast }) {
+  const CATS = [{name:"Food",icon:"🍽"},{name:"Travel",icon:"🚗"},{name:"Coffee",icon:"☕"},{name:"Grocery",icon:"🛒"},{name:"Medical",icon:"💊"},{name:"Entertainment",icon:"🎬"},{name:"Other",icon:"💸"}];
+  const DAYS = Array.from({length:28},(_,i)=>i+1);
+
+  const [showForm, setShowForm] = useState(false);
+  const [editId,   setEditId]   = useState(null);
+  const [fLabel,   setFLabel]   = useState("");
+  const [fCat,     setFCat]     = useState("Food");
+  const [fAmt,     setFAmt]     = useState("");
+  const [fDay,     setFDay]     = useState(1);
+  const [fNote,    setFNote]    = useState("");
+
+  const ordinal = (d) => { const s=["th","st","nd","rd"]; const v=d%100; return d+(s[(v-20)%10]||s[v]||s[0]); };
+  const inp2 = { width:"100%", padding:"9px 11px", borderRadius:8, border:`1px solid ${C.border}`, fontFamily:"inherit", fontSize:13, background:"#fff", outline:"none", boxSizing:"border-box" };
+
+  const openNew  = () => { setFLabel(""); setFCat("Food"); setFAmt(""); setFDay(1); setFNote(""); setEditId(null); setShowForm(true); };
+  const openEdit = (r) => { setFLabel(r.label); setFCat(r.category); setFAmt(String(r.amount)); setFDay(r.dayOfMonth); setFNote(r.note||""); setEditId(r.id); setShowForm(true); };
+  const cancel   = () => { setShowForm(false); setEditId(null); };
+
+  const save = () => {
+    const v = parseFloat(fAmt);
+    if (!fLabel.trim() || !v || v <= 0) return;
+    const data = { label:fLabel.trim(), category:fCat, amount:v, dayOfMonth:fDay, note:fNote.trim() };
+    if (editId !== null) { onUpdate(editId, data); showToast("Recurring updated ✓"); }
+    else                 { onAdd(data);            showToast("Recurring saved ✓"); }
+    cancel();
+  };
+
+  const monthlyTotal = recurringExpenses.filter(r=>r.active).reduce((s,r)=>s+r.amount, 0);
+  const curMonthKey  = currentMonthKey();
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:14}}>
+        <div>
+          <h2 style={{margin:"0 0 2px", fontSize:17, fontWeight:700, color:C.ink, fontFamily:"Georgia,serif"}}>Recurring Expenses</h2>
+          <p style={{margin:0, fontSize:11, color:C.muted}}>
+            Auto-logged monthly · {recurringExpenses.filter(r=>r.active).length} active
+            {monthlyTotal > 0 && ` · ${fmt(monthlyTotal)}/month`}
+          </p>
+        </div>
+        {!showForm && (
+          <button onClick={openNew} style={{
+            padding:"7px 14px", borderRadius:9, border:"none",
+            background:C.ink, color:"#fff", fontSize:12, fontWeight:700,
+            cursor:"pointer", fontFamily:"inherit", flexShrink:0,
+          }}>+ Add</button>
+        )}
+      </div>
+
+      {/* Empty state banner */}
+      {recurringExpenses.length === 0 && !showForm && (
+        <div style={{background:"#EFF6FF", border:"1px solid #BFDBFE", borderRadius:11, padding:"12px 14px", marginBottom:14, display:"flex", alignItems:"flex-start", gap:10}}>
+          <span style={{fontSize:20, flexShrink:0}}>🔁</span>
+          <p style={{margin:0, fontSize:12, color:C.ink, lineHeight:1.6}}>
+            Add expenses that repeat every month — Netflix, gym, electricity. They'll be <strong>auto-logged</strong> on the day you set, so you never have to enter them manually.
+          </p>
+        </div>
+      )}
+
+      {/* Add / Edit form */}
+      {showForm && (
+        <div style={{background:"#fff", borderRadius:13, border:`1px solid ${C.border}`, boxShadow:"0 1px 4px rgba(0,0,0,0.06)", padding:16, marginBottom:14}}>
+          <p style={{margin:"0 0 14px", fontSize:14, fontWeight:700, color:C.ink}}>
+            {editId !== null ? "✏️ Edit Recurring" : "🔁 New Recurring Expense"}
+          </p>
+          <p style={{margin:"0 0 4px", fontSize:10, fontWeight:700, color:C.muted, textTransform:"uppercase", letterSpacing:"0.9px"}}>Label *</p>
+          <input value={fLabel} onChange={e=>setFLabel(e.target.value)} placeholder="e.g. Netflix, Gym, Electricity"
+            style={{...inp2, marginBottom:12}} />
+
+          <p style={{margin:"0 0 6px", fontSize:10, fontWeight:700, color:C.muted, textTransform:"uppercase", letterSpacing:"0.9px"}}>Category</p>
+          <div style={{display:"flex", flexWrap:"wrap", gap:5, marginBottom:12}}>
+            {CATS.map(c=>(
+              <button key={c.name} onClick={()=>setFCat(c.name)} style={{
+                padding:"4px 10px", borderRadius:99, fontSize:11, fontWeight:600,
+                cursor:"pointer", fontFamily:"inherit",
+                border:`1.5px solid ${fCat===c.name?C.ink:C.border}`,
+                background:fCat===c.name?C.ink:"#fff",
+                color:fCat===c.name?"#fff":C.ink,
+              }}>{c.icon} {c.name}</button>
+            ))}
+          </div>
+
+          <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:12}}>
+            <div>
+              <p style={{margin:"0 0 4px", fontSize:10, fontWeight:700, color:C.muted, textTransform:"uppercase", letterSpacing:"0.9px"}}>Amount (₹) *</p>
+              <input type="number" value={fAmt} onChange={e=>setFAmt(e.target.value)} placeholder="e.g. 649" style={inp2} />
+            </div>
+            <div>
+              <p style={{margin:"0 0 4px", fontSize:10, fontWeight:700, color:C.muted, textTransform:"uppercase", letterSpacing:"0.9px"}}>Day of Month</p>
+              <select value={fDay} onChange={e=>setFDay(Number(e.target.value))} style={inp2}>
+                {DAYS.map(d=><option key={d} value={d}>{ordinal(d)} of every month</option>)}
+              </select>
+            </div>
+          </div>
+
+          <p style={{margin:"0 0 4px", fontSize:10, fontWeight:700, color:C.muted, textTransform:"uppercase", letterSpacing:"0.9px"}}>Note (optional)</p>
+          <input value={fNote} onChange={e=>setFNote(e.target.value)} placeholder="e.g. Hotstar annual plan"
+            style={{...inp2, marginBottom:14}} />
+
+          <div style={{display:"flex", gap:9}}>
+            <button onClick={cancel} style={{flex:1, padding:"9px", borderRadius:9, border:`1px solid ${C.border}`, background:"#fff", color:C.muted, fontFamily:"inherit", fontSize:13, cursor:"pointer"}}>Cancel</button>
+            <button onClick={save}   style={{flex:2, padding:"9px", borderRadius:9, border:"none", background:C.ink, color:"#fff", fontFamily:"inherit", fontSize:13, fontWeight:700, cursor:"pointer"}}>
+              {editId !== null ? "Save Changes ✓" : "Add Recurring ✓"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* List */}
+      {recurringExpenses.length > 0 && (
+        <div style={{display:"flex", flexDirection:"column", gap:8}}>
+          {recurringExpenses.map(r => {
+            const cat        = CATS.find(c=>c.name===r.category) || {icon:"💸"};
+            const autoLogged = (allExpenses[curMonthKey]||[]).some(e=>e.recurringId===r.id);
+            return (
+              <div key={r.id} style={{
+                background:"#fff", borderRadius:12, border:`1px solid ${C.border}`,
+                boxShadow:"0 1px 2px rgba(0,0,0,0.04)", padding:"11px 14px",
+                opacity: r.active ? 1 : 0.55,
+              }}>
+                <div style={{display:"flex", alignItems:"center", gap:10}}>
+                  <div style={{width:36, height:36, borderRadius:9, flexShrink:0, fontSize:18,
+                               background:`${C.blue}10`, border:`1px solid ${C.blue}20`,
+                               display:"flex", alignItems:"center", justifyContent:"center"}}>
+                    {cat.icon}
+                  </div>
+                  <div style={{flex:1, minWidth:0}}>
+                    <div style={{display:"flex", alignItems:"center", gap:6, flexWrap:"wrap", marginBottom:2}}>
+                      <p style={{margin:0, fontSize:13, fontWeight:700, color:C.ink}}>{r.label}</p>
+                      {autoLogged && (
+                        <span style={{fontSize:9, fontWeight:700, color:C.green, background:"#F0FDF4", border:"1px solid #86EFAC", borderRadius:99, padding:"1px 7px"}}>✓ logged this month</span>
+                      )}
+                      {!r.active && (
+                        <span style={{fontSize:9, color:C.muted, background:C.bg, border:`1px solid ${C.border}`, borderRadius:99, padding:"1px 7px"}}>paused</span>
+                      )}
+                    </div>
+                    <p style={{margin:0, fontSize:10, color:C.muted}}>
+                      {r.category} · {fmt(r.amount)}/month · {ordinal(r.dayOfMonth)} of month{r.note?` · ${r.note}`:""}
+                    </p>
+                  </div>
+                  <p style={{margin:0, fontSize:15, fontWeight:700, color:C.ink, fontFamily:"Georgia,serif", flexShrink:0}}>
+                    {fmt(r.amount)}
+                  </p>
+                </div>
+                <div style={{display:"flex", gap:6, marginTop:9, paddingTop:9, borderTop:`1px solid ${C.bg}`}}>
+                  <button onClick={()=>onToggle(r.id)} style={{flex:1, padding:"5px 0", borderRadius:7, fontSize:11, fontWeight:600, cursor:"pointer", fontFamily:"inherit", border:`1px solid ${C.border}`, background:r.active?"#FFFBEB":"#F0FDF4", color:r.active?C.amber:C.green}}>
+                    {r.active ? "⏸ Pause" : "▶ Resume"}
+                  </button>
+                  <button onClick={()=>openEdit(r)} style={{flex:1, padding:"5px 0", borderRadius:7, fontSize:11, fontWeight:600, cursor:"pointer", fontFamily:"inherit", border:`1px solid ${C.border}`, background:"#fff", color:C.ink}}>
+                    ✏ Edit
+                  </button>
+                  <button onClick={()=>{ if(window.confirm(`Delete "${r.label}"?`)) onDelete(r.id); }} style={{flex:1, padding:"5px 0", borderRadius:7, fontSize:11, fontWeight:600, cursor:"pointer", fontFamily:"inherit", border:"1px solid #FECACA", background:"#FFF1F2", color:C.red}}>
+                    🗑 Delete
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── DASHBOARD ────────────────────────────────────────────────────────────
 function DashboardScreen(props) {
   const {
@@ -1089,185 +1256,17 @@ function DashboardScreen(props) {
         )}
 
         {/* ══ RECURRING EXPENSES ══ */}
-        {tab==="recurring"&&(()=>{
-          const CATS = [{name:"Food",icon:"🍽"},{name:"Travel",icon:"🚗"},{name:"Coffee",icon:"☕"},{name:"Grocery",icon:"🛒"},{name:"Medical",icon:"💊"},{name:"Entertainment",icon:"🎬"},{name:"Other",icon:"💸"}];
-          const DAYS = Array.from({length:28},(_,i)=>i+1);
-          const [showForm, setShowForm] = useState(false);
-          const [editId,   setEditId]   = useState(null);
-          const [fLabel,   setFLabel]   = useState("");
-          const [fCat,     setFCat]     = useState("Food");
-          const [fAmt,     setFAmt]     = useState("");
-          const [fDay,     setFDay]     = useState(1);
-          const [fNote,    setFNote]    = useState("");
-
-          const openNew = () => { setFLabel(""); setFCat("Food"); setFAmt(""); setFDay(1); setFNote(""); setEditId(null); setShowForm(true); };
-          const openEdit = (r) => { setFLabel(r.label); setFCat(r.category); setFAmt(String(r.amount)); setFDay(r.dayOfMonth); setFNote(r.note||""); setEditId(r.id); setShowForm(true); };
-          const cancel = () => { setShowForm(false); setEditId(null); };
-
-          const save = () => {
-            const v = parseFloat(fAmt);
-            if (!fLabel.trim() || !v || v <= 0) return;
-            const data = { label:fLabel.trim(), category:fCat, amount:v, dayOfMonth:fDay, note:fNote.trim() };
-            if (editId !== null) { updateRecurring(editId, data); showToast("Recurring updated ✓"); }
-            else                 { addRecurring(data);            showToast("Recurring saved ✓"); }
-            cancel();
-          };
-
-          const monthlyTotal = (recurringExpenses||[]).filter(r=>r.active).reduce((s,r)=>s+r.amount,0);
-          const ordinal = (d) => { const s=["th","st","nd","rd"]; const v=d%100; return d+(s[(v-20)%10]||s[v]||s[0]); };
-
-          const inp2 = { width:"100%", padding:"9px 11px", borderRadius:8, border:`1px solid ${C.border}`, fontFamily:"inherit", fontSize:13, background:"#fff", outline:"none", boxSizing:"border-box" };
-
-          return (
-            <div>
-              {/* Header */}
-              <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:14}}>
-                <div>
-                  <h2 style={{margin:"0 0 2px", fontSize:17, fontWeight:700, color:C.ink, fontFamily:"Georgia,serif"}}>Recurring Expenses</h2>
-                  <p style={{margin:0, fontSize:11, color:C.muted}}>
-                    Auto-logged monthly · {(recurringExpenses||[]).filter(r=>r.active).length} active
-                    {monthlyTotal > 0 && ` · ${fmt(monthlyTotal)}/month`}
-                  </p>
-                </div>
-                {!showForm && (
-                  <button onClick={openNew} style={{
-                    padding:"7px 14px", borderRadius:9, border:"none",
-                    background:C.ink, color:"#fff", fontSize:12, fontWeight:700,
-                    cursor:"pointer", fontFamily:"inherit", flexShrink:0,
-                  }}>+ Add</button>
-                )}
-              </div>
-
-              {/* How it works banner — shown when empty */}
-              {(recurringExpenses||[]).length === 0 && !showForm && (
-                <div style={{background:"#EFF6FF", border:"1px solid #BFDBFE", borderRadius:11, padding:"12px 14px", marginBottom:14, display:"flex", alignItems:"flex-start", gap:10}}>
-                  <span style={{fontSize:20, flexShrink:0}}>🔁</span>
-                  <p style={{margin:0, fontSize:12, color:C.ink, lineHeight:1.6}}>
-                    Add expenses that repeat every month — Netflix, gym, electricity. They'll be <strong>auto-logged</strong> on the day you set, so you don't have to enter them manually.
-                  </p>
-                </div>
-              )}
-
-              {/* Add/Edit Form */}
-              {showForm && (
-                <div style={{background:"#fff", borderRadius:13, border:`1px solid ${C.border}`, boxShadow:"0 1px 4px rgba(0,0,0,0.06)", padding:16, marginBottom:14}}>
-                  <p style={{margin:"0 0 14px", fontSize:14, fontWeight:700, color:C.ink}}>
-                    {editId !== null ? "✏️ Edit Recurring" : "🔁 New Recurring Expense"}
-                  </p>
-
-                  <p style={{margin:"0 0 4px", fontSize:10, fontWeight:700, color:C.muted, textTransform:"uppercase", letterSpacing:"0.9px"}}>Label *</p>
-                  <input value={fLabel} onChange={e=>setFLabel(e.target.value)} placeholder="e.g. Netflix, Gym, Electricity"
-                    style={{...inp2, marginBottom:12}} />
-
-                  <p style={{margin:"0 0 6px", fontSize:10, fontWeight:700, color:C.muted, textTransform:"uppercase", letterSpacing:"0.9px"}}>Category</p>
-                  <div style={{display:"flex", flexWrap:"wrap", gap:5, marginBottom:12}}>
-                    {CATS.map(c=>(
-                      <button key={c.name} onClick={()=>setFCat(c.name)} style={{
-                        padding:"4px 10px", borderRadius:99, fontSize:11, fontWeight:600, cursor:"pointer",
-                        fontFamily:"inherit", border:`1.5px solid ${fCat===c.name?C.ink:C.border}`,
-                        background:fCat===c.name?C.ink:"#fff", color:fCat===c.name?"#fff":C.ink,
-                      }}>{c.icon} {c.name}</button>
-                    ))}
-                  </div>
-
-                  <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:12}}>
-                    <div>
-                      <p style={{margin:"0 0 4px", fontSize:10, fontWeight:700, color:C.muted, textTransform:"uppercase", letterSpacing:"0.9px"}}>Amount (₹) *</p>
-                      <input type="number" value={fAmt} onChange={e=>setFAmt(e.target.value)} placeholder="e.g. 649"
-                        style={inp2} />
-                    </div>
-                    <div>
-                      <p style={{margin:"0 0 4px", fontSize:10, fontWeight:700, color:C.muted, textTransform:"uppercase", letterSpacing:"0.9px"}}>Day of Month</p>
-                      <select value={fDay} onChange={e=>setFDay(Number(e.target.value))} style={inp2}>
-                        {DAYS.map(d=><option key={d} value={d}>{ordinal(d)} of every month</option>)}
-                      </select>
-                    </div>
-                  </div>
-
-                  <p style={{margin:"0 0 4px", fontSize:10, fontWeight:700, color:C.muted, textTransform:"uppercase", letterSpacing:"0.9px"}}>Note (optional)</p>
-                  <input value={fNote} onChange={e=>setFNote(e.target.value)} placeholder="e.g. Hotstar annual plan"
-                    style={{...inp2, marginBottom:14}} />
-
-                  <div style={{display:"flex", gap:9}}>
-                    <button onClick={cancel} style={{flex:1, padding:"9px", borderRadius:9, border:`1px solid ${C.border}`, background:"#fff", color:C.muted, fontFamily:"inherit", fontSize:13, cursor:"pointer"}}>Cancel</button>
-                    <button onClick={save}   style={{flex:2, padding:"9px", borderRadius:9, border:"none", background:C.ink, color:"#fff", fontFamily:"inherit", fontSize:13, fontWeight:700, cursor:"pointer"}}>
-                      {editId !== null ? "Save Changes ✓" : "Add Recurring ✓"}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Recurring list */}
-              {(recurringExpenses||[]).length > 0 && (
-                <div style={{display:"flex", flexDirection:"column", gap:8}}>
-                  {(recurringExpenses||[]).map(r => {
-                    const cat = CATS.find(c=>c.name===r.category)||{icon:"💸"};
-                    const autoLogged = (allExpenses[currentMonthKey()]||[]).some(e=>e.recurringId===r.id);
-                    return (
-                      <div key={r.id} style={{
-                        background:"#fff", borderRadius:12, border:`1px solid ${C.border}`,
-                        boxShadow:"0 1px 2px rgba(0,0,0,0.04)", padding:"11px 14px",
-                        opacity: r.active ? 1 : 0.55,
-                      }}>
-                        <div style={{display:"flex", alignItems:"center", gap:10}}>
-                          {/* Icon */}
-                          <div style={{width:36, height:36, borderRadius:9, flexShrink:0, fontSize:18,
-                                       background:`${C.blue}10`, border:`1px solid ${C.blue}20`,
-                                       display:"flex", alignItems:"center", justifyContent:"center"}}>
-                            {cat.icon}
-                          </div>
-                          {/* Info */}
-                          <div style={{flex:1, minWidth:0}}>
-                            <div style={{display:"flex", alignItems:"center", gap:6, marginBottom:2}}>
-                              <p style={{margin:0, fontSize:13, fontWeight:700, color:C.ink}}>{r.label}</p>
-                              {autoLogged && (
-                                <span style={{fontSize:9, fontWeight:700, color:C.green, background:"#F0FDF4", border:"1px solid #86EFAC", borderRadius:99, padding:"1px 7px"}}>
-                                  ✓ logged this month
-                                </span>
-                              )}
-                              {!r.active && (
-                                <span style={{fontSize:9, color:C.muted, background:C.bg, border:`1px solid ${C.border}`, borderRadius:99, padding:"1px 7px"}}>
-                                  paused
-                                </span>
-                              )}
-                            </div>
-                            <p style={{margin:0, fontSize:10, color:C.muted}}>
-                              {r.category} · {fmt(r.amount)}/month · {ordinal(r.dayOfMonth)}
-                              {r.note && ` · ${r.note}`}
-                            </p>
-                          </div>
-                          {/* Amount */}
-                          <p style={{margin:0, fontSize:15, fontWeight:700, color:C.ink, fontFamily:"Georgia,serif", flexShrink:0}}>
-                            {fmt(r.amount)}
-                          </p>
-                        </div>
-                        {/* Actions */}
-                        <div style={{display:"flex", gap:6, marginTop:9, paddingTop:9, borderTop:`1px solid ${C.bg}`}}>
-                          <button onClick={()=>toggleRecurring(r.id)} style={{
-                            flex:1, padding:"5px 0", borderRadius:7, fontSize:11, fontWeight:600, cursor:"pointer",
-                            fontFamily:"inherit", border:`1px solid ${C.border}`,
-                            background: r.active ? "#FFFBEB" : "#F0FDF4",
-                            color: r.active ? C.amber : C.green,
-                          }}>
-                            {r.active ? "⏸ Pause" : "▶ Resume"}
-                          </button>
-                          <button onClick={()=>openEdit(r)} style={{
-                            flex:1, padding:"5px 0", borderRadius:7, fontSize:11, fontWeight:600, cursor:"pointer",
-                            fontFamily:"inherit", border:`1px solid ${C.border}`, background:"#fff", color:C.ink,
-                          }}>✏ Edit</button>
-                          <button onClick={()=>{ if(window.confirm(`Delete "${r.label}"?`)) deleteRecurring(r.id); }} style={{
-                            flex:1, padding:"5px 0", borderRadius:7, fontSize:11, fontWeight:600, cursor:"pointer",
-                            fontFamily:"inherit", border:"1px solid #FECACA", background:"#FFF1F2", color:C.red,
-                          }}>🗑 Delete</button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })()}
+        {tab==="recurring"&&(
+          <RecurringTab
+            recurringExpenses={recurringExpenses||[]}
+            allExpenses={allExpenses}
+            onAdd={addRecurring}
+            onUpdate={updateRecurring}
+            onDelete={deleteRecurring}
+            onToggle={toggleRecurring}
+            showToast={showToast}
+          />
+        )}
 
         {/* ══ CATEGORY BUDGETS ══ */}
         {tab==="catbudget"&&(
