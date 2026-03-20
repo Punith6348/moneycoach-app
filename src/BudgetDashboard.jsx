@@ -256,99 +256,155 @@ export default function BudgetDashboard({
       <style>{DASH_CSS}</style>
 
       {/* ══ 1. HERO CARD ══ */}
-      <div style={{
-        background:"linear-gradient(135deg, #1E293B 0%, #334155 100%)", borderRadius:12, padding:"11px 14px",
-        marginBottom:10, display:"flex", justifyContent:"space-between", alignItems:"flex-end", gap:12,
-      }}>
-        <div style={{flex:1, minWidth:0}}>
-          <p style={{margin:0, fontSize:8, color:"#6B7280", textTransform:"uppercase", letterSpacing:"1.3px", fontWeight:700}}>
-            Remaining Balance
-          </p>
-          <p style={{
-            margin:"2px 0 0", lineHeight:1, fontWeight:700, fontFamily:"Georgia,serif",
-            fontSize: remaining >= 1000000 ? 28 : remaining >= 100000 ? 32 : 34,
-            color: remaining >= 0 ? "#fff" : "#F87171",
+      {(() => {
+        const daysInMonth  = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+        const daysPassed   = now.getDate();
+        const dayPct       = Math.round((daysPassed / daysInMonth) * 100);
+        const spendPct2    = remaining > 0 ? Math.min(Math.round((monthSpent / (monthSpent + remaining)) * 100), 100) : 100;
+        const progressColor = spendPct2 > dayPct + 15 ? "#F87171" : spendPct2 > dayPct + 5 ? "#FCD34D" : "#86EFAC";
+        return (
+          <div style={{
+            background:"linear-gradient(135deg, #1E293B 0%, #334155 100%)", borderRadius:12, padding:"12px 14px",
+            marginBottom:10,
           }}>
-            {remaining >= 0 ? fmt(remaining) : `−${fmt(remaining)}`}
-          </p>
-          <div style={{height:1, background:"rgba(255,255,255,0.08)", margin:"7px 0 6px", maxWidth:260}} />
-          <div style={{display:"flex", alignItems:"baseline", gap:4, flexWrap:"wrap"}}>
-            <p style={{margin:0, fontSize:9, color:"#94A3B8"}}>Daily spend</p>
-            <p style={{margin:0, fontSize:13, fontWeight:700, fontFamily:"Georgia,serif", color: dailyLimit>0?"#E5E7EB":"#F87171"}}>
-              {dailyLimit > 0 ? fmt(dailyLimit) : "₹0"}
-            </p>
+            {/* Top row: balance + today */}
+            <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:12, marginBottom:10}}>
+              <div style={{flex:1, minWidth:0}}>
+                <p style={{margin:0, fontSize:8, color:"#64748B", textTransform:"uppercase", letterSpacing:"1.3px", fontWeight:700}}>
+                  Remaining Balance
+                </p>
+                <p style={{
+                  margin:"2px 0 0", lineHeight:1, fontWeight:700, fontFamily:"Georgia,serif",
+                  fontSize: remaining >= 1000000 ? 28 : remaining >= 100000 ? 32 : 34,
+                  color: remaining >= 0 ? "#fff" : "#F87171",
+                }}>
+                  {remaining >= 0 ? fmt(remaining) : `−${fmt(Math.abs(remaining))}`}
+                </p>
+                <div style={{display:"flex", alignItems:"baseline", gap:4, marginTop:5}}>
+                  <p style={{margin:0, fontSize:9, color:"#94A3B8"}}>Daily limit</p>
+                  <p style={{margin:0, fontSize:13, fontWeight:700, fontFamily:"Georgia,serif",
+                    color: dailyLimit > 0 ? "#E2E8F0" : "#F87171"}}>
+                    {dailyLimit > 0 ? fmt(dailyLimit) : "₹0"}
+                  </p>
+                  <p style={{margin:0, fontSize:9, color:"#64748B"}}>· {daysLeft} days left</p>
+                </div>
+              </div>
+              {/* Today panel — always shown */}
+              <div style={{
+                textAlign:"right", flexShrink:0,
+                background:"rgba(255,255,255,0.07)", borderRadius:9,
+                padding:"7px 11px", minWidth:80,
+              }}>
+                <p style={{margin:0, fontSize:8, color:"#64748B", textTransform:"uppercase", letterSpacing:"0.8px"}}>Today</p>
+                {todaySpent > 0 ? (
+                  <>
+                    <p style={{margin:"2px 0 0", fontSize:16, fontWeight:700, fontFamily:"Georgia,serif",
+                      color: todaySpent <= dailyLimit ? "#86EFAC" : "#F87171"}}>
+                      {fmt(todaySpent)}
+                    </p>
+                    <p style={{margin:"1px 0 0", fontSize:8,
+                      color: todaySpent <= dailyLimit ? "#86EFAC" : "#F87171", fontWeight:600}}>
+                      {todaySpent <= dailyLimit ? "✓ on track" : "⚠ over limit"}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p style={{margin:"2px 0 0", fontSize:13, fontWeight:700, color:"#475569"}}>₹0</p>
+                    <p style={{margin:"1px 0 0", fontSize:8, color:"#475569"}}>nothing logged</p>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Spend progress bar */}
+            <div>
+              <div style={{display:"flex", justifyContent:"space-between", marginBottom:4}}>
+                <p style={{margin:0, fontSize:8, color:"#64748B"}}>
+                  Day {daysPassed} of {daysInMonth} · spent {spendPct2}% of budget
+                </p>
+                <p style={{margin:0, fontSize:8, color: progressColor === "#86EFAC" ? "#86EFAC" : progressColor === "#FCD34D" ? "#FCD34D" : "#F87171", fontWeight:600}}>
+                  {spendPct2 <= dayPct + 5 ? "✓ On pace" : spendPct2 <= dayPct + 15 ? "⚡ Slightly fast" : "🔴 Overspending"}
+                </p>
+              </div>
+              {/* Track: day progress (grey) behind spend (coloured) */}
+              <div style={{position:"relative", height:5, borderRadius:99, background:"rgba(255,255,255,0.08)"}}>
+                {/* Day marker */}
+                <div style={{
+                  position:"absolute", left:0, top:0, height:"100%",
+                  width:`${dayPct}%`, borderRadius:99,
+                  background:"rgba(255,255,255,0.15)",
+                }}/>
+                {/* Actual spend */}
+                <div style={{
+                  position:"absolute", left:0, top:0, height:"100%",
+                  width:`${spendPct2}%`, borderRadius:99,
+                  background: progressColor,
+                  transition:"width 0.5s",
+                }}/>
+              </div>
+              <div style={{display:"flex", justifyContent:"space-between", marginTop:3}}>
+                <p style={{margin:0, fontSize:7, color:"#475569"}}>{fmt(monthSpent)} spent</p>
+                <p style={{margin:0, fontSize:7, color:"#475569"}}>{fmt(monthSpent + remaining)} budget</p>
+              </div>
+            </div>
           </div>
-          <p style={{margin:"2px 0 0", fontSize:9, color:"#64748B"}}>
-            {daysLeft} days left in {monthName}
-          </p>
-        </div>
-        {todaySpent > 0 && (
-          <div style={{textAlign:"right", flexShrink:0}}>
-            <p style={{margin:0, fontSize:8, color:"#64748B", textTransform:"uppercase", letterSpacing:"0.8px"}}>Today</p>
-            <p style={{margin:"1px 0 0", fontSize:13, fontWeight:700, fontFamily:"Georgia,serif",
-              color: todaySpent <= dailyLimit ? "#86EFAC" : "#F87171"}}>
-              {fmt(todaySpent)}
-            </p>
-            <p style={{margin:"1px 0 0", fontSize:8, color: todaySpent<=dailyLimit?"#86EFAC":"#F87171"}}>
-              {todaySpent<=dailyLimit?"✓ within limit":"⚠ over limit"}
-            </p>
-          </div>
-        )}
-      </div>
+        );
+      })()}
 
       {/* ══ 1b. ACTION CENTER — always visible ══ */}
       {(() => {
-        // Determine which fallback to show when no rules fired
         const lowData = totalIncome === 0 && currentExpenses.length === 0;
         const displayItems = actions.length > 0 ? actions : lowData ? [{
           icon:"💡", type:"neutral",
-          text:"Start tracking to get personalised recommendations.",
-          action:"Add income in Plan, then log your first expense.",
+          text:"Add income in Plan, then log your first expense.",
+          action:"Get started",
         }] : [{
           icon:"✅", type:"good",
-          text:"All good — you're on track this month. No issues detected.",
-          action:"Keep logging expenses to maintain this status.",
+          text:"You're on track this month. No issues detected.",
+          action:"Keep it up",
         }];
 
         const ITEM_STYLE = {
-          bad:     { bg:"#FFF1F2", border:"#FECACA", textColor:"#991B1B" },
-          warn:    { bg:"#FFFBEB", border:"#FDE68A", textColor:"#92400E" },
-          neutral: { bg:C.bg,      border:C.border,  textColor:C.muted   },
-          good:    { bg:"#F0FDF4", border:"#BBF7D0", textColor:"#166534" },
+          bad:     { bg:"#FFF1F2", border:"#FECACA", tagBg:"#FCA5A5", tagColor:"#7F1D1D" },
+          warn:    { bg:"#FFFBEB", border:"#FDE68A", tagBg:"#FDE68A", tagColor:"#78350F" },
+          neutral: { bg:C.bg,      border:C.border,  tagBg:C.border,  tagColor:C.muted   },
+          good:    { bg:"#F0FDF4", border:"#BBF7D0", tagBg:"#BBF7D0", tagColor:"#14532D" },
         };
 
         return (
           <div style={{marginBottom:10}}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:7}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
               <p style={{margin:0,fontSize:9,fontWeight:700,color:C.muted,
                          textTransform:"uppercase",letterSpacing:"1px"}}>
-                Action Center
+                What to do now
               </p>
               {actions.length > 0 && (
-                <p style={{margin:0,fontSize:9,color:C.muted}}>
-                  {actions.length} item{actions.length!==1?"s":""}
-                </p>
+                <span style={{fontSize:9,color:C.muted,background:C.bg,
+                              border:`1px solid ${C.border}`,borderRadius:99,padding:"1px 7px"}}>
+                  {actions.length} alert{actions.length!==1?"s":""}
+                </span>
               )}
             </div>
-            <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            <div style={{display:"flex",flexDirection:"column",gap:5}}>
               {displayItems.map((a,i) => {
                 const s = ITEM_STYLE[a.type] || ITEM_STYLE.neutral;
                 return (
                   <div key={i} style={{
                     background:s.bg, border:`1px solid ${s.border}`,
-                    borderRadius:10, padding:"9px 12px",
-                    display:"flex", alignItems:"flex-start", gap:10,
+                    borderRadius:9, padding:"8px 11px",
+                    display:"flex", alignItems:"center", gap:9,
                   }}>
-                    <span style={{fontSize:16,flexShrink:0,marginTop:1,lineHeight:1}}>{a.icon}</span>
-                    <div style={{flex:1,minWidth:0}}>
-                      <p style={{margin:0,fontSize:12,fontWeight:600,color:C.ink,lineHeight:1.4}}>
-                        {a.text}
-                      </p>
-                      <p style={{margin:"3px 0 0",fontSize:10,color:s.textColor,
-                                 lineHeight:1.4,fontStyle:"italic"}}>
-                        → {a.action}
-                      </p>
-                    </div>
+                    <span style={{fontSize:15,flexShrink:0,lineHeight:1}}>{a.icon}</span>
+                    <p style={{margin:0,fontSize:12,fontWeight:500,color:C.ink,lineHeight:1.35,flex:1,minWidth:0}}>
+                      {a.text}
+                    </p>
+                    <span style={{
+                      flexShrink:0, fontSize:9, fontWeight:700,
+                      background:s.tagBg, color:s.tagColor,
+                      borderRadius:99, padding:"2px 8px", whiteSpace:"nowrap",
+                    }}>
+                      {a.action}
+                    </span>
                   </div>
                 );
               })}
@@ -361,10 +417,10 @@ export default function BudgetDashboard({
       <div className="mc-summary-row">
         {[
           // navTo: {tab, section} for editable cards — null for computed/derived cards
-          { label:"Total Income",         value:fmt(totalIncome),                                   color:C.green,  icon:"💰", navTo:{tab:"plan",    section:"plan-income"} },
-          { label:"Fixed Expenses",       value:fmt(totalFixed),                                    color:C.red,    icon:"🏠", navTo:{tab:"plan",    section:"plan-fixed"}  },
-          { label:"Savings & Inv.",       value:fmt(totalSavings),                              color:C.blue,   icon:"📈", navTo:{tab:"plan",  section:"plan-savings"} },
-          { label:"Loan EMI",             value:loans.length>0?`${fmt(totalLoanEmi)}/mo`:"₹0", color:C.purple, icon:"🏦", navTo:{tab:"loans", section:null} },
+          { label:"Total Income",   value:fmt(totalIncome),                                   color:C.green,  icon:"💰", sub:null,                                          navTo:{tab:"plan",  section:"plan-income"} },
+          { label:"Fixed Expenses", value:fmt(totalFixed),                                    color:C.red,    icon:"🏠", sub:totalIncome>0?`${allocPct(totalFixed)}% of income`:null,  navTo:{tab:"plan",  section:"plan-fixed"}  },
+          { label:"Savings & Inv.", value:fmt(totalSavings),                                  color:C.blue,   icon:"📈", sub:totalIncome>0?`${allocPct(totalSavings)}% of income`:null, navTo:{tab:"plan",  section:"plan-savings"} },
+          { label:"Loan EMI",       value:loans.length>0?`${fmt(totalLoanEmi)}/mo`:"₹0",     color:C.purple, icon:"🏦", sub:loans.length>0&&totalIncome>0?`${allocPct(totalLoanEmi)}% of income`:null, navTo:{tab:"loans", section:null} },
         ].map(t => {
           const clickable = !!t.navTo && !!onNavigate;
           const hovered   = hoveredCard === t.label;
@@ -400,6 +456,9 @@ export default function BudgetDashboard({
                 margin:0, fontWeight:700, color:t.color,
                 fontFamily:"Georgia,serif", lineHeight:1.1,
               }}>{t.value}</p>
+              {t.sub && (
+                <p style={{margin:"3px 0 0", fontSize:8, color:C.muted, fontWeight:500}}>{t.sub}</p>
+              )}
             </>
           );
 
@@ -573,8 +632,8 @@ export default function BudgetDashboard({
           {/* Three metrics */}
           <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:0}}>
             {[
-              {label:"Outstanding",   value:fmt(totalOutstanding),   color:C.red},
               {label:"Monthly EMI",   value:fmt(totalLoanEmi),       color:C.purple},
+              {label:"Outstanding",   value:fmt(totalOutstanding),   color:C.red},
               {label:"Interest Left", value:fmt(totalLoanInterest),  color:C.amber},
             ].map((m,i)=>(
               <div key={m.label} style={{padding:"10px 14px",borderRight:i<2?`1px solid ${C.bg}`:"none"}}>
