@@ -12,6 +12,7 @@ const DEFAULT_STATE = {
   futurePayments:   [],
   loans:            [],  // [{id, name, principal, rate, tenureMonths, emi, startDate}]
   categoryBudgets:  {},  // { "Food": 3000, "Travel": 1500, ... }
+  recurringExpenses:[],  // [{id, label, category, amount, dayOfMonth, note, active}]
   allExpenses:   {},
   checkIns:      [],
 };
@@ -201,6 +202,7 @@ export function useAppData() {
       checkIns:       Array.isArray(saved.checkIns)       ? saved.checkIns       : [],
       allExpenses:    (saved.allExpenses && typeof saved.allExpenses==="object") ? saved.allExpenses : {},
       categoryBudgets:(saved.categoryBudgets && typeof saved.categoryBudgets==="object") ? saved.categoryBudgets : {},
+      recurringExpenses: Array.isArray(saved.recurringExpenses) ? saved.recurringExpenses : [],
     };
   });
 
@@ -275,6 +277,43 @@ export function useAppData() {
     return { ...prev, categoryBudgets: next };
   });
 
+  // Recurring expenses
+  const addRecurring    = (r)      => commit(prev=>({...prev, recurringExpenses:[...(prev.recurringExpenses||[]),{...r,id:Date.now(),active:true}]}));
+  const updateRecurring = (id,upd) => commit(prev=>({...prev, recurringExpenses:(prev.recurringExpenses||[]).map(r=>r.id===id?{...r,...upd}:r)}));
+  const deleteRecurring = (id)     => commit(prev=>({...prev, recurringExpenses:(prev.recurringExpenses||[]).filter(r=>r.id!==id)}));
+  const toggleRecurring = (id)     => commit(prev=>({...prev, recurringExpenses:(prev.recurringExpenses||[]).map(r=>r.id===id?{...r,active:!r.active}:r)}));
+
+  // Auto-log recurring expenses for the current month if not already logged
+  // Called once on app load — checks each active recurring item
+  const autoLogRecurring = () => {
+    const now   = new Date();
+    const today = now.getDate();
+    const mk    = currentMonthKey();
+    commit(prev => {
+      const recs     = prev.recurringExpenses || [];
+      const existing = prev.allExpenses[mk]   || [];
+      const toAdd    = [];
+      recs.forEach(r => {
+        if (!r.active) return;
+        if (today < r.dayOfMonth) return; // not due yet this month
+        // Check if already auto-logged this month (tagged with recurringId)
+        const alreadyLogged = existing.some(e => e.recurringId === r.id);
+        if (alreadyLogged) return;
+        toAdd.push({
+          id: Date.now() + Math.random(),
+          amount:      r.amount,
+          label:       r.category,
+          note:        r.note || r.label,
+          date:        new Date(now.getFullYear(), now.getMonth(), r.dayOfMonth, 9, 0, 0).toISOString(),
+          recurringId: r.id,   // mark so we don't log twice
+          auto:        true,   // flag for UI display
+        });
+      });
+      if (toAdd.length === 0) return prev;
+      return { ...prev, allExpenses: { ...prev.allExpenses, [mk]: [...existing, ...toAdd] } };
+    });
+  };
+
   // Profile
   const updateName = (newName) => commit(prev => ({ ...prev, name: newName || "" }));
 
@@ -294,6 +333,7 @@ export function useAppData() {
     savingsPlans:data.savingsPlans, futurePayments:data.futurePayments,
     loans: data.loans || [],
     categoryBudgets: data.categoryBudgets || {},
+    recurringExpenses: data.recurringExpenses || [],
     allExpenses:data.allExpenses, checkIns:data.checkIns,
     totalIncome, totalFixed, totalSavings, totalReserve, remaining, dailyLimit,
     completeOnboarding,
@@ -305,5 +345,6 @@ export function useAppData() {
     addLoan, updateLoan, deleteLoan,
     setCategoryBudget,
     updateName,
+    addRecurring, updateRecurring, deleteRecurring, toggleRecurring, autoLogRecurring,
   };
 }

@@ -244,6 +244,27 @@ export default function BudgetDashboard({
       }
     }
 
+    // 12. Spending forecast — project month-end based on last 7 days pace
+    if (daysPassed >= 5 && monthSpent > 0 && totalIncome > 0) {
+      const dailyAvg      = monthSpent / daysPassed;
+      const projected     = Math.round(dailyAvg * daysInMonth);
+      const budget        = monthSpent + Math.max(0, remaining);
+      const overshootAmt  = projected - budget;
+      if (overshootAmt > budget * 0.1) {
+        list.push({
+          icon:"🔮", type:"warn",
+          text:`At this pace you'll spend ${fmt(projected)} — ${fmt(overshootAmt)} over your ${fmt(budget)} budget.`,
+          action:"Cut back now",
+        });
+      } else if (projected <= budget * 0.85) {
+        list.push({
+          icon:"🔮", type:"good",
+          text:`On track to spend ${fmt(projected)} this month — ${fmt(budget - projected)} under budget.`,
+          action:"Great pace",
+        });
+      }
+    }
+
     // Return: bad first, then warn, then neutral, then good — max 4
     const order = { bad:0, warn:1, neutral:2, good:3 };
     return list.sort((a,b) => order[a.type] - order[b.type]).slice(0, 4);
@@ -346,6 +367,30 @@ export default function BudgetDashboard({
                 <p style={{margin:0, fontSize:7, color:"#475569"}}>{fmt(monthSpent)} spent</p>
                 <p style={{margin:0, fontSize:7, color:"#475569"}}>{fmt(monthSpent + remaining)} budget</p>
               </div>
+              {/* Forecast line — only when 5+ days of data */}
+              {daysPassed >= 5 && monthSpent > 0 && (() => {
+                const dailyAvg  = monthSpent / daysPassed;
+                const projected = Math.round(dailyAvg * daysInMonth);
+                const budget    = monthSpent + Math.max(0, remaining);
+                const over      = projected > budget;
+                return (
+                  <div style={{
+                    marginTop:7, paddingTop:6,
+                    borderTop:"1px solid rgba(255,255,255,0.08)",
+                    display:"flex", alignItems:"center", justifyContent:"space-between",
+                  }}>
+                    <p style={{margin:0, fontSize:8, color:"#64748B"}}>🔮 Month-end forecast</p>
+                    <p style={{margin:0, fontSize:11, fontWeight:700, fontFamily:"Georgia,serif",
+                      color: over ? "#F87171" : "#86EFAC"}}>
+                      {fmt(projected)}
+                      <span style={{fontSize:8, fontWeight:400, marginLeft:4,
+                        color: over ? "#F87171" : "#86EFAC"}}>
+                        {over ? `▲ ${fmt(projected - budget)} over` : `▼ ${fmt(budget - projected)} under`}
+                      </span>
+                    </p>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         );
@@ -662,7 +707,7 @@ export default function BudgetDashboard({
         <div style={{background:"#fff",borderRadius:12,border:`1px solid ${C.border}`,boxShadow:"0 1px 2px rgba(0,0,0,0.04)",overflow:"hidden"}}>
           <div style={{padding:"9px 14px",borderBottom:`1px solid ${C.bg}`}}>
             <p style={{margin:0,fontSize:12,fontWeight:700,color:C.ink}}>Recent Expenses</p>
-            <p style={{margin:0,fontSize:10,color:C.muted}}>Last {recentExp.length} transactions this month</p>
+            <p style={{margin:0,fontSize:10,color:C.muted}}>{recentExp.length} transaction{recentExp.length!==1?"s":""} this month</p>
           </div>
           {recentExp.map((e,i) => {
             const icon = CAT_ICONS[e.label] || "💸";
@@ -686,6 +731,151 @@ export default function BudgetDashboard({
               </div>
             );
           })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MONTH CLOSE REPORT — exported, rendered on dashboard when prior month exists
+// Shows budget vs actual for the previous month
+// ─────────────────────────────────────────────────────────────────────────────
+export function MonthCloseReport({ allExpenses, totalIncome, totalFixed, totalSavings, totalReserve, categoryBudgets = {} }) {
+  const [open, setOpen] = useState(false);
+
+  const now     = new Date();
+  const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const prevKey  = `${prevDate.getFullYear()}-${String(prevDate.getMonth()+1).padStart(2,"0")}`;
+  const prevLabel = prevDate.toLocaleDateString("en-IN", { month:"long", year:"numeric" });
+  const prevExps  = allExpenses[prevKey] || [];
+
+  if (prevExps.length === 0) return null;
+
+  const prevVarTotal = prevExps.reduce((s,e) => s+e.amount, 0);
+  const prevBalance  = totalIncome - totalFixed - totalSavings - totalReserve - prevVarTotal;
+
+  // Category breakdown vs budget
+  const catMap = {};
+  prevExps.forEach(e => { catMap[e.label] = (catMap[e.label]||0) + e.amount; });
+  const catList = Object.entries(catMap).sort((a,b) => b[1]-a[1]);
+
+  const grade = prevBalance >= totalIncome*0.2 ? { label:"Excellent 🏆", color:C.green }
+              : prevBalance >= 0               ? { label:"On Track ✓",  color:C.blue  }
+              : prevBalance >= -totalIncome*0.1 ? { label:"Slight Deficit ⚠", color:C.amber }
+              :                                   { label:"Over Budget 🔴", color:C.red };
+
+  return (
+    <div style={{
+      background:"#fff", borderRadius:12, border:`1.5px solid ${C.blue}33`,
+      boxShadow:"0 1px 3px rgba(0,0,0,0.05)", overflow:"hidden", marginBottom:12,
+    }}>
+      {/* Header — always visible */}
+      <button onClick={() => setOpen(p=>!p)} style={{
+        width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between",
+        padding:"10px 14px", background:`${C.blue}06`,
+        border:"none", cursor:"pointer", fontFamily:"inherit",
+        borderBottom: open ? `1px solid ${C.bg}` : "none",
+      }}>
+        <div style={{textAlign:"left"}}>
+          <p style={{margin:0, fontSize:12, fontWeight:700, color:C.ink}}>
+            📋 {prevLabel} — How did it go?
+          </p>
+          <p style={{margin:"1px 0 0", fontSize:10, color:C.muted}}>
+            {prevExps.length} transactions · tap to review
+          </p>
+        </div>
+        <div style={{textAlign:"right", flexShrink:0}}>
+          <span style={{
+            fontSize:10, fontWeight:700, color:grade.color,
+            background:`${grade.color}15`, border:`1px solid ${grade.color}30`,
+            borderRadius:99, padding:"2px 9px",
+          }}>
+            {grade.label}
+          </span>
+          <p style={{margin:"3px 0 0", fontSize:9, color:C.muted}}>{open ? "▲ hide" : "▼ show"}</p>
+        </div>
+      </button>
+
+      {open && (
+        <div style={{padding:"12px 14px"}}>
+
+          {/* Top-line summary */}
+          <div style={{display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:14}}>
+            {[
+              { label:"Variable Spent", value:fmt(prevVarTotal), color:C.red   },
+              { label:"Savings Plan",   value:fmt(totalSavings), color:C.blue  },
+              { label:"Month Balance",  value:prevBalance>=0?fmt(prevBalance):`−${fmt(Math.abs(prevBalance))}`,
+                color: prevBalance >= 0 ? C.green : C.red },
+            ].map(t => (
+              <div key={t.label} style={{background:C.bg, borderRadius:9, padding:"8px 10px", border:`1px solid ${C.border}`}}>
+                <p style={{margin:0, fontSize:8, color:C.muted, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.6px"}}>{t.label}</p>
+                <p style={{margin:"3px 0 0", fontSize:13, fontWeight:700, color:t.color, fontFamily:"Georgia,serif"}}>{t.value}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Category breakdown vs budget */}
+          <p style={{margin:"0 0 8px", fontSize:10, fontWeight:700, color:C.muted,
+                     textTransform:"uppercase", letterSpacing:"0.8px"}}>
+            Spending by category
+          </p>
+          {catList.map(([cat, amt]) => {
+            const budget  = categoryBudgets[cat] || 0;
+            const over    = budget > 0 && amt > budget;
+            const pct     = prevVarTotal > 0 ? Math.round((amt/prevVarTotal)*100) : 0;
+            return (
+              <div key={cat} style={{marginBottom:8}}>
+                <div style={{display:"flex", justifyContent:"space-between", marginBottom:2}}>
+                  <div style={{display:"flex", alignItems:"center", gap:6}}>
+                    <span style={{fontSize:14}}>{CAT_ICONS[cat]||"💸"}</span>
+                    <span style={{fontSize:12, fontWeight:600, color:C.ink}}>{cat}</span>
+                    {budget > 0 && (
+                      <span style={{
+                        fontSize:9, fontWeight:700, borderRadius:99, padding:"1px 7px",
+                        background: over ? "#FFF1F2" : "#F0FDF4",
+                        border: `1px solid ${over ? "#FECACA" : "#86EFAC"}`,
+                        color: over ? C.red : C.green,
+                      }}>
+                        {over ? `over by ${fmt(amt-budget)}` : `under budget`}
+                      </span>
+                    )}
+                  </div>
+                  <span style={{fontSize:13, fontWeight:700, color:over?C.red:C.ink, fontFamily:"Georgia,serif"}}>
+                    {fmt(amt)}
+                  </span>
+                </div>
+                <div style={{height:4, borderRadius:99, background:C.border, overflow:"hidden"}}>
+                  <div style={{
+                    height:"100%", borderRadius:99,
+                    width:`${pct}%`,
+                    background: over ? C.red : C.blue,
+                    transition:"width 0.4s",
+                  }}/>
+                </div>
+                {budget > 0 && (
+                  <p style={{margin:"2px 0 0", fontSize:9, color:C.muted}}>
+                    Budget: {fmt(budget)} · spent {Math.round((amt/budget)*100)}%
+                  </p>
+                )}
+              </div>
+            );
+          })}
+
+          {/* Takeaway */}
+          <div style={{
+            marginTop:10, padding:"9px 12px", borderRadius:9,
+            background: prevBalance >= 0 ? "#F0FDF4" : "#FFF1F2",
+            border:`1px solid ${prevBalance >= 0 ? "#86EFAC" : "#FECACA"}`,
+          }}>
+            <p style={{margin:0, fontSize:12, color:C.ink, fontWeight:500}}>
+              {prevBalance >= totalIncome*0.2
+                ? `🏆 Strong month — you kept ${fmt(prevBalance)} (${Math.round((prevBalance/totalIncome)*100)}% of income) as net balance.`
+                : prevBalance >= 0
+                ? `✅ Positive month. ${fmt(prevBalance)} left over after all commitments.`
+                : `⚠ Spent ${fmt(Math.abs(prevBalance))} more than planned. Review your top categories for ${now.toLocaleDateString("en-IN",{month:"long"})}.`}
+            </p>
+          </div>
         </div>
       )}
     </div>
