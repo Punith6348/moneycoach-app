@@ -634,7 +634,7 @@ function DashboardScreen(props) {
     addFuturePayment, updateFuturePayment, deleteFuturePayment,
     addExpense, editExpense, deleteExpense, addCheckIn, resetAll,
     addLoan, updateLoan, deleteLoan,
-    setCategoryBudget, updateName,
+    updateName,
   } = props;
 
   const [selectedMonth,setSelectedMonth] = useState(currentMonthKey());
