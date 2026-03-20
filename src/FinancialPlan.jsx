@@ -8,7 +8,7 @@
 import { useState, useEffect, useRef } from "react";
 import { calcMonthlyReserve } from "./useAppData";
 
-const C = {ink:"#1C1917",muted:"#78716C",border:"#E7E5E0",bg:"#F7F5F0",red:"#DC2626",green:"#16A34A",amber:"#D97706",blue:"#2563EB",purple:"#7C3AED"};
+const C = {ink:"#111827",muted:"#6B7280",border:"#E5E7EB",bg:"#F8FAFC",red:"#DC2626",green:"#16A34A",amber:"#D97706",blue:"#2563EB",purple:"#7C3AED"};
 const fmt = (n) => `₹${Math.abs(Math.round(n)).toLocaleString("en-IN")}`;
 const Label = ({children}) => <p style={{fontSize:11,color:C.muted,textTransform:"uppercase",letterSpacing:"1.1px",fontWeight:600,margin:"0 0 4px"}}>{children}</p>;
 
@@ -198,7 +198,7 @@ export function IncomeSources({sources,totalIncome,onAdd,onUpdate,onDelete}) {
     <div id="plan-income">
     <SectionCard icon="💰" title="Income Sources" color={C.green}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-        <p style={{fontSize:10,color:"#78716C",textTransform:"uppercase",letterSpacing:"0.9px",fontWeight:600,margin:0}}>Total Monthly Income</p>
+        <p style={{fontSize:10,color:"#6B7280",textTransform:"uppercase",letterSpacing:"0.9px",fontWeight:600,margin:0}}>Total Monthly Income</p>
         <p style={{fontSize:17,fontWeight:700,color:"#16A34A",fontFamily:"Georgia,serif",margin:0}}>{fmt(totalIncome)}</p>
       </div>
 

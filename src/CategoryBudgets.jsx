@@ -7,7 +7,7 @@ import { useState, useMemo } from "react";
 import { currentMonthKey, monthKeyToLabel } from "./useAppData";
 
 const C = {
-  ink:"#1C1917", muted:"#78716C", border:"#E7E5E0", bg:"#F7F5F0",
+  ink:"#111827", muted:"#6B7280", border:"#E5E7EB", bg:"#F8FAFC",
   red:"#DC2626", green:"#16A34A", amber:"#D97706", blue:"#2563EB",
 };
 const fmt = (n) => `₹${Math.abs(Math.round(n)).toLocaleString("en-IN")}`;

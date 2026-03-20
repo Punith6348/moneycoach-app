@@ -35,18 +35,18 @@ const NOTE_PLACEHOLDER = {Food:"e.g. Lunch at Zomato",Travel:"e.g. Auto to offic
 // ICONS keeps fixed cats too so existing logged entries render correctly
 const FIXED_ICONS   = {Rent:"🏠",Electricity:"⚡",Water:"💧",Internet:"📶","EMI/Loan":"🏦",Insurance:"🛡",Maintenance:"🔧","School Fees":"🎓"};
 const ICONS         = {...Object.fromEntries(VARIABLE_CATS.map(c=>[c.name,c.icon])), ...FIXED_ICONS};
-const C = {ink:"#1C1917",muted:"#78716C",border:"#E7E5E0",bg:"#F7F5F0",red:"#DC2626",green:"#16A34A",amber:"#D97706",blue:"#2563EB",purple:"#7C3AED"};
+const C = {ink:"#111827",muted:"#6B7280",border:"#E5E7EB",bg:"#F8FAFC",red:"#DC2626",green:"#16A34A",amber:"#D97706",blue:"#2563EB",purple:"#7C3AED"};
 
 // Responsive CSS injected once into <head> equivalent via a style tag in the app shell
 const APP_CSS = `
-  .mc-app  { display:flex; flex-direction:column; min-height:100vh; background:#F7F5F0; }
+  .mc-app  { display:flex; flex-direction:column; min-height:100vh; background:#F8FAFC; }
   .mc-body { display:flex; flex:1; min-height:0; }
   .mc-main { flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden; }
   .mc-scroll { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; }
   .mc-content { padding:18px 18px 24px; max-width:960px; width:100%; margin:0 auto; }
 
   .mc-sidebar {
-    width:220px; min-width:220px; background:#1C1917;
+    width:220px; min-width:220px; background:#1E293B;
     display:flex; flex-direction:column;
     position:sticky; top:0; height:100vh;
     overflow-y:auto; flex-shrink:0;
@@ -57,7 +57,7 @@ const APP_CSS = `
   .mc-plan-full { width:100%; }
   @media(min-width:768px){ .mc-plan-top { grid-template-columns:1fr 1fr; gap:12px; } }
 
-  .mc-expense-row { display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px solid #F7F5F0; gap:8px; }
+  .mc-expense-row { display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px solid #F8FAFC; gap:8px; }
   .mc-expense-row:last-child { border-bottom:none; }
   ::-webkit-scrollbar { display:none; }
   * { scrollbar-width:none; }
@@ -545,7 +545,7 @@ function DashboardScreen(props) {
   const MonthBar=()=><MonthSelector selectedMonth={selectedMonth} onChange={setSelectedMonth} allExpenses={allExpenses}/>;
 
   // ── Shared inline style tokens ─────────────────────────────────────────
-  const NAV_BG      = "#1C1917";
+  const NAV_BG      = "#1E293B";
   const NAV_HEIGHT  = 48;
   const NAV_BORDER  = "1px solid rgba(255,255,255,0.12)";
 
@@ -572,7 +572,7 @@ function DashboardScreen(props) {
           {/* Dropdown */}
           <div style={{
             position:"fixed", bottom:NAV_HEIGHT, left:0, right:0, zIndex:10000,
-            background:"#272220", borderTop:"1px solid rgba(255,255,255,0.12)",
+            background:"#1E293B", borderTop:"1px solid rgba(255,255,255,0.12)",
             borderRadius:"16px 16px 0 0", padding:"12px 0 10px",
             boxShadow:"0 -8px 32px rgba(0,0,0,0.5)", animation:"slideUp 0.2s ease",
           }}>
@@ -587,7 +587,7 @@ function DashboardScreen(props) {
                   display:"flex", alignItems:"center", gap:12,
                   width:"100%", padding:"13px 20px", border:"none",
                   background: tab===key ? "rgba(255,255,255,0.09)" : "transparent",
-                  color: tab===key ? "#F7F5F0" : "#A8A29E",
+                  color: tab===key ? "#F8FAFC" : "#A8A29E",
                   fontSize:15, fontFamily:"inherit",
                   fontWeight: tab===key ? 700 : 400,
                   cursor:"pointer", textAlign:"left",
@@ -608,7 +608,7 @@ function DashboardScreen(props) {
             <div style={{padding:"20px 18px 16px",borderBottom:"1px solid rgba(255,255,255,0.07)"}}>
               <p style={{margin:0,fontSize:9,color:"#57534E",textTransform:"uppercase",
                          letterSpacing:"1.4px",fontWeight:700,marginBottom:4}}>Money Coach</p>
-              <p style={{margin:0,fontSize:11,color:"#A8A29E",lineHeight:1.4}}>
+              <p style={{margin:0,fontSize:11,color:"#CBD5E1",lineHeight:1.4}}>
                 {new Date().toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"short"})}
               </p>
             </div>
@@ -621,15 +621,15 @@ function DashboardScreen(props) {
                       display:"flex",alignItems:"center",gap:10,
                       width:"100%",padding:"10px 12px",marginBottom:2,
                       borderRadius:9,border:"none",
-                      background:active?"rgba(255,255,255,0.10)":"transparent",
-                      borderLeft:`3px solid ${active?"#E7E5E0":"transparent"}`,
-                      color:active?"#F7F5F0":"#78716C",
+                      background:active?"rgba(255,255,255,0.12)":"transparent",
+                      borderLeft:`3px solid ${active?"#93C5FD":"transparent"}`,
+                      color:active?"#F1F5F9":"#94A3B8",
                       fontSize:13,fontFamily:"inherit",fontWeight:active?700:400,
                       cursor:"pointer",textAlign:"left",
                       transition:"background 0.15s,color 0.15s",
                     }}
-                    onMouseEnter={e=>{if(!active){e.currentTarget.style.background="rgba(255,255,255,0.05)";e.currentTarget.style.color="#D6D3D1";}}}
-                    onMouseLeave={e=>{if(!active){e.currentTarget.style.background="transparent";e.currentTarget.style.color="#78716C";}}}
+                    onMouseEnter={e=>{if(!active){e.currentTarget.style.background="rgba(255,255,255,0.06)";e.currentTarget.style.color="#E2E8F0";}}}
+                    onMouseLeave={e=>{if(!active){e.currentTarget.style.background="transparent";e.currentTarget.style.color="#6B7280";}}}
                   >
                     <span style={{fontSize:16,width:20,textAlign:"center",flexShrink:0}}>{icon}</span>
                     <span>{label}</span>
@@ -642,8 +642,8 @@ function DashboardScreen(props) {
                 <div style={{display:"flex",alignItems:"center",gap:7}}>
                   <span style={{fontSize:16}}>🔥</span>
                   <div>
-                    <p style={{margin:0,fontSize:11,fontWeight:700,color:"#FDBA74"}}>{streak} day streak</p>
-                    <p style={{margin:0,fontSize:9,color:"#78716C"}}>Keep it up!</p>
+                    <p style={{margin:0,fontSize:11,fontWeight:700,color:"#FCD34D"}}>{streak} day streak</p>
+                    <p style={{margin:0,fontSize:9,color:"#6B7280"}}>Keep it up!</p>
                   </div>
                 </div>
               </div>
@@ -659,15 +659,15 @@ function DashboardScreen(props) {
             <header style={{
               display:"flex", alignItems:"center", justifyContent:"space-between",
               gap:6, padding:"6px 12px", flexShrink:0,
-              background:"#fff", borderBottom:"1px solid #E7E5E0",
+              background:"#fff", borderBottom:"1px solid #E5E7EB",
               position:"sticky", top:0, zIndex:100,
             }}>
               <div>
-                <p style={{margin:0,fontSize:9,color:"#78716C",fontWeight:500,marginBottom:1,
+                <p style={{margin:0,fontSize:9,color:"#6B7280",fontWeight:500,marginBottom:1,
                            textTransform:"uppercase",letterSpacing:"0.8px"}}>
                   {new Date().toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"})}
                 </p>
-                <p style={{margin:0,fontSize:14,fontWeight:700,color:"#1C1917",fontFamily:"Georgia,serif",lineHeight:1.15}}>
+                <p style={{margin:0,fontSize:14,fontWeight:700,color:"#111827",fontFamily:"Georgia,serif",lineHeight:1.15}}>
                   {getGreeting(name)} 👋
                 </p>
               </div>

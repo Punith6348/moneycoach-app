@@ -6,7 +6,7 @@
 import { useState, useMemo } from "react";
 import { calcMonthlyReserve, calcLoanTotals } from "./useAppData";
 
-const C = {ink:"#1C1917",muted:"#78716C",border:"#E7E5E0",bg:"#F7F5F0",red:"#DC2626",green:"#16A34A",amber:"#D97706",blue:"#2563EB",purple:"#7C3AED"};
+const C = {ink:"#111827",muted:"#6B7280",border:"#E5E7EB",bg:"#F8FAFC",red:"#DC2626",green:"#16A34A",amber:"#D97706",blue:"#2563EB",purple:"#7C3AED"};
 const fmt = (n) => `₹${Math.abs(Math.round(n)).toLocaleString("en-IN")}`;
 
 const DASH_CSS = `
@@ -235,11 +235,11 @@ export default function BudgetDashboard({
 
       {/* ══ 1. HERO CARD ══ */}
       <div style={{
-        background:"#1C1917", borderRadius:12, padding:"11px 14px",
+        background:"linear-gradient(135deg, #1E293B 0%, #334155 100%)", borderRadius:12, padding:"11px 14px",
         marginBottom:10, display:"flex", justifyContent:"space-between", alignItems:"flex-end", gap:12,
       }}>
         <div style={{flex:1, minWidth:0}}>
-          <p style={{margin:0, fontSize:8, color:"#78716C", textTransform:"uppercase", letterSpacing:"1.3px", fontWeight:700}}>
+          <p style={{margin:0, fontSize:8, color:"#6B7280", textTransform:"uppercase", letterSpacing:"1.3px", fontWeight:700}}>
             Remaining Balance
           </p>
           <p style={{
@@ -251,18 +251,18 @@ export default function BudgetDashboard({
           </p>
           <div style={{height:1, background:"rgba(255,255,255,0.08)", margin:"7px 0 6px", maxWidth:260}} />
           <div style={{display:"flex", alignItems:"baseline", gap:4, flexWrap:"wrap"}}>
-            <p style={{margin:0, fontSize:9, color:"#A8A29E"}}>Daily spend</p>
-            <p style={{margin:0, fontSize:13, fontWeight:700, fontFamily:"Georgia,serif", color: dailyLimit>0?"#E7E5E0":"#F87171"}}>
+            <p style={{margin:0, fontSize:9, color:"#94A3B8"}}>Daily spend</p>
+            <p style={{margin:0, fontSize:13, fontWeight:700, fontFamily:"Georgia,serif", color: dailyLimit>0?"#E5E7EB":"#F87171"}}>
               {dailyLimit > 0 ? fmt(dailyLimit) : "₹0"}
             </p>
           </div>
-          <p style={{margin:"2px 0 0", fontSize:9, color:"#57534E"}}>
+          <p style={{margin:"2px 0 0", fontSize:9, color:"#64748B"}}>
             {daysLeft} days left in {monthName}
           </p>
         </div>
         {todaySpent > 0 && (
           <div style={{textAlign:"right", flexShrink:0}}>
-            <p style={{margin:0, fontSize:8, color:"#57534E", textTransform:"uppercase", letterSpacing:"0.8px"}}>Today</p>
+            <p style={{margin:0, fontSize:8, color:"#64748B", textTransform:"uppercase", letterSpacing:"0.8px"}}>Today</p>
             <p style={{margin:"1px 0 0", fontSize:13, fontWeight:700, fontFamily:"Georgia,serif",
               color: todaySpent <= dailyLimit ? "#86EFAC" : "#F87171"}}>
               {fmt(todaySpent)}
