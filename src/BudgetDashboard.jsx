@@ -313,8 +313,10 @@ export default function BudgetDashboard({
               {/* Today panel — always shown */}
               <div style={{
                 textAlign:"right", flexShrink:0,
-                background:"rgba(255,255,255,0.07)", borderRadius:9,
-                padding:"7px 11px", minWidth:80,
+                ...(todaySpent > 0 ? {
+                  background:"rgba(255,255,255,0.07)", borderRadius:9,
+                  padding:"7px 11px", minWidth:80,
+                } : { minWidth:70 }),
               }}>
                 <p style={{margin:0, fontSize:8, color:"#64748B", textTransform:"uppercase", letterSpacing:"0.8px"}}>Today</p>
                 {todaySpent > 0 ? (
@@ -329,10 +331,7 @@ export default function BudgetDashboard({
                     </p>
                   </>
                 ) : (
-                  <>
-                    <p style={{margin:"2px 0 0", fontSize:13, fontWeight:700, color:"#475569"}}>₹0</p>
-                    <p style={{margin:"1px 0 0", fontSize:8, color:"#475569"}}>nothing logged</p>
-                  </>
+                  <p style={{margin:"2px 0 0", fontSize:11, color:"#475569"}}>₹0 logged</p>
                 )}
               </div>
             </div>
@@ -436,20 +435,25 @@ export default function BudgetDashboard({
                 return (
                   <div key={i} style={{
                     background:s.bg, border:`1px solid ${s.border}`,
-                    borderRadius:9, padding:"8px 11px",
-                    display:"flex", alignItems:"center", gap:9,
+                    borderRadius:9, padding:"9px 11px",
                   }}>
-                    <span style={{fontSize:15,flexShrink:0,lineHeight:1}}>{a.icon}</span>
-                    <p style={{margin:0,fontSize:12,fontWeight:500,color:C.ink,lineHeight:1.35,flex:1,minWidth:0}}>
-                      {a.text}
-                    </p>
-                    <span style={{
-                      flexShrink:0, fontSize:9, fontWeight:700,
-                      background:s.tagBg, color:s.tagColor,
-                      borderRadius:99, padding:"2px 8px", whiteSpace:"nowrap",
-                    }}>
-                      {a.action}
-                    </span>
+                    {/* Row 1: icon + text */}
+                    <div style={{display:"flex", alignItems:"flex-start", gap:9, marginBottom:5}}>
+                      <span style={{fontSize:15,flexShrink:0,lineHeight:1.4}}>{a.icon}</span>
+                      <p style={{margin:0,fontSize:12,fontWeight:500,color:C.ink,lineHeight:1.45,flex:1,minWidth:0}}>
+                        {a.text}
+                      </p>
+                    </div>
+                    {/* Row 2: tag right-aligned */}
+                    <div style={{display:"flex", justifyContent:"flex-end"}}>
+                      <span style={{
+                        fontSize:9, fontWeight:700,
+                        background:s.tagBg, color:s.tagColor,
+                        borderRadius:99, padding:"2px 9px", whiteSpace:"nowrap",
+                      }}>
+                        {a.action}
+                      </span>
+                    </div>
                   </div>
                 );
               })}
