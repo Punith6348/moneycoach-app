@@ -123,7 +123,7 @@ export default function BudgetDashboard({
       list.push({
         icon:"🚨", type:"bad",
         text:`Today's spending (${fmt(todaySpent)}) exceeded your ${fmt(dailyLimit)} daily limit.`,
-        action:"Log expenses carefully for the rest of today.",
+        action:"Slow down today",
       });
     }
 
@@ -132,7 +132,7 @@ export default function BudgetDashboard({
       list.push({
         icon:"⚠️", type:"warn",
         text:`Only ${fmt(remaining)} left with ${daysLeft} days to go in ${monthName}.`,
-        action:"Limit non-essential spending until next month.",
+        action:"Cut spending",
       });
     }
 
@@ -141,7 +141,7 @@ export default function BudgetDashboard({
       list.push({
         icon:"🔴", type:"bad",
         text:`Monthly budget is in deficit — commitments exceed income by ${fmt(Math.abs(remaining))}.`,
-        action:"Review fixed expenses or income sources in the Plan tab.",
+        action:"Review Plan tab",
       });
     }
 
@@ -151,7 +151,7 @@ export default function BudgetDashboard({
       list.push({
         icon:"📉", type:"warn",
         text:`You've spent ${fmt(ahead)} more than expected for day ${daysPassed} of the month.`,
-        action:"Slow down daily spending to stay on track.",
+        action:"Slow down",
       });
     }
 
@@ -165,7 +165,7 @@ export default function BudgetDashboard({
       list.push({
         icon, type:"warn",
         text:`${cat} budget of ${fmt(budget)} is exceeded — spent ${fmt(catSpend[cat]||0)} so far.`,
-        action:`Tap Budgets to review your ${cat} limit.`,
+        action:"Check Budgets",
       });
     }
 
@@ -174,13 +174,13 @@ export default function BudgetDashboard({
       list.push({
         icon:"🏦", type:"warn",
         text:`Fixed costs + EMIs consume ${fixedBurden}% of income — very little room for daily spending.`,
-        action:"Consider reducing fixed subscriptions or prepaying a loan.",
+        action:"Review bills",
       });
     } else if (fixedBurden > 45 && totalIncome > 0) {
       list.push({
         icon:"📋", type:"neutral",
         text:`Fixed costs + EMIs are ${fixedBurden}% of income. Watch variable spending closely.`,
-        action:"Keep daily expenses lean this month.",
+        action:"Stay lean",
       });
     }
 
@@ -189,7 +189,7 @@ export default function BudgetDashboard({
       list.push({
         icon:"⚠️", type:"warn",
         text:`Loan EMIs are ${debtRatio}% of income — above the healthy 30% threshold.`,
-        action:"Check the Loans tab to explore early closure options.",
+        action:"Check Loans",
       });
     }
 
@@ -198,7 +198,7 @@ export default function BudgetDashboard({
       list.push({
         icon:"💡", type:"neutral",
         text:`No savings or investments are set up yet.`,
-        action:"Add a SIP or recurring deposit in the Plan tab.",
+        action:"Go to Plan",
       });
     }
 
@@ -207,7 +207,7 @@ export default function BudgetDashboard({
       list.push({
         icon:"✅", type:"good",
         text:`Saving ${savingsRate}% of income this month — above the recommended 20% benchmark.`,
-        action:"Keep it up. Consider investing the surplus.",
+        action:"Invest surplus",
       });
     }
 
@@ -218,7 +218,7 @@ export default function BudgetDashboard({
       list.push({
         icon:"🌱", type:"good",
         text:`${noSpend} no-spend days so far this month.`,
-        action:"Every zero-spend day improves your month-end balance.",
+        action:"Keep going",
       });
     }
 
@@ -239,7 +239,7 @@ export default function BudgetDashboard({
             : urgent.days === 1
             ? `${urgent.label} (${fmt(urgent.totalAmount)}) is due tomorrow.`
             : `${urgent.label} (${fmt(urgent.totalAmount)}) is due in ${urgent.days} days.`,
-          action:"Check that you have enough reserved for this payment.",
+          action:"Check reserve",
         });
       }
     }
@@ -444,12 +444,14 @@ export default function BudgetDashboard({
                         {a.text}
                       </p>
                     </div>
-                    {/* Row 2: tag right-aligned */}
+                    {/* Row 2: tag right-aligned, never full width */}
                     <div style={{display:"flex", justifyContent:"flex-end"}}>
                       <span style={{
                         fontSize:9, fontWeight:700,
                         background:s.tagBg, color:s.tagColor,
-                        borderRadius:99, padding:"2px 9px", whiteSpace:"nowrap",
+                        borderRadius:99, padding:"2px 9px",
+                        whiteSpace:"nowrap", alignSelf:"flex-start",
+                        maxWidth:"60%", overflow:"hidden", textOverflow:"ellipsis",
                       }}>
                         {a.action}
                       </span>
