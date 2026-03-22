@@ -42,7 +42,8 @@ function aggregate(expenses) {
 
 // ── Donut SVG ─────────────────────────────────────────────────────────────────
 function Donut({ data, grandTotal, selected, onSelect }) {
-  const SIZE=180, CX=90, CY=90, R=68, r=46, GAP=2;
+  // Responsive: bigger donut
+  const SIZE=240, CX=120, CY=120, R=96, r=62, GAP=1.8;
   const segs = useMemo(()=>{
     if(!data.length) return [];
     const total=data.reduce((s,d)=>s+d.total,0);
@@ -57,28 +58,43 @@ function Donut({ data, grandTotal, selected, onSelect }) {
       return{...d,path:`M${x1},${y1}A${R},${R}0${large},1${x2},${y2}L${x3},${y3}A${r},${r}0${large},0${x4},${y4}Z`,sweep};
     });
   },[data]);
-  const sel=data.find(d=>d.name===selected);
+
+  const sel    = data.find(d=>d.name===selected);
+  const topCat = !selected && data[0]; // show top category in center when nothing selected
+
   return(
-    <div style={{display:"flex",justifyContent:"center"}}>
+    <div style={{display:"flex",justifyContent:"center",marginBottom:4}}>
       <svg width={SIZE} height={SIZE} style={{overflow:"visible"}}>
         {segs.map(s=>(
           <path key={s.name} d={s.path} fill={s.color}
-            opacity={selected&&selected!==s.name?0.18:1}
-            stroke={selected===s.name?"#111":"#fff"} strokeWidth={selected===s.name?2.5:1.5}
-            style={{cursor:"pointer",transition:"opacity 0.18s"}}
+            opacity={selected&&selected!==s.name?0.15:1}
+            stroke={selected===s.name?"#111":"#fff"}
+            strokeWidth={selected===s.name?3:2}
+            style={{cursor:"pointer",transition:"opacity 0.18s",filter:selected===s.name?"drop-shadow(0 2px 6px rgba(0,0,0,0.18))":"none"}}
             onClick={()=>onSelect(s.name)}/>
         ))}
-        <text x={CX} y={CY-10} textAnchor="middle" style={{fontSize:9,fill:C.muted,fontFamily:"inherit"}}>
-          {sel?`${sel.pct}% of spend`:"Total"}
-        </text>
-        <text x={CX} y={CY+8} textAnchor="middle"
-          style={{fontSize:sel?16:15,fontWeight:700,fill:C.ink,fontFamily:"Georgia,serif"}}>
-          {sel?fmt(sel.total):fmt(grandTotal)}
-        </text>
-        {sel&&<text x={CX} y={CY+24} textAnchor="middle"
-          style={{fontSize:10,fill:sel.color,fontFamily:"inherit",fontWeight:600}}>
-          {sel.icon} {sel.name}
-        </text>}
+
+        {/* Center content */}
+        {sel ? (
+          <>
+            <text x={CX} y={CY-20} textAnchor="middle" style={{fontSize:22,fontFamily:"inherit"}}>{sel.icon}</text>
+            <text x={CX} y={CY+2} textAnchor="middle" style={{fontSize:10,fill:C.muted,fontFamily:"inherit"}}>{sel.pct}% of spend</text>
+            <text x={CX} y={CY+20} textAnchor="middle" style={{fontSize:19,fontWeight:700,fill:sel.color,fontFamily:"Georgia,serif"}}>{fmt(sel.total)}</text>
+            <text x={CX} y={CY+36} textAnchor="middle" style={{fontSize:10,fill:sel.color,fontWeight:600,fontFamily:"inherit"}}>{sel.name}</text>
+          </>
+        ) : topCat ? (
+          <>
+            <text x={CX} y={CY-22} textAnchor="middle" style={{fontSize:9,fill:C.muted,fontFamily:"inherit",letterSpacing:"0.5px"}}>TOP SPEND</text>
+            <text x={CX} y={CY-6} textAnchor="middle" style={{fontSize:18,fontFamily:"inherit"}}>{topCat.icon}</text>
+            <text x={CX} y={CY+14} textAnchor="middle" style={{fontSize:17,fontWeight:700,fill:topCat.color,fontFamily:"Georgia,serif"}}>{fmt(topCat.total)}</text>
+            <text x={CX} y={CY+30} textAnchor="middle" style={{fontSize:10,fill:C.muted,fontFamily:"inherit"}}>{topCat.name} · {topCat.pct}%</text>
+          </>
+        ) : (
+          <>
+            <text x={CX} y={CY-6} textAnchor="middle" style={{fontSize:10,fill:C.muted,fontFamily:"inherit"}}>Total Spent</text>
+            <text x={CX} y={CY+16} textAnchor="middle" style={{fontSize:20,fontWeight:700,fill:C.ink,fontFamily:"Georgia,serif"}}>{fmt(grandTotal)}</text>
+          </>
+        )}
       </svg>
     </div>
   );
@@ -157,58 +173,68 @@ export default function SpendingChart({ expenses=[], monthlyIncome=0 }) {
         </button>}
       </div>
 
-      <div style={{padding:"12px 14px"}}>
-        {/* Two-column: donut left + category list right on wide, stacked on narrow */}
-        <div style={{display:"grid",gridTemplateColumns:"auto 1fr",gap:16,alignItems:"start"}}>
-          {/* Donut */}
-          <div style={{width:180}}>
-            <Donut data={data} grandTotal={grandTotal} selected={sel} onSelect={toggle}/>
-            {/* Legend */}
-            <div style={{display:"flex",flexWrap:"wrap",gap:"3px 8px",justifyContent:"center",marginTop:4}}>
-              {data.map(d=>(
-                <button key={d.name} onClick={()=>toggle(d.name)} style={{
-                  display:"flex",alignItems:"center",gap:3,background:"none",border:"none",
-                  cursor:"pointer",padding:"2px 0",fontFamily:"inherit",
-                  opacity:sel&&sel!==d.name?0.3:1,transition:"opacity 0.18s",
-                }}>
-                  <div style={{width:7,height:7,borderRadius:"50%",background:d.color,flexShrink:0}}/>
-                  <span style={{fontSize:9,color:C.muted,whiteSpace:"nowrap"}}>{d.name}</span>
-                </button>
-              ))}
-            </div>
-          </div>
+      <div style={{padding:"14px"}}>
+        {/* Donut centered */}
+        <Donut data={data} grandTotal={grandTotal} selected={sel} onSelect={toggle}/>
 
-          {/* Category horizontal bars */}
-          <div style={{display:"flex",flexDirection:"column",gap:8,minWidth:0}}>
+        {/* Legend dots — centered, clickable */}
+        <div style={{display:"flex",flexWrap:"wrap",gap:"5px 10px",justifyContent:"center",marginBottom:16}}>
+          {data.map(d=>(
+            <button key={d.name} onClick={()=>toggle(d.name)} style={{
+              display:"flex",alignItems:"center",gap:4,background:"none",border:"none",
+              cursor:"pointer",padding:"3px 6px",fontFamily:"inherit",borderRadius:99,
+              opacity:sel&&sel!==d.name?0.3:1,transition:"opacity 0.18s",
+              background:sel===d.name?`${d.color}12`:"transparent",
+            }}>
+              <div style={{width:8,height:8,borderRadius:"50%",background:d.color,flexShrink:0}}/>
+              <span style={{fontSize:10,color:sel===d.name?d.color:C.muted,
+                            fontWeight:sel===d.name?700:400}}>{d.name}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Drill-down (shown when category selected) */}
+        {selCat&&<DrillDown cat={selCat} onClose={()=>setSel(null)}/>}
+
+        {/* Category list — full width horizontal bars */}
+        {!selCat&&(
+          <div style={{borderTop:`1px solid ${C.bg}`,paddingTop:12,display:"flex",flexDirection:"column",gap:10}}>
             {data.map(d=>{
               const isActive=sel===d.name;
               return(
-                <div key={d.name} onClick={()=>toggle(d.name)} style={{cursor:"pointer"}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
-                    <div style={{display:"flex",alignItems:"center",gap:5}}>
-                      <span style={{fontSize:13}}>{d.icon}</span>
-                      <span style={{fontSize:11,fontWeight:isActive?700:600,color:C.ink}}>{d.name}</span>
+                <div key={d.name} onClick={()=>toggle(d.name)}
+                  style={{cursor:"pointer",padding:"6px 8px",borderRadius:9,
+                          background:isActive?`${d.color}08`:"transparent",
+                          transition:"background 0.15s"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      <div style={{width:28,height:28,borderRadius:7,background:`${d.color}15`,
+                                   display:"flex",alignItems:"center",justifyContent:"center",
+                                   fontSize:15,flexShrink:0,
+                                   border:isActive?`1.5px solid ${d.color}40`:"1.5px solid transparent"}}>
+                        {d.icon}
+                      </div>
+                      <div>
+                        <p style={{margin:0,fontSize:12,fontWeight:isActive?700:600,color:C.ink}}>{d.name}</p>
+                        <p style={{margin:0,fontSize:9,color:C.muted}}>
+                          {d.count} txn{d.count!==1?"s":""} · avg {fmt(Math.round(d.total/d.count))}
+                        </p>
+                      </div>
                     </div>
-                    <span style={{fontSize:11,fontWeight:700,color:d.color,fontFamily:"Georgia,serif",flexShrink:0}}>
-                      {fmt(d.total)}
-                    </span>
+                    <div style={{textAlign:"right",flexShrink:0}}>
+                      <p style={{margin:0,fontSize:14,fontWeight:700,color:d.color,fontFamily:"Georgia,serif"}}>{fmt(d.total)}</p>
+                      <p style={{margin:0,fontSize:9,color:C.muted}}>{d.pct}% of spend</p>
+                    </div>
                   </div>
-                  <div style={{height:5,borderRadius:99,background:C.bg,overflow:"hidden"}}>
+                  <div style={{height:4,borderRadius:99,background:C.bg,overflow:"hidden"}}>
                     <div style={{height:"100%",borderRadius:99,width:`${d.pct}%`,background:d.color,
-                                 opacity:sel&&!isActive?0.3:1,transition:"width 0.4s,opacity 0.18s"}}/>
+                                 opacity:sel&&!isActive?0.25:1,transition:"width 0.4s,opacity 0.18s"}}/>
                   </div>
-                  <p style={{margin:"2px 0 0",fontSize:9,color:C.muted}}>
-                    {d.pct}% · {d.count} transaction{d.count!==1?"s":""}
-                    {d.count>0&&` · avg ${fmt(Math.round(d.total/d.count))}`}
-                  </p>
                 </div>
               );
             })}
           </div>
-        </div>
-
-        {/* Drill-down */}
-        {selCat&&<DrillDown cat={selCat} onClose={()=>setSel(null)}/>}
+        )}
       </div>
     </div>
   );
