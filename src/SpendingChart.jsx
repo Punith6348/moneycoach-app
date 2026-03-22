@@ -464,3 +464,142 @@ export default function SpendingChart({ expenses = [], monthlyIncome = 0 }) {
     </div>
   );
 }
+// ── Category History Chart — 4 months per category ───────────────────────
+export function CategoryHistoryChart({ allExpenses }) {
+  const [selectedCat, setSelectedCat] = useState(null);
+
+  const { months, categories, data } = useMemo(() => {
+    const now    = new Date();
+    const months = [];
+    for (let i = 3; i >= 0; i--) {
+      const d   = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+      months.push({ key, label: d.toLocaleDateString("en-IN",{month:"short"}), isCurrent: i===0 });
+    }
+
+    // All categories that appear in any of the 4 months
+    const catSet = new Set();
+    months.forEach(m => {
+      (allExpenses[m.key]||[]).forEach(e => catSet.add(e.label));
+    });
+    const categories = [...catSet];
+
+    // Build data: { cat -> { monthKey -> total } }
+    const data = {};
+    categories.forEach(cat => {
+      data[cat] = {};
+      months.forEach(m => {
+        const total = (allExpenses[m.key]||[])
+          .filter(e => e.label === cat)
+          .reduce((s,e) => s+e.amount, 0);
+        data[cat][m.key] = Math.round(total);
+      });
+    });
+
+    return { months, categories, data };
+  }, [allExpenses]);
+
+  const hasData = categories.length > 0;
+  if (!hasData) return null;
+
+  const fmt2 = (n) => n >= 100000 ? `₹${(n/100000).toFixed(1)}L` : n >= 1000 ? `₹${(n/1000).toFixed(0)}k` : `₹${n}`;
+
+  // Max value across all cats + months for scaling
+  const allVals = categories.flatMap(cat => months.map(m => data[cat][m.key]||0));
+  const maxVal  = Math.max(...allVals, 1);
+
+  const displayCats = selectedCat ? [selectedCat] : categories;
+
+  return (
+    <div style={{
+      background:"#fff", borderRadius:14, border:`1px solid ${C.border}`,
+      boxShadow:"0 1px 3px rgba(0,0,0,0.06)", padding:"14px 16px", marginBottom:12,
+    }}>
+      {/* Header */}
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:12 }}>
+        <div>
+          <p style={{ margin:0, fontSize:12, fontWeight:700, color:C.ink }}>Category History</p>
+          <p style={{ margin:"1px 0 0", fontSize:10, color:C.muted }}>Last 4 months · tap a category to focus</p>
+        </div>
+        {selectedCat && (
+          <button onClick={()=>setSelectedCat(null)} style={{
+            background:"none", border:`1px solid ${C.border}`, borderRadius:99,
+            padding:"3px 10px", fontSize:11, color:C.muted, cursor:"pointer", fontFamily:"inherit",
+          }}>All ✕</button>
+        )}
+      </div>
+
+      {/* Category filter pills */}
+      <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:12 }}>
+        {categories.map(cat => {
+          const cfg = CATEGORY_CONFIG[cat] || { icon:"💸", color:"#6B7280" };
+          const active = selectedCat === cat;
+          return (
+            <button key={cat} onClick={()=>setSelectedCat(active ? null : cat)} style={{
+              display:"flex", alignItems:"center", gap:4, padding:"3px 9px",
+              borderRadius:99, fontSize:11, fontWeight:600, cursor:"pointer",
+              fontFamily:"inherit",
+              border:`1.5px solid ${active ? cfg.color : C.border}`,
+              background: active ? `${cfg.color}18` : "#fff",
+              color: active ? cfg.color : C.muted,
+            }}>
+              <span style={{fontSize:12}}>{cfg.icon}</span>
+              {cat}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Grouped bars per month */}
+      <div style={{ display:"flex", gap:8, alignItems:"flex-end" }}>
+        {months.map(m => {
+          const monthTotal = displayCats.reduce((s,cat) => s+(data[cat][m.key]||0), 0);
+          return (
+            <div key={m.key} style={{ flex:1, display:"flex", flexDirection:"column", gap:3, alignItems:"center" }}>
+              {/* Value label */}
+              <p style={{ margin:0, fontSize:8, color:m.isCurrent?C.ink:C.muted, fontWeight:m.isCurrent?700:400 }}>
+                {monthTotal > 0 ? fmt2(monthTotal) : ""}
+              </p>
+              {/* Stacked bars */}
+              <div style={{ width:"100%", height:80, display:"flex", flexDirection:"column", justifyContent:"flex-end", gap:1 }}>
+                {displayCats.map(cat => {
+                  const val = data[cat][m.key] || 0;
+                  if (val === 0) return null;
+                  const cfg = CATEGORY_CONFIG[cat] || { color:"#6B7280" };
+                  const barH = Math.max(Math.round((val/maxVal)*76), 2);
+                  return (
+                    <div key={cat} style={{
+                      width:"100%", height:barH,
+                      background: m.isCurrent ? cfg.color : `${cfg.color}70`,
+                      borderRadius: "3px 3px 0 0",
+                      transition:"height 0.4s",
+                    }} title={`${cat}: ${fmt2(val)}`} />
+                  );
+                })}
+              </div>
+              {/* Month label */}
+              <p style={{ margin:0, fontSize:9, color:m.isCurrent?C.ink:C.muted, fontWeight:m.isCurrent?700:400, textAlign:"center" }}>
+                {m.label}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Legend */}
+      {!selectedCat && (
+        <div style={{ display:"flex", flexWrap:"wrap", gap:"4px 10px", justifyContent:"center", marginTop:10 }}>
+          {categories.map(cat => {
+            const cfg = CATEGORY_CONFIG[cat] || { icon:"💸", color:"#6B7280" };
+            return (
+              <div key={cat} style={{ display:"flex", alignItems:"center", gap:4 }}>
+                <div style={{ width:8, height:8, borderRadius:2, background:cfg.color }} />
+                <span style={{ fontSize:9, color:C.muted }}>{cat}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
