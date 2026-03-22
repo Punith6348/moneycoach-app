@@ -17,6 +17,9 @@ export const CATEGORY_CONFIG = {
   Insurance:     { icon:"🛡", color:"#059669" },
   "School Fees": { icon:"🎓", color:"#D97706" },
   Maintenance:   { icon:"🔧", color:"#64748B" },
+  Subscription:  { icon:"📺", color:"#8B5CF6" },
+  Gym:           { icon:"💪", color:"#10B981" },
+  Mobile:        { icon:"📱", color:"#0EA5E9" },
 };
 
 const C   = { ink:"#111827", muted:"#6B7280", border:"#E5E7EB", bg:"#F8FAFC" };

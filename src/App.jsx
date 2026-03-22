@@ -683,13 +683,26 @@ function SummaryStrip({totalIncome,remaining,expenses,dailyLimit}) {
 
 // ─── RECURRING EXPENSES TAB ───────────────────────────────────────────────
 function RecurringTab({ recurringExpenses, allExpenses, onAdd, onUpdate, onDelete, onToggle, showToast }) {
-  const CATS = [{name:"Food",icon:"🍽"},{name:"Travel",icon:"🚗"},{name:"Coffee",icon:"☕"},{name:"Grocery",icon:"🛒"},{name:"Medical",icon:"💊"},{name:"Entertainment",icon:"🎬"},{name:"Other",icon:"💸"}];
+  const CATS = [
+    {name:"Rent",          icon:"🏠"},
+    {name:"EMI/Loan",      icon:"🏦"},
+    {name:"Electricity",   icon:"⚡"},
+    {name:"Internet",      icon:"📶"},
+    {name:"Mobile",        icon:"📱"},
+    {name:"Insurance",     icon:"🛡"},
+    {name:"Subscription",  icon:"📺"},
+    {name:"Gym",           icon:"💪"},
+    {name:"School Fees",   icon:"🎓"},
+    {name:"Maintenance",   icon:"🔧"},
+    {name:"Water",         icon:"💧"},
+    {name:"Other",         icon:"💸"},
+  ];
   const DAYS = Array.from({length:28},(_,i)=>i+1);
 
   const [showForm, setShowForm] = useState(false);
   const [editId,   setEditId]   = useState(null);
   const [fLabel,   setFLabel]   = useState("");
-  const [fCat,     setFCat]     = useState("Food");
+  const [fCat,     setFCat]     = useState("Rent");
   const [fAmt,     setFAmt]     = useState("");
   const [fDay,     setFDay]     = useState(1);
   const [fNote,    setFNote]    = useState("");
