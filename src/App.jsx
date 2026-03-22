@@ -364,29 +364,65 @@ function EditModal({expense,monthKey,onSave,onClose}) {
 
 // ─── 3-DOT MENU ───────────────────────────────────────────────────────────────
 function ExpenseDotMenu({onEdit, onDelete}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
+  const [open, setOpen]   = useState(false);
+  const [pos,  setPos]    = useState({top:0, right:0});
+  const btnRef            = useRef(null);
+
   useEffect(() => {
     if (!open) return;
-    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    const close = (e) => {
+      if (btnRef.current && !btnRef.current.closest('[data-dotmenu]')?.contains(e.target))
+        setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("touchstart", close);
+    return () => { document.removeEventListener("mousedown", close); document.removeEventListener("touchstart", close); };
   }, [open]);
+
+  const toggle = (e) => {
+    e.stopPropagation();
+    if (!open) {
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
+    }
+    setOpen(p => !p);
+  };
+
   return (
-    <div ref={ref} style={{position:"relative",flexShrink:0}}>
-      <button onClick={e=>{e.stopPropagation();setOpen(p=>!p);}}
-        style={{background:"none",border:"none",cursor:"pointer",padding:"4px 8px",borderRadius:8,fontSize:16,color:C.muted,lineHeight:1}}>
+    <div data-dotmenu="1" style={{position:"relative",flexShrink:0}}>
+      <button ref={btnRef} onClick={toggle}
+        style={{background:open?"#F3F4F6":"none",
+                border:`1px solid ${open?"#D1D5DB":"transparent"}`,
+                cursor:"pointer",padding:"5px 10px",borderRadius:8,
+                fontSize:14,color:C.muted,lineHeight:1,fontFamily:"inherit"}}>
         ···
       </button>
       {open&&(
-        <div style={{position:"absolute",right:0,top:"100%",background:"#fff",borderRadius:10,border:`1px solid ${C.border}`,boxShadow:"0 4px 16px rgba(0,0,0,0.12)",zIndex:50,minWidth:120,overflow:"hidden"}}>
+        <div style={{
+          position:"fixed", top:pos.top, right:pos.right,
+          background:"#fff", borderRadius:10,
+          border:`1px solid ${C.border}`,
+          boxShadow:"0 8px 24px rgba(0,0,0,0.14)",
+          zIndex:9999, minWidth:130, overflow:"hidden",
+        }}>
           <button onClick={e=>{e.stopPropagation();setOpen(false);onEdit();}}
-            style={{display:"block",width:"100%",padding:"10px 14px",background:"none",border:"none",textAlign:"left",fontSize:13,cursor:"pointer",color:C.ink,fontFamily:"inherit"}}>
-            ✏ Edit
+            style={{display:"flex",alignItems:"center",gap:8,width:"100%",
+                    padding:"11px 16px",background:"none",border:"none",
+                    textAlign:"left",fontSize:13,cursor:"pointer",
+                    color:C.ink,fontFamily:"inherit"}}
+            onMouseEnter={e=>e.currentTarget.style.background="#F9FAFB"}
+            onMouseLeave={e=>e.currentTarget.style.background="none"}>
+            ✏️ Edit
           </button>
+          <div style={{height:1,background:"#F3F4F6"}}/>
           <button onClick={e=>{e.stopPropagation();setOpen(false);onDelete();}}
-            style={{display:"block",width:"100%",padding:"10px 14px",background:"none",border:"none",textAlign:"left",fontSize:13,cursor:"pointer",color:C.red,fontFamily:"inherit"}}>
-            🗑 Delete
+            style={{display:"flex",alignItems:"center",gap:8,width:"100%",
+                    padding:"11px 16px",background:"none",border:"none",
+                    textAlign:"left",fontSize:13,cursor:"pointer",
+                    color:C.red,fontFamily:"inherit"}}
+            onMouseEnter={e=>e.currentTarget.style.background="#FFF1F2"}
+            onMouseLeave={e=>e.currentTarget.style.background="none"}>
+            🗑️ Delete
           </button>
         </div>
       )}
