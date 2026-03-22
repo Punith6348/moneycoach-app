@@ -385,202 +385,66 @@ export default function BudgetDashboard({
                   </div>
                 );
               })()}
-            </div>
-          </div>
-        );
-      })()}
 
-      {/* ══ 1b. FINANCIAL HEALTH SCORE ══ */}
-      {totalIncome > 0 && (() => {
-        const daysInMonth  = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
-        const daysPassed   = now.getDate();
-        const savingsRate  = Math.round((totalSavings / totalIncome) * 100);
-        const idealSpent   = Math.round((daysPassed / daysInMonth) * (monthSpent + Math.max(0, remaining)));
-        const paceDiff     = idealSpent > 0 ? (monthSpent - idealSpent) / idealSpent : 0;
-        const daysWithSpend = new Set(currentExpenses.map(e=>e.date.split("T")[0])).size;
-        const noSpendDays  = Math.max(0, daysPassed - daysWithSpend);
-
-        // Category budgets on track
-        const budgetedCats = Object.entries(categoryBudgets).filter(([,b])=>b>0);
-        const onTrackCats  = budgetedCats.filter(([cat, b]) => (catSpend[cat]||0) <= b).length;
-        const budgetScore  = budgetedCats.length > 0
-          ? Math.round((onTrackCats / budgetedCats.length) * 15)
-          : 10; // neutral if no budgets set
-
-        // Pillar scores (0–max)
-        const s1 = Math.round(Math.min(savingsRate / 20, 1) * 25);           // Savings: 25pts
-        const s2 = Math.round(Math.max(0, 1 - Math.max(0, paceDiff)) * 25);  // Pace: 25pts
-        const s3 = Math.round(Math.max(0, 1 - (debtRatio / 50)) * 20);       // Debt: 20pts
-        const s4 = budgetScore;                                                // Budgets: 15pts
-        const s5 = Math.round(Math.min(noSpendDays / 10, 1) * 15);           // No-spend: 15pts
-
-        const score = Math.min(100, s1 + s2 + s3 + s4 + s5);
-
-        const grade =
-          score >= 80 ? { label:"Excellent",   emoji:"🏆", color:"#059669", bg:"#ECFDF5", border:"#6EE7B7", track:"#D1FAE5" } :
-          score >= 60 ? { label:"Good",         emoji:"✅", color:"#2563EB", bg:"#EFF6FF", border:"#93C5FD", track:"#DBEAFE" } :
-          score >= 40 ? { label:"Fair",         emoji:"⚡", color:"#D97706", bg:"#FFFBEB", border:"#FCD34D", track:"#FEF3C7" } :
-                        { label:"Needs Work",   emoji:"📉", color:"#DC2626", bg:"#FFF1F2", border:"#FCA5A5", track:"#FEE2E2" };
-
-        const pillars = [
-          { label:"Savings",   score:s1,  max:25, tip:`${savingsRate}% rate` },
-          { label:"Pace",      score:s2,  max:25, tip: paceDiff > 0 ? `${Math.round(paceDiff*100)}% fast` : "On track" },
-          { label:"Debt",      score:s3,  max:20, tip:`${debtRatio}% EMI ratio` },
-          { label:"Budgets",   score:s4,  max:15, tip: budgetedCats.length > 0 ? `${onTrackCats}/${budgetedCats.length} ok` : "Not set" },
-          { label:"No-spend",  score:s5,  max:15, tip:`${noSpendDays} days` },
-        ];
-
-        return (
-          <div style={{
-            background: grade.bg,
-            border: `1px solid ${grade.border}`,
-            borderRadius: 13,
-            padding: "12px 14px",
-            marginBottom: 10,
-          }}>
-            {/* Header row */}
-            <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10}}>
-              <div>
-                <p style={{margin:0, fontSize:9, fontWeight:700, color:grade.color,
-                           textTransform:"uppercase", letterSpacing:"1px"}}>
-                  Financial Health Score
-                </p>
-                <div style={{display:"flex", alignItems:"baseline", gap:6, marginTop:2}}>
-                  <p style={{margin:0, fontSize:32, fontWeight:700, fontFamily:"Georgia,serif",
-                             lineHeight:1, color:grade.color}}>
-                    {score}
-                  </p>
-                  <p style={{margin:0, fontSize:11, color:grade.color, fontWeight:600}}>/100</p>
-                  <p style={{margin:0, fontSize:13}}>{grade.emoji}</p>
-                </div>
-              </div>
-              <div style={{textAlign:"right"}}>
-                <span style={{
-                  fontSize:12, fontWeight:700, color:grade.color,
-                  background:"rgba(255,255,255,0.6)",
-                  borderRadius:99, padding:"4px 12px",
-                  border:`1px solid ${grade.border}`,
-                }}>
-                  {grade.label}
-                </span>
-                <p style={{margin:"4px 0 0", fontSize:9, color:grade.color, opacity:0.8}}>
-                  {monthName} {now.getFullYear()}
-                </p>
-              </div>
-            </div>
-
-            {/* Score track bar */}
-            <div style={{
-              height:6, borderRadius:99,
-              background: grade.track,
-              overflow:"hidden", marginBottom:10,
-            }}>
-              <div style={{
-                height:"100%", borderRadius:99,
-                width:`${score}%`,
-                background: grade.color,
-                transition:"width 0.6s ease",
-              }}/>
-            </div>
-
-            {/* Pillar breakdown */}
-            <div style={{display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:4}}>
-              {pillars.map(p => {
-                const pct = Math.round((p.score / p.max) * 100);
-                const col = pct >= 80 ? "#059669" : pct >= 50 ? "#2563EB" : pct >= 30 ? "#D97706" : "#DC2626";
+              {/* Health Score inline — compact single row */}
+              {totalIncome > 0 && (() => {
+                const savingsRate = Math.round((totalSavings / totalIncome) * 100);
+                const idealSpent  = Math.round((daysPassed / daysInMonth) * (monthSpent + Math.max(0, remaining)));
+                const paceDiff    = idealSpent > 0 ? (monthSpent - idealSpent) / idealSpent : 0;
+                const daysWithSpend = new Set(currentExpenses.map(e=>e.date.split("T")[0])).size;
+                const noSpendDays = Math.max(0, daysPassed - daysWithSpend);
+                const budgetedCats = Object.entries(categoryBudgets).filter(([,b])=>b>0);
+                const onTrackCats  = budgetedCats.filter(([cat,b]) => (catSpend[cat]||0) <= b).length;
+                const budgetScore  = budgetedCats.length > 0 ? Math.round((onTrackCats/budgetedCats.length)*15) : 10;
+                const s1 = Math.round(Math.min(savingsRate/20,1)*25);
+                const s2 = Math.round(Math.max(0,1-Math.max(0,paceDiff))*25);
+                const s3 = Math.round(Math.max(0,1-(debtRatio/50))*20);
+                const s4 = budgetScore;
+                const s5 = Math.round(Math.min(noSpendDays/10,1)*15);
+                const score = Math.min(100, s1+s2+s3+s4+s5);
+                const grade =
+                  score >= 80 ? { label:"Excellent", emoji:"🏆", color:"#86EFAC" } :
+                  score >= 60 ? { label:"Good",       emoji:"✅", color:"#93C5FD" } :
+                  score >= 40 ? { label:"Fair",       emoji:"⚡", color:"#FCD34D" } :
+                                { label:"Needs Work", emoji:"📉", color:"#F87171" };
                 return (
-                  <div key={p.label} style={{textAlign:"center"}}>
-                    <div style={{
-                      height:3, borderRadius:99,
-                      background:"rgba(0,0,0,0.08)",
-                      overflow:"hidden", marginBottom:3,
-                    }}>
-                      <div style={{
-                        height:"100%", borderRadius:99,
-                        width:`${pct}%`,
-                        background: col,
-                        transition:"width 0.5s",
-                      }}/>
-                    </div>
-                    <p style={{margin:0, fontSize:7, color:grade.color, fontWeight:700,
-                               textTransform:"uppercase", letterSpacing:"0.4px"}}>
-                      {p.label}
-                    </p>
-                    <p style={{margin:"1px 0 0", fontSize:8, color:grade.color, opacity:0.75}}>
-                      {p.tip}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* ══ 1c. ACTION CENTER — always visible ══ */}
-      {(() => {
-        const lowData = totalIncome === 0 && currentExpenses.length === 0;
-        const displayItems = actions.length > 0 ? actions : lowData ? [{
-          icon:"💡", type:"neutral",
-          text:"Add income in Plan, then log your first expense.",
-          action:"Get started",
-        }] : [{
-          icon:"✅", type:"good",
-          text:"You're on track this month. No issues detected.",
-          action:"Keep it up",
-        }];
-
-        const ITEM_STYLE = {
-          bad:     { bg:"#FFF1F2", border:"#FECACA", tagBg:"#FCA5A5", tagColor:"#7F1D1D" },
-          warn:    { bg:"#FFFBEB", border:"#FDE68A", tagBg:"#FDE68A", tagColor:"#78350F" },
-          neutral: { bg:C.bg,      border:C.border,  tagBg:C.border,  tagColor:C.muted   },
-          good:    { bg:"#F0FDF4", border:"#BBF7D0", tagBg:"#BBF7D0", tagColor:"#14532D" },
-        };
-
-        return (
-          <div style={{marginBottom:10}}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
-              <p style={{margin:0,fontSize:9,fontWeight:700,color:C.muted,
-                         textTransform:"uppercase",letterSpacing:"1px"}}>
-                What to do now
-              </p>
-              {actions.length > 0 && (
-                <span style={{fontSize:9,color:C.muted,background:C.bg,
-                              border:`1px solid ${C.border}`,borderRadius:99,padding:"1px 7px"}}>
-                  {actions.length} alert{actions.length!==1?"s":""}
-                </span>
-              )}
-            </div>
-            <div style={{display:"flex",flexDirection:"column",gap:5}}>
-              {displayItems.map((a,i) => {
-                const s = ITEM_STYLE[a.type] || ITEM_STYLE.neutral;
-                return (
-                  <div key={i} style={{
-                    background:s.bg, border:`1px solid ${s.border}`,
-                    borderRadius:9, padding:"9px 11px",
+                  <div style={{
+                    marginTop:8, paddingTop:7,
+                    borderTop:"1px solid rgba(255,255,255,0.08)",
+                    display:"flex", alignItems:"center", justifyContent:"space-between",
                   }}>
-                    {/* Row 1: icon + text */}
-                    <div style={{display:"flex", alignItems:"flex-start", gap:9, marginBottom:5}}>
-                      <span style={{fontSize:15,flexShrink:0,lineHeight:1.4}}>{a.icon}</span>
-                      <p style={{margin:0,fontSize:12,fontWeight:500,color:C.ink,lineHeight:1.45,flex:1,minWidth:0}}>
-                        {a.text}
+                    <div style={{display:"flex", alignItems:"center", gap:6}}>
+                      <p style={{margin:0, fontSize:8, color:"#64748B", textTransform:"uppercase", letterSpacing:"0.8px", fontWeight:700}}>
+                        Health Score
                       </p>
+                      {/* Mini 5-dot pillar indicators */}
+                      <div style={{display:"flex", gap:2, alignItems:"center"}}>
+                        {[s1/25, s2/25, s3/20, s4/15, s5/15].map((pct,i) => (
+                          <div key={i} style={{
+                            width:3, height: Math.max(4, Math.round(pct*12)),
+                            borderRadius:99,
+                            background: pct >= 0.8 ? "#86EFAC" : pct >= 0.5 ? "#93C5FD" : pct >= 0.3 ? "#FCD34D" : "#F87171",
+                          }}/>
+                        ))}
+                      </div>
                     </div>
-                    {/* Row 2: tag right-aligned, never full width */}
-                    <div style={{display:"flex", justifyContent:"flex-end"}}>
+                    <div style={{display:"flex", alignItems:"center", gap:5}}>
+                      <span style={{fontSize:9}}>{grade.emoji}</span>
+                      <p style={{margin:0, fontSize:16, fontWeight:700, fontFamily:"Georgia,serif", color:grade.color, lineHeight:1}}>
+                        {score}
+                      </p>
+                      <p style={{margin:0, fontSize:8, color:"#64748B"}}>/100</p>
                       <span style={{
-                        fontSize:9, fontWeight:700,
-                        background:s.tagBg, color:s.tagColor,
-                        borderRadius:99, padding:"2px 9px",
-                        whiteSpace:"nowrap", alignSelf:"flex-start",
-                        maxWidth:"60%", overflow:"hidden", textOverflow:"ellipsis",
+                        fontSize:9, fontWeight:700, color:grade.color,
+                        background:"rgba(255,255,255,0.08)", borderRadius:99,
+                        padding:"2px 7px",
                       }}>
-                        {a.action}
+                        {grade.label}
                       </span>
                     </div>
                   </div>
                 );
-              })}
+              })()}
             </div>
           </div>
         );
