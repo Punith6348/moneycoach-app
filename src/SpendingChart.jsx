@@ -55,7 +55,14 @@ function Donut({ data, grandTotal, selected, onSelect }) {
       const[x1,y1]=polar(CX,CY,R,start),[x2,y2]=polar(CX,CY,R,end);
       const[x3,y3]=polar(CX,CY,r,end),[x4,y4]=polar(CX,CY,r,start);
       const large=sweep-GAP>180?1:0;
-      return{...d,path:`M${x1},${y1}A${R},${R}0${large},1${x2},${y2}L${x3},${y3}A${r},${r}0${large},0${x4},${y4}Z`,sweep};
+      const path=[
+        `M ${x1} ${y1}`,
+        `A ${R} ${R} 0 ${large} 1 ${x2} ${y2}`,
+        `L ${x3} ${y3}`,
+        `A ${r} ${r} 0 ${large} 0 ${x4} ${y4}`,
+        `Z`
+      ].join(' ');
+      return{...d,path,sweep};
     });
   },[data]);
 
