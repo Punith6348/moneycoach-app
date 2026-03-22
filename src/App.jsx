@@ -476,64 +476,69 @@ function ExpenseList({expenses, monthKey, onEdit, onDelete, isCurrentMonth}) {
 
 // ─── DATE FILTER ──────────────────────────────────────────────────────────────
 function DateFilter({ expenses, onFiltered }) {
-  const today    = new Date().toISOString().split("T")[0];
-  const yest     = new Date(); yest.setDate(yest.getDate()-1);
-  const yestStr  = yest.toISOString().split("T")[0];
-  const weekAgo  = new Date(); weekAgo.setDate(weekAgo.getDate()-6);
-  const weekStr  = weekAgo.toISOString().split("T")[0];
+  const today   = new Date().toISOString().split("T")[0];
+  const yest    = new Date(); yest.setDate(yest.getDate()-1);
+  const yestStr = yest.toISOString().split("T")[0];
 
-  const [active,   setActive]   = useState("today");   // default = today
+  const [active,     setActive]     = useState("today");
   const [customDate, setCustomDate] = useState(today);
 
   useEffect(() => {
     let filtered;
-    if      (active==="today")     filtered = expenses.filter(e=>e.date.startsWith(today));
+    if      (active==="today")  filtered = expenses.filter(e=>e.date.startsWith(today));
     else if (active==="yesterday") filtered = expenses.filter(e=>e.date.startsWith(yestStr));
-    else if (active==="week")      filtered = expenses.filter(e=>e.date.split("T")[0]>=weekStr);
-    else if (active==="custom")    filtered = expenses.filter(e=>e.date.startsWith(customDate));
-    else                           filtered = expenses;
-    onFiltered(filtered, active);
+    else                        filtered = expenses.filter(e=>e.date.startsWith(customDate));
+    onFiltered(filtered);
   }, [active, customDate, expenses]);
 
-  const btn=(key,label)=>(
-    <button key={key} onClick={()=>setActive(key)} style={{
-      padding:"6px 12px", borderRadius:99, fontSize:11, fontWeight:600,
-      cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap",
-      border:`1.5px solid ${active===key?C.ink:C.border}`,
-      background:active===key?C.ink:"#fff",
-      color:active===key?"#fff":C.muted,
-      transition:"all 0.12s",
-    }}>{label}</button>
-  );
-
-  return (
-    <div style={{marginBottom:12}}>
-      <div style={{display:"flex",gap:6,overflowX:"auto",scrollbarWidth:"none",paddingBottom:2,alignItems:"center"}}>
-        {btn("all",   "All")}
-        {btn("today", "Today")}
-        {btn("yesterday","Yesterday")}
-        {btn("week",  "This Week")}
-        {btn("custom","📅 Pick Date")}
-      </div>
-      {active==="custom"&&(
-        <div style={{marginTop:8}}>
-          <input type="date" value={customDate}
-            max={today}
-            onChange={e=>setCustomDate(e.target.value)}
-            style={{padding:"8px 12px",borderRadius:9,border:`1.5px solid ${C.blue}`,
-                    fontFamily:"inherit",fontSize:13,background:"#fff",
-                    outline:"none",color:C.ink,width:"100%",boxSizing:"border-box"}}/>
-          {(() => {
-            const d = expenses.filter(e=>e.date.startsWith(customDate));
-            const total = d.reduce((s,e)=>s+e.amount,0);
-            return d.length > 0
-              ? <p style={{margin:"4px 0 0",fontSize:11,color:C.muted}}>
-                  {d.length} expense{d.length!==1?"s":""} · {fmt(total)} on {new Date(customDate+"T12:00:00").toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"short"})}
-                </p>
-              : <p style={{margin:"4px 0 0",fontSize:11,color:C.muted}}>No expenses on this date</p>;
-          })()}
+  // When Pick Date is active — show only the calendar
+  if (active === "custom") {
+    const dayExp   = expenses.filter(e=>e.date.startsWith(customDate));
+    const dayTotal = dayExp.reduce((s,e)=>s+e.amount, 0);
+    return (
+      <div style={{marginBottom:12}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+          <button onClick={()=>setActive("today")} style={{
+            padding:"6px 11px",borderRadius:99,fontSize:11,fontWeight:600,
+            cursor:"pointer",fontFamily:"inherit",border:`1px solid ${C.border}`,
+            background:"#fff",color:C.muted,
+          }}>← Back</button>
+          <p style={{margin:0,fontSize:11,fontWeight:600,color:C.ink}}>Pick a date</p>
         </div>
-      )}
+        <input type="date" value={customDate} max={today}
+          onChange={e=>setCustomDate(e.target.value)}
+          style={{width:"100%",padding:"10px 12px",borderRadius:10,
+                  border:`1.5px solid ${C.blue}`,fontFamily:"inherit",
+                  fontSize:14,background:"#fff",outline:"none",
+                  color:C.ink,boxSizing:"border-box"}}/>
+        {dayExp.length > 0
+          ? <p style={{margin:"5px 0 0",fontSize:11,color:C.muted}}>
+              {dayExp.length} expense{dayExp.length!==1?"s":""} · {fmt(dayTotal)} on{" "}
+              {new Date(customDate+"T12:00:00").toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"short"})}
+            </p>
+          : <p style={{margin:"5px 0 0",fontSize:11,color:C.muted}}>No expenses on this date</p>
+        }
+      </div>
+    );
+  }
+
+  // Default: Today / Yesterday / Pick Date buttons
+  return (
+    <div style={{display:"flex",gap:6,marginBottom:12}}>
+      {[
+        {key:"today",    label:"Today"},
+        {key:"yesterday",label:"Yesterday"},
+        {key:"custom",   label:"📅 Pick Date"},
+      ].map(({key,label})=>(
+        <button key={key} onClick={()=>setActive(key)} style={{
+          padding:"7px 14px",borderRadius:99,fontSize:12,fontWeight:600,
+          cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap",
+          border:`1.5px solid ${active===key?C.ink:C.border}`,
+          background:active===key?C.ink:"#fff",
+          color:active===key?"#fff":C.muted,
+          transition:"all 0.12s",
+        }}>{label}</button>
+      ))}
     </div>
   );
 }
