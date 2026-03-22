@@ -1316,25 +1316,28 @@ function DashboardScreen(props) {
 
         {/* ══ CHARTS ══ */}
         {tab==="charts"&&(()=>{
-          const totalSpent   = expenses.reduce((s,e)=>s+e.amount,0);
-          const txCount      = expenses.length;
-          const daysWithSpend= new Set(expenses.map(e=>e.date.split("T")[0])).size;
-          const avgDaily     = daysWithSpend>0?Math.round(totalSpent/daysWithSpend):0;
-          const biggest      = expenses.length>0?expenses.reduce((mx,e)=>e.amount>mx.amount?e:mx,expenses[0]):null;
+          const totalSpent    = expenses.reduce((s,e)=>s+e.amount,0);
+          const txCount       = expenses.length;
+          const daysWithSpend = new Set(expenses.map(e=>e.date.split("T")[0])).size;
+          const avgDaily      = daysWithSpend>0?Math.round(totalSpent/daysWithSpend):0;
           return (
             <>
               <MonthBar/>
-              {/* Stats strip */}
+              {/* Stats strip — only when data exists */}
               {totalSpent > 0 && (
                 <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:12}}>
                   {[
-                    {label:"Total Spent",  value:`₹${Math.round(totalSpent).toLocaleString("en-IN")}`,    color:"#DC2626"},
-                    {label:"Avg/Spend Day",value:`₹${avgDaily.toLocaleString("en-IN")}`,                  color:"#D97706"},
-                    {label:"Transactions", value:String(txCount),                                          color:"#2563EB"},
+                    {label:"Total Spent",   value:fmt(totalSpent), color:"#DC2626"},
+                    {label:"Avg/Spend Day", value:fmt(avgDaily),   color:"#D97706"},
+                    {label:"Transactions",  value:String(txCount), color:"#2563EB"},
                   ].map(s=>(
-                    <div key={s.label} style={{background:"#fff",borderRadius:11,border:`1px solid ${C.border}`,padding:"9px 11px",boxShadow:"0 1px 2px rgba(0,0,0,0.04)"}}>
-                      <p style={{margin:0,fontSize:8,color:C.muted,textTransform:"uppercase",letterSpacing:"0.7px",fontWeight:700}}>{s.label}</p>
-                      <p style={{margin:"3px 0 0",fontSize:15,fontWeight:700,color:s.color,fontFamily:"Georgia,serif"}}>{s.value}</p>
+                    <div key={s.label} style={{background:"#fff",borderRadius:11,
+                      border:`1px solid ${C.border}`,padding:"9px 11px",
+                      boxShadow:"0 1px 2px rgba(0,0,0,0.04)"}}>
+                      <p style={{margin:0,fontSize:8,color:C.muted,textTransform:"uppercase",
+                                 letterSpacing:"0.7px",fontWeight:700}}>{s.label}</p>
+                      <p style={{margin:"3px 0 0",fontSize:15,fontWeight:700,color:s.color,
+                                 fontFamily:"Georgia,serif"}}>{s.value}</p>
                     </div>
                   ))}
                 </div>
