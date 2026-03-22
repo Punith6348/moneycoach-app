@@ -395,7 +395,134 @@ export default function BudgetDashboard({
         );
       })()}
 
-      {/* ══ 1b. ACTION CENTER — always visible ══ */}
+      {/* ══ 1b. FINANCIAL HEALTH SCORE ══ */}
+      {totalIncome > 0 && (() => {
+        const daysInMonth  = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+        const daysPassed   = now.getDate();
+        const savingsRate  = Math.round((totalSavings / totalIncome) * 100);
+        const idealSpent   = Math.round((daysPassed / daysInMonth) * (monthSpent + Math.max(0, remaining)));
+        const paceDiff     = idealSpent > 0 ? (monthSpent - idealSpent) / idealSpent : 0;
+        const daysWithSpend = new Set(currentExpenses.map(e=>e.date.split("T")[0])).size;
+        const noSpendDays  = Math.max(0, daysPassed - daysWithSpend);
+
+        // Category budgets on track
+        const budgetedCats = Object.entries(categoryBudgets).filter(([,b])=>b>0);
+        const onTrackCats  = budgetedCats.filter(([cat, b]) => (catSpend[cat]||0) <= b).length;
+        const budgetScore  = budgetedCats.length > 0
+          ? Math.round((onTrackCats / budgetedCats.length) * 15)
+          : 10; // neutral if no budgets set
+
+        // Pillar scores (0–max)
+        const s1 = Math.round(Math.min(savingsRate / 20, 1) * 25);           // Savings: 25pts
+        const s2 = Math.round(Math.max(0, 1 - Math.max(0, paceDiff)) * 25);  // Pace: 25pts
+        const s3 = Math.round(Math.max(0, 1 - (debtRatio / 50)) * 20);       // Debt: 20pts
+        const s4 = budgetScore;                                                // Budgets: 15pts
+        const s5 = Math.round(Math.min(noSpendDays / 10, 1) * 15);           // No-spend: 15pts
+
+        const score = Math.min(100, s1 + s2 + s3 + s4 + s5);
+
+        const grade =
+          score >= 80 ? { label:"Excellent",   emoji:"🏆", color:"#059669", bg:"#ECFDF5", border:"#6EE7B7", track:"#D1FAE5" } :
+          score >= 60 ? { label:"Good",         emoji:"✅", color:"#2563EB", bg:"#EFF6FF", border:"#93C5FD", track:"#DBEAFE" } :
+          score >= 40 ? { label:"Fair",         emoji:"⚡", color:"#D97706", bg:"#FFFBEB", border:"#FCD34D", track:"#FEF3C7" } :
+                        { label:"Needs Work",   emoji:"📉", color:"#DC2626", bg:"#FFF1F2", border:"#FCA5A5", track:"#FEE2E2" };
+
+        const pillars = [
+          { label:"Savings",   score:s1,  max:25, tip:`${savingsRate}% rate` },
+          { label:"Pace",      score:s2,  max:25, tip: paceDiff > 0 ? `${Math.round(paceDiff*100)}% fast` : "On track" },
+          { label:"Debt",      score:s3,  max:20, tip:`${debtRatio}% EMI ratio` },
+          { label:"Budgets",   score:s4,  max:15, tip: budgetedCats.length > 0 ? `${onTrackCats}/${budgetedCats.length} ok` : "Not set" },
+          { label:"No-spend",  score:s5,  max:15, tip:`${noSpendDays} days` },
+        ];
+
+        return (
+          <div style={{
+            background: grade.bg,
+            border: `1px solid ${grade.border}`,
+            borderRadius: 13,
+            padding: "12px 14px",
+            marginBottom: 10,
+          }}>
+            {/* Header row */}
+            <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10}}>
+              <div>
+                <p style={{margin:0, fontSize:9, fontWeight:700, color:grade.color,
+                           textTransform:"uppercase", letterSpacing:"1px"}}>
+                  Financial Health Score
+                </p>
+                <div style={{display:"flex", alignItems:"baseline", gap:6, marginTop:2}}>
+                  <p style={{margin:0, fontSize:32, fontWeight:700, fontFamily:"Georgia,serif",
+                             lineHeight:1, color:grade.color}}>
+                    {score}
+                  </p>
+                  <p style={{margin:0, fontSize:11, color:grade.color, fontWeight:600}}>/100</p>
+                  <p style={{margin:0, fontSize:13}}>{grade.emoji}</p>
+                </div>
+              </div>
+              <div style={{textAlign:"right"}}>
+                <span style={{
+                  fontSize:12, fontWeight:700, color:grade.color,
+                  background:"rgba(255,255,255,0.6)",
+                  borderRadius:99, padding:"4px 12px",
+                  border:`1px solid ${grade.border}`,
+                }}>
+                  {grade.label}
+                </span>
+                <p style={{margin:"4px 0 0", fontSize:9, color:grade.color, opacity:0.8}}>
+                  {monthName} {now.getFullYear()}
+                </p>
+              </div>
+            </div>
+
+            {/* Score track bar */}
+            <div style={{
+              height:6, borderRadius:99,
+              background: grade.track,
+              overflow:"hidden", marginBottom:10,
+            }}>
+              <div style={{
+                height:"100%", borderRadius:99,
+                width:`${score}%`,
+                background: grade.color,
+                transition:"width 0.6s ease",
+              }}/>
+            </div>
+
+            {/* Pillar breakdown */}
+            <div style={{display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:4}}>
+              {pillars.map(p => {
+                const pct = Math.round((p.score / p.max) * 100);
+                const col = pct >= 80 ? "#059669" : pct >= 50 ? "#2563EB" : pct >= 30 ? "#D97706" : "#DC2626";
+                return (
+                  <div key={p.label} style={{textAlign:"center"}}>
+                    <div style={{
+                      height:3, borderRadius:99,
+                      background:"rgba(0,0,0,0.08)",
+                      overflow:"hidden", marginBottom:3,
+                    }}>
+                      <div style={{
+                        height:"100%", borderRadius:99,
+                        width:`${pct}%`,
+                        background: col,
+                        transition:"width 0.5s",
+                      }}/>
+                    </div>
+                    <p style={{margin:0, fontSize:7, color:grade.color, fontWeight:700,
+                               textTransform:"uppercase", letterSpacing:"0.4px"}}>
+                      {p.label}
+                    </p>
+                    <p style={{margin:"1px 0 0", fontSize:8, color:grade.color, opacity:0.75}}>
+                      {p.tip}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ══ 1c. ACTION CENTER — always visible ══ */}
       {(() => {
         const lowData = totalIncome === 0 && currentExpenses.length === 0;
         const displayItems = actions.length > 0 ? actions : lowData ? [{
