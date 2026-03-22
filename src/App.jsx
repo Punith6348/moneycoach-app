@@ -495,28 +495,29 @@ function DateFilter({ expenses, onFiltered }) {
   if (active === "custom") {
     const dayExp   = expenses.filter(e=>e.date.startsWith(customDate));
     const dayTotal = dayExp.reduce((s,e)=>s+e.amount, 0);
+    const dateLabel = new Date(customDate+"T12:00:00").toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"long"});
     return (
       <div style={{marginBottom:12}}>
-        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+          {/* Selected date shown as label, tapping it opens the calendar */}
+          <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",position:"relative"}}>
+            <span style={{fontSize:13,fontWeight:700,color:C.ink}}>📅 {dateLabel}</span>
+            <span style={{fontSize:11,color:C.blue,fontWeight:600}}>Change</span>
+            <input type="date" value={customDate} max={today}
+              onChange={e=>setCustomDate(e.target.value)}
+              style={{position:"absolute",opacity:0,width:"100%",height:"100%",top:0,left:0,cursor:"pointer"}}/>
+          </label>
           <button onClick={()=>setActive("today")} style={{
-            padding:"6px 11px",borderRadius:99,fontSize:11,fontWeight:600,
+            padding:"5px 11px",borderRadius:99,fontSize:11,fontWeight:600,
             cursor:"pointer",fontFamily:"inherit",border:`1px solid ${C.border}`,
             background:"#fff",color:C.muted,
-          }}>← Back</button>
-          <p style={{margin:0,fontSize:11,fontWeight:600,color:C.ink}}>Pick a date</p>
+          }}>✕ Close</button>
         </div>
-        <input type="date" value={customDate} max={today}
-          onChange={e=>setCustomDate(e.target.value)}
-          style={{width:"100%",padding:"10px 12px",borderRadius:10,
-                  border:`1.5px solid ${C.blue}`,fontFamily:"inherit",
-                  fontSize:14,background:"#fff",outline:"none",
-                  color:C.ink,boxSizing:"border-box"}}/>
         {dayExp.length > 0
-          ? <p style={{margin:"5px 0 0",fontSize:11,color:C.muted}}>
-              {dayExp.length} expense{dayExp.length!==1?"s":""} · {fmt(dayTotal)} on{" "}
-              {new Date(customDate+"T12:00:00").toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"short"})}
+          ? <p style={{margin:"0 0 8px",fontSize:11,color:C.muted}}>
+              {dayExp.length} expense{dayExp.length!==1?"s":""} · {fmt(dayTotal)}
             </p>
-          : <p style={{margin:"5px 0 0",fontSize:11,color:C.muted}}>No expenses on this date</p>
+          : <p style={{margin:"0 0 8px",fontSize:11,color:C.muted}}>No expenses on this date</p>
         }
       </div>
     );
@@ -528,7 +529,6 @@ function DateFilter({ expenses, onFiltered }) {
       {[
         {key:"today",    label:"Today"},
         {key:"yesterday",label:"Yesterday"},
-        {key:"custom",   label:"📅 Pick Date"},
       ].map(({key,label})=>(
         <button key={key} onClick={()=>setActive(key)} style={{
           padding:"7px 14px",borderRadius:99,fontSize:12,fontWeight:600,
@@ -539,6 +539,18 @@ function DateFilter({ expenses, onFiltered }) {
           transition:"all 0.12s",
         }}>{label}</button>
       ))}
+      {/* Pick Date — hidden input overlaid so tapping opens native calendar directly */}
+      <label style={{position:"relative",display:"inline-flex",alignItems:"center",cursor:"pointer"}}>
+        <span style={{
+          padding:"7px 14px",borderRadius:99,fontSize:12,fontWeight:600,
+          whiteSpace:"nowrap",border:`1.5px solid ${C.border}`,
+          background:"#fff",color:C.muted,userSelect:"none",
+        }}>📅 Pick Date</span>
+        <input type="date" value={customDate} max={today}
+          onChange={e=>{ setCustomDate(e.target.value); setActive("custom"); }}
+          style={{position:"absolute",opacity:0,width:"100%",height:"100%",
+                  top:0,left:0,cursor:"pointer"}}/>
+      </label>
     </div>
   );
 }
