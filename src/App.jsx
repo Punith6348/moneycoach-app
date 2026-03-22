@@ -475,35 +475,46 @@ function ExpenseList({expenses, monthKey, onEdit, onDelete, isCurrentMonth}) {
 }
 
 // ─── DATE FILTER ──────────────────────────────────────────────────────────────
-function DateFilter({ expenses, onFiltered }) {
+function DateFilter({ expenses, onFiltered, monthKey }) {
   const today   = new Date().toISOString().split("T")[0];
   const yest    = new Date(); yest.setDate(yest.getDate()-1);
   const yestStr = yest.toISOString().split("T")[0];
+
+  // Month boundaries — restrict calendar to selected month only
+  const [year, mon] = monthKey.split("-").map(Number);
+  const monthMin  = `${monthKey}-01`;
+  const lastDay   = new Date(year, mon, 0).getDate();
+  const monthMax  = `${monthKey}-${String(lastDay).padStart(2,"0")}`;
+  // Don't allow future dates
+  const calMax    = monthMax < today ? monthMax : today;
+
+  // Dates that actually have expenses in this month
+  const datesWithData = new Set(expenses.map(e => e.date.split("T")[0]));
 
   const [active,     setActive]     = useState("today");
   const [customDate, setCustomDate] = useState(today);
 
   useEffect(() => {
     let filtered;
-    if      (active==="today")  filtered = expenses.filter(e=>e.date.startsWith(today));
+    if      (active==="today")     filtered = expenses.filter(e=>e.date.startsWith(today));
     else if (active==="yesterday") filtered = expenses.filter(e=>e.date.startsWith(yestStr));
-    else                        filtered = expenses.filter(e=>e.date.startsWith(customDate));
+    else                           filtered = expenses.filter(e=>e.date.startsWith(customDate));
     onFiltered(filtered);
   }, [active, customDate, expenses]);
 
-  // When Pick Date is active — show only the calendar
+  // When Pick Date is active
   if (active === "custom") {
-    const dayExp   = expenses.filter(e=>e.date.startsWith(customDate));
-    const dayTotal = dayExp.reduce((s,e)=>s+e.amount, 0);
+    const dayExp    = expenses.filter(e=>e.date.startsWith(customDate));
+    const dayTotal  = dayExp.reduce((s,e)=>s+e.amount, 0);
     const dateLabel = new Date(customDate+"T12:00:00").toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"long"});
     return (
       <div style={{marginBottom:12}}>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-          {/* Selected date shown as label, tapping it opens the calendar */}
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
           <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",position:"relative"}}>
             <span style={{fontSize:13,fontWeight:700,color:C.ink}}>📅 {dateLabel}</span>
             <span style={{fontSize:11,color:C.blue,fontWeight:600}}>Change</span>
-            <input type="date" value={customDate} max={today}
+            <input type="date" value={customDate}
+              min={monthMin} max={calMax}
               onChange={e=>setCustomDate(e.target.value)}
               style={{position:"absolute",opacity:0,width:"100%",height:"100%",top:0,left:0,cursor:"pointer"}}/>
           </label>
@@ -513,17 +524,34 @@ function DateFilter({ expenses, onFiltered }) {
             background:"#fff",color:C.muted,
           }}>✕ Close</button>
         </div>
-        {dayExp.length > 0
-          ? <p style={{margin:"0 0 8px",fontSize:11,color:C.muted}}>
-              {dayExp.length} expense{dayExp.length!==1?"s":""} · {fmt(dayTotal)}
-            </p>
-          : <p style={{margin:"0 0 8px",fontSize:11,color:C.muted}}>No expenses on this date</p>
-        }
+        {/* Show dates with data as quick-tap chips */}
+        {datesWithData.size > 0 && (
+          <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
+            {[...datesWithData].sort((a,b)=>b.localeCompare(a)).map(d=>{
+              const label = d===today?"Today":d===yestStr?"Yesterday":
+                new Date(d+"T12:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short"});
+              return (
+                <button key={d} onClick={()=>setCustomDate(d)} style={{
+                  padding:"4px 10px",borderRadius:99,fontSize:10,fontWeight:600,
+                  cursor:"pointer",fontFamily:"inherit",
+                  border:`1.5px solid ${customDate===d?C.ink:C.border}`,
+                  background:customDate===d?C.ink:"#fff",
+                  color:customDate===d?"#fff":C.muted,
+                }}>{label}</button>
+              );
+            })}
+          </div>
+        )}
+        <p style={{margin:0,fontSize:11,color:C.muted}}>
+          {dayExp.length > 0
+            ? `${dayExp.length} expense${dayExp.length!==1?"s":""} · ${fmt(dayTotal)}`
+            : "No expenses on this date"}
+        </p>
       </div>
     );
   }
 
-  // Default: Today / Yesterday / Pick Date buttons
+  // Default: Today / Yesterday / Pick Date
   return (
     <div style={{display:"flex",gap:6,marginBottom:12}}>
       {[
@@ -539,17 +567,17 @@ function DateFilter({ expenses, onFiltered }) {
           transition:"all 0.12s",
         }}>{label}</button>
       ))}
-      {/* Pick Date — hidden input overlaid so tapping opens native calendar directly */}
+      {/* Pick Date — invisible input over button so native calendar opens on tap */}
       <label style={{position:"relative",display:"inline-flex",alignItems:"center",cursor:"pointer"}}>
         <span style={{
           padding:"7px 14px",borderRadius:99,fontSize:12,fontWeight:600,
           whiteSpace:"nowrap",border:`1.5px solid ${C.border}`,
           background:"#fff",color:C.muted,userSelect:"none",
         }}>📅 Pick Date</span>
-        <input type="date" value={customDate} max={today}
+        <input type="date" value={customDate}
+          min={monthMin} max={calMax}
           onChange={e=>{ setCustomDate(e.target.value); setActive("custom"); }}
-          style={{position:"absolute",opacity:0,width:"100%",height:"100%",
-                  top:0,left:0,cursor:"pointer"}}/>
+          style={{position:"absolute",opacity:0,width:"100%",height:"100%",top:0,left:0,cursor:"pointer"}}/>
       </label>
     </div>
   );
@@ -561,7 +589,7 @@ function FilteredExpenseList({ expenses, monthKey, onEdit, onDelete, isCurrentMo
   useEffect(() => { setFiltered(expenses.filter(e=>e.date.startsWith(new Date().toISOString().split("T")[0]))); }, [expenses]);
   return (
     <>
-      <DateFilter expenses={expenses} onFiltered={(f) => setFiltered(f)} />
+      <DateFilter expenses={expenses} onFiltered={(f) => setFiltered(f)} monthKey={monthKey}/>
       <ExpenseList expenses={filtered} monthKey={monthKey}
         onEdit={onEdit} onDelete={onDelete} isCurrentMonth={isCurrentMonth}/>
     </>
