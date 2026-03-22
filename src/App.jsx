@@ -482,7 +482,7 @@ function DateFilter({ expenses, onFiltered }) {
   const weekAgo  = new Date(); weekAgo.setDate(weekAgo.getDate()-6);
   const weekStr  = weekAgo.toISOString().split("T")[0];
 
-  const [active,   setActive]   = useState("all");   // "today"|"yesterday"|"week"|"all"|"custom"
+  const [active,   setActive]   = useState("today");   // default = today
   const [customDate, setCustomDate] = useState(today);
 
   useEffect(() => {
@@ -541,7 +541,7 @@ function DateFilter({ expenses, onFiltered }) {
 // ─── FILTERED EXPENSE LIST ────────────────────────────────────────────────────
 function FilteredExpenseList({ expenses, monthKey, onEdit, onDelete, isCurrentMonth }) {
   const [filtered, setFiltered] = useState(expenses);
-  useEffect(() => { setFiltered(expenses); }, [expenses]);
+  useEffect(() => { setFiltered(expenses.filter(e=>e.date.startsWith(new Date().toISOString().split("T")[0]))); }, [expenses]);
   return (
     <>
       <DateFilter expenses={expenses} onFiltered={(f) => setFiltered(f)} />
