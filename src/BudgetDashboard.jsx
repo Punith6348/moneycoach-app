@@ -94,11 +94,6 @@ export default function BudgetDashboard({
   const barColor  = spentPct < 60 ? C.green : spentPct < 85 ? C.amber : C.red;
   const monthName = now.toLocaleDateString("en-IN", {month:"long"});
 
-  // ── Recent expenses: last 5 across all days ──────────────────────────
-  const recentExp = [...currentExpenses]
-    .sort((a,b) => new Date(b.date) - new Date(a.date))
-    .slice(0, 5);
-
   // ── Income allocation %s ─────────────────────────────────────────────
   const allocPct = (v) => totalIncome > 0 ? Math.round((v / totalIncome) * 100) : 0;
 
@@ -267,7 +262,7 @@ export default function BudgetDashboard({
 
     // Return: bad first, then warn, then neutral, then good — max 4
     const order = { bad:0, warn:1, neutral:2, good:3 };
-    return list.sort((a,b) => order[a.type] - order[b.type]).slice(0, 4);
+    return list.sort((a,b) => order[a.type] - order[b.type]).slice(0, 2);
   }, [dailyLimit, todaySpent, remaining, totalIncome, monthSpent, daysLeft,
       totalFixed, totalLoanEmi, totalSavings, debtRatio, categoryBudgets,
       catSpend, currentExpenses, monthName, futurePayments]);
@@ -835,37 +830,6 @@ export default function BudgetDashboard({
         </div>
       )}
 
-      {/* ══ 5. RECENT EXPENSES (last 5) ══ */}
-      {recentExp.length > 0 && (
-        <div style={{background:"#fff",borderRadius:12,border:`1px solid ${C.border}`,boxShadow:"0 1px 2px rgba(0,0,0,0.04)",overflow:"hidden"}}>
-          <div style={{padding:"9px 14px",borderBottom:`1px solid ${C.bg}`}}>
-            <p style={{margin:0,fontSize:12,fontWeight:700,color:C.ink}}>Recent Expenses</p>
-            <p style={{margin:0,fontSize:10,color:C.muted}}>{recentExp.length} transaction{recentExp.length!==1?"s":""} this month</p>
-          </div>
-          {recentExp.map((e,i) => {
-            const icon = CAT_ICONS[e.label] || "💸";
-            const time = new Date(e.date).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"});
-            const dateStr = new Date(e.date).toLocaleDateString("en-IN",{day:"numeric",month:"short"});
-            return (
-              <div key={e.id} style={{
-                display:"flex", alignItems:"center", justifyContent:"space-between",
-                padding:"7px 14px", borderBottom: i<recentExp.length-1?`1px solid ${C.bg}`:"none", gap:8,
-              }}>
-                <div style={{display:"flex",alignItems:"center",gap:9,flex:1,minWidth:0}}>
-                  <div style={{width:28,height:28,borderRadius:7,background:C.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,flexShrink:0}}>{icon}</div>
-                  <div style={{minWidth:0}}>
-                    <p style={{margin:0,fontSize:12,fontWeight:600,color:C.ink,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                      {e.label}{e.note?` · ${e.note}`:""}
-                    </p>
-                    <p style={{margin:0,fontSize:10,color:C.muted}}>{dateStr} · {time}</p>
-                  </div>
-                </div>
-                <p style={{margin:0,fontSize:13,fontWeight:700,color:C.red,fontFamily:"Georgia,serif",flexShrink:0}}>{fmt(e.amount)}</p>
-              </div>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }
