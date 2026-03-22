@@ -18,15 +18,21 @@ const getGreeting = (name) => {
   return name ? `${t}, ${name}` : t;
 };
 const groupByDate = (expenses) => {
-  const groups = {}; const today = new Date().toISOString().split("T")[0];
-  const yest = new Date(); yest.setDate(yest.getDate()-1); const yestStr = yest.toISOString().split("T")[0];
+  const groups = {}; const order = [];
+  const today = new Date().toISOString().split("T")[0];
+  const yest = new Date(); yest.setDate(yest.getDate()-1);
+  const yestStr = yest.toISOString().split("T")[0];
   [...expenses].reverse().forEach(e => {
     const d = e.date.split("T")[0];
     const l = d===today?"Today":d===yestStr?"Yesterday":new Date(d).toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"short"});
-    if(!groups[l]) groups[l]=[];
+    if(!groups[l]){ groups[l]=[]; order.push(l); }
     groups[l].push(e);
   });
-  return groups;
+  return order.map(label => ({
+    dateLabel: label,
+    items: groups[label],
+    dayTotal: groups[label].reduce((s,e)=>s+e.amount,0),
+  }));
 };
 
 // Fix #2: Only variable/daily categories in the log form.
