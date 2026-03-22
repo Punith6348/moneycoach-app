@@ -333,8 +333,10 @@ function EditModal({expense,monthKey,onSave,onClose}) {
     onClose();
   };
   return (
-    <div onClick={e=>e.target===e.currentTarget&&onClose()} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
-      <div style={{background:"#fff",borderRadius:16,padding:24,width:"100%",maxWidth:420,boxShadow:"0 20px 60px rgba(0,0,0,0.2)"}}>
+    <div onClick={e=>e.target===e.currentTarget&&onClose()} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:9999,display:"flex",alignItems:"flex-end",justifyContent:"center",padding:"0"}}>
+      <div style={{background:"#fff",borderRadius:"20px 20px 0 0",padding:"20px 20px 32px",width:"100%",maxWidth:480,boxShadow:"0 -8px 40px rgba(0,0,0,0.18)",maxHeight:"92vh",overflowY:"auto"}}>
+        {/* Handle bar */}
+        <div style={{width:36,height:4,borderRadius:99,background:"#E5E7EB",margin:"0 auto 16px"}}/>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
           <p style={{fontSize:16,fontWeight:700,color:C.ink,margin:0}}>Edit Expense</p>
           <button onClick={onClose} style={{background:"none",border:"none",fontSize:20,cursor:"pointer",color:C.muted}}>✕</button>
@@ -352,10 +354,10 @@ function EditModal({expense,monthKey,onSave,onClose}) {
           style={{width:"100%",padding:"10px 12px",borderRadius:8,border:`1.5px solid ${C.border}`,fontFamily:"inherit",fontSize:14,background:C.bg,outline:"none",marginTop:6,marginBottom:12,boxSizing:"border-box"}} />
         <Label>Note (optional)</Label>
         <input type="text" value={note} onChange={e=>setNote(e.target.value)} placeholder="Optional note"
-          style={{width:"100%",padding:"10px 12px",borderRadius:8,border:`1.5px solid ${C.border}`,fontFamily:"inherit",fontSize:14,background:C.bg,outline:"none",marginTop:6,marginBottom:14,boxSizing:"border-box"}} />
+          style={{width:"100%",padding:"10px 12px",borderRadius:8,border:`1.5px solid ${C.border}`,fontFamily:"inherit",fontSize:14,background:C.bg,outline:"none",marginTop:6,marginBottom:16,boxSizing:"border-box"}} />
         <div style={{display:"flex",gap:10}}>
-          <button onClick={onClose} style={{flex:1,padding:11,borderRadius:10,border:`1px solid ${C.border}`,background:"#fff",color:C.muted,fontFamily:"inherit",fontSize:13,cursor:"pointer"}}>Cancel</button>
-          <button onClick={save} style={{flex:2,padding:11,borderRadius:10,border:"none",background:C.ink,color:"#fff",fontFamily:"inherit",fontSize:13,fontWeight:700,cursor:"pointer"}}>Save Changes ✓</button>
+          <button onClick={onClose} style={{flex:1,padding:12,borderRadius:10,border:`1px solid ${C.border}`,background:"#fff",color:C.muted,fontFamily:"inherit",fontSize:13,cursor:"pointer"}}>Cancel</button>
+          <button onClick={save} style={{flex:2,padding:12,borderRadius:10,border:"none",background:C.ink,color:"#fff",fontFamily:"inherit",fontSize:13,fontWeight:700,cursor:"pointer"}}>Save Changes ✓</button>
         </div>
       </div>
     </div>
@@ -472,7 +474,83 @@ function ExpenseList({expenses, monthKey, onEdit, onDelete, isCurrentMonth}) {
   );
 }
 
-// ─── LOG EXPENSE FORM ─────────────────────────────────────────────────────────
+// ─── DATE FILTER ──────────────────────────────────────────────────────────────
+function DateFilter({ expenses, onFiltered }) {
+  const today    = new Date().toISOString().split("T")[0];
+  const yest     = new Date(); yest.setDate(yest.getDate()-1);
+  const yestStr  = yest.toISOString().split("T")[0];
+  const weekAgo  = new Date(); weekAgo.setDate(weekAgo.getDate()-6);
+  const weekStr  = weekAgo.toISOString().split("T")[0];
+
+  const [active,   setActive]   = useState("all");   // "today"|"yesterday"|"week"|"all"|"custom"
+  const [customDate, setCustomDate] = useState(today);
+
+  useEffect(() => {
+    let filtered;
+    if      (active==="today")     filtered = expenses.filter(e=>e.date.startsWith(today));
+    else if (active==="yesterday") filtered = expenses.filter(e=>e.date.startsWith(yestStr));
+    else if (active==="week")      filtered = expenses.filter(e=>e.date.split("T")[0]>=weekStr);
+    else if (active==="custom")    filtered = expenses.filter(e=>e.date.startsWith(customDate));
+    else                           filtered = expenses;
+    onFiltered(filtered, active);
+  }, [active, customDate, expenses]);
+
+  const btn=(key,label)=>(
+    <button key={key} onClick={()=>setActive(key)} style={{
+      padding:"6px 12px", borderRadius:99, fontSize:11, fontWeight:600,
+      cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap",
+      border:`1.5px solid ${active===key?C.ink:C.border}`,
+      background:active===key?C.ink:"#fff",
+      color:active===key?"#fff":C.muted,
+      transition:"all 0.12s",
+    }}>{label}</button>
+  );
+
+  return (
+    <div style={{marginBottom:12}}>
+      <div style={{display:"flex",gap:6,overflowX:"auto",scrollbarWidth:"none",paddingBottom:2,alignItems:"center"}}>
+        {btn("all",   "All")}
+        {btn("today", "Today")}
+        {btn("yesterday","Yesterday")}
+        {btn("week",  "This Week")}
+        {btn("custom","📅 Pick Date")}
+      </div>
+      {active==="custom"&&(
+        <div style={{marginTop:8}}>
+          <input type="date" value={customDate}
+            max={today}
+            onChange={e=>setCustomDate(e.target.value)}
+            style={{padding:"8px 12px",borderRadius:9,border:`1.5px solid ${C.blue}`,
+                    fontFamily:"inherit",fontSize:13,background:"#fff",
+                    outline:"none",color:C.ink,width:"100%",boxSizing:"border-box"}}/>
+          {(() => {
+            const d = expenses.filter(e=>e.date.startsWith(customDate));
+            const total = d.reduce((s,e)=>s+e.amount,0);
+            return d.length > 0
+              ? <p style={{margin:"4px 0 0",fontSize:11,color:C.muted}}>
+                  {d.length} expense{d.length!==1?"s":""} · {fmt(total)} on {new Date(customDate+"T12:00:00").toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"short"})}
+                </p>
+              : <p style={{margin:"4px 0 0",fontSize:11,color:C.muted}}>No expenses on this date</p>;
+          })()}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── FILTERED EXPENSE LIST ────────────────────────────────────────────────────
+function FilteredExpenseList({ expenses, monthKey, onEdit, onDelete, isCurrentMonth }) {
+  const [filtered, setFiltered] = useState(expenses);
+  useEffect(() => { setFiltered(expenses); }, [expenses]);
+  return (
+    <>
+      <DateFilter expenses={expenses} onFiltered={(f) => setFiltered(f)} />
+      <ExpenseList expenses={filtered} monthKey={monthKey}
+        onEdit={onEdit} onDelete={onDelete} isCurrentMonth={isCurrentMonth}/>
+    </>
+  );
+}
+
 function LogExpenseForm({onAdd, disabled, currentExpenses=[], dailyLimit=0}) {
   const [amount,setAmount]=useState("");
   const [label,setLabel]=useState("Food");
@@ -1128,7 +1206,13 @@ function DashboardScreen(props) {
                 <LogExpenseForm onAdd={handleAdd} disabled={!isCurrentMonth}
                   currentExpenses={currentExpenses} dailyLimit={dailyLimit}/>
               </div>
-              <ExpenseList expenses={expenses} monthKey={selectedMonth} onEdit={editExpense} onDelete={deleteExpense} isCurrentMonth={isCurrentMonth}/>
+              <FilteredExpenseList
+                expenses={expenses}
+                monthKey={selectedMonth}
+                onEdit={editExpense}
+                onDelete={deleteExpense}
+                isCurrentMonth={isCurrentMonth}
+              />
             </div>
           </>
         )}
