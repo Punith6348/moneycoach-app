@@ -198,7 +198,7 @@ function SetupChecklist({ totalIncome, fixedExpenses, savingsPlans, onNavigate }
 
 // ─── QUICK-ADD TEMPLATES ──────────────────────────────────────────────────────
 // Shows top 5 most-used categories from last 60 days as tappable chips.
-// Each chip pre-fills the category + average amount. No notes shown.
+// Tapping pre-fills ONLY the category — amount field stays empty and gets focus.
 function QuickAddTemplates({ allExpenses, onQuickAdd, disabled }) {
   const templates = useMemo(() => {
     const now    = new Date();
@@ -206,12 +206,10 @@ function QuickAddTemplates({ allExpenses, onQuickAdd, disabled }) {
     const cats   = {};
     Object.values(allExpenses).flat().forEach(e => {
       if (new Date(e.date) < cutoff) return;
-      if (!cats[e.label]) cats[e.label] = { label:e.label, total:0, count:0 };
-      cats[e.label].total  += e.amount;
-      cats[e.label].count  += 1;
+      if (!cats[e.label]) cats[e.label] = { label:e.label, count:0 };
+      cats[e.label].count += 1;
     });
     return Object.values(cats)
-      .map(c => ({ ...c, avg: Math.round(c.total / c.count) }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
   }, [allExpenses]);
@@ -229,15 +227,15 @@ function QuickAddTemplates({ allExpenses, onQuickAdd, disabled }) {
     <div style={{ marginBottom:10 }}>
       <p style={{ margin:"0 0 6px", fontSize:9, color:C.muted, fontWeight:700,
                   textTransform:"uppercase", letterSpacing:"0.8px" }}>
-        Quick Add · tap to pre-fill
+        Quick Add · tap to select category
       </p>
       <div style={{ display:"flex", gap:6, overflowX:"auto", scrollbarWidth:"none", paddingBottom:2 }}>
         {templates.map((t, i) => (
           <button key={i}
-            onClick={() => onQuickAdd({ amount:t.avg, label:t.label, note:"" })}
+            onClick={() => onQuickAdd({ amount:"", label:t.label, note:"" })}
             style={{
-              flexShrink:0, display:"flex", alignItems:"center", gap:5,
-              padding:"6px 12px", borderRadius:99,
+              flexShrink:0, display:"flex", alignItems:"center", gap:6,
+              padding:"7px 13px", borderRadius:99,
               border:`1.5px solid ${C.border}`, background:"#fff",
               cursor:"pointer", fontFamily:"inherit",
               transition:"border-color 0.12s, background 0.12s",
@@ -245,13 +243,8 @@ function QuickAddTemplates({ allExpenses, onQuickAdd, disabled }) {
             onMouseEnter={e => { e.currentTarget.style.borderColor=C.ink; e.currentTarget.style.background=C.bg; }}
             onMouseLeave={e => { e.currentTarget.style.borderColor=C.border; e.currentTarget.style.background="#fff"; }}
           >
-            <span style={{ fontSize:14 }}>{ICONS[t.label] || "💸"}</span>
-            <div style={{ textAlign:"left" }}>
-              <p style={{ margin:0, fontSize:11, fontWeight:700, color:C.ink, lineHeight:1.2 }}>{t.label}</p>
-              <p style={{ margin:0, fontSize:9, color:C.muted, fontFamily:"Georgia,serif" }}>
-                avg ₹{t.avg.toLocaleString("en-IN")} · {t.count}×
-              </p>
-            </div>
+            <span style={{ fontSize:15 }}>{ICONS[t.label] || "💸"}</span>
+            <span style={{ fontSize:12, fontWeight:600, color:C.ink }}>{t.label}</span>
           </button>
         ))}
       </div>
@@ -511,11 +504,23 @@ function ExpenseList({expenses, monthKey, onEdit, onDelete, isCurrentMonth}) {
 }
 
 // ─── LOG EXPENSE FORM ─────────────────────────────────────────────────────
-function LogExpenseForm({onAdd, disabled, currentExpenses=[], dailyLimit=0}) {
+function LogExpenseForm({onAdd, disabled, currentExpenses=[], dailyLimit=0, prefill=null}) {
   const [amount,setAmount]=useState("");
   const [label,setLabel]=useState("Food");
   const [note,setNote]=useState("");
   const [err,setErr]=useState("");
+  const amountRef = useRef(null);
+
+  // When a Quick Add chip is tapped, prefill the category and focus amount
+  useEffect(() => {
+    if (!prefill) return;
+    setLabel(prefill.label);
+    setAmount("");
+    setNote("");
+    setErr("");
+    // Small delay so the re-render completes before focusing
+    setTimeout(() => amountRef.current?.focus(), 50);
+  }, [prefill]);
 
   // Today's running total
   const todayStr   = new Date().toISOString().split("T")[0];
@@ -546,6 +551,7 @@ function LogExpenseForm({onAdd, disabled, currentExpenses=[], dailyLimit=0}) {
       {disabled&&<div style={{marginBottom:10,padding:"7px 11px",borderRadius:8,background:"#FFFBEB",border:"1px solid #FCD34D",fontSize:12,color:C.amber}}>⚠️ Switch to current month to add expenses.</div>}
       <Label>Amount (₹) *</Label>
       <input type="number" value={amount} min="0.01" step="any"
+        ref={amountRef}
         onChange={e=>{setAmount(e.target.value);if(err)setErr("");}}
         placeholder="e.g. 250" disabled={disabled}
         onKeyDown={e=>e.key==="Enter"&&submit()}
@@ -886,6 +892,7 @@ function DashboardScreen(props) {
   const [selectedMonth,setSelectedMonth] = useState(currentMonthKey());
   const [toast,setToast]                 = useState(null);
   const [tab,setTab]                     = useState("budget");
+  const [quickPrefill,setQuickPrefill]   = useState(null);
 
   const isCurrentMonth  = selectedMonth===currentMonthKey();
   const expenses        = useMemo(()=>allExpenses[selectedMonth]||[],[allExpenses,selectedMonth]);
@@ -1284,12 +1291,11 @@ function DashboardScreen(props) {
                 <QuickAddTemplates
                   allExpenses={allExpenses}
                   disabled={!isCurrentMonth}
-                  onQuickAdd={({amount,label,note}) => {
-                    handleAdd({amount,label,note});
-                  }}
+                  onQuickAdd={({label}) => setQuickPrefill({label, ts:Date.now()})}
                 />
                 <LogExpenseForm onAdd={handleAdd} disabled={!isCurrentMonth}
-                  currentExpenses={currentExpenses} dailyLimit={dailyLimit}/>
+                  currentExpenses={currentExpenses} dailyLimit={dailyLimit}
+                  prefill={quickPrefill}/>
               </div>
               <ExpenseList expenses={expenses} monthKey={selectedMonth} onEdit={editExpense} onDelete={deleteExpense} isCurrentMonth={isCurrentMonth}/>
             </div>
