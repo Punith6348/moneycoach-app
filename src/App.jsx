@@ -295,6 +295,197 @@ function SummaryStrip({totalIncome,remaining,expenses,dailyLimit}) {
   );
 }
 
+// ─── MONTH SELECTOR ───────────────────────────────────────────────────────────
+function MonthSelector({selectedMonth,onChange,allExpenses}) {
+  const keys=getActiveMonthKeys(allExpenses), cur=currentMonthKey();
+  return (
+    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,flexWrap:"wrap"}}>
+      <select value={selectedMonth} onChange={e=>onChange(e.target.value)}
+        style={{padding:"7px 30px 7px 12px",borderRadius:10,border:`1.5px solid ${C.border}`,background:"#fff",fontFamily:"inherit",fontSize:13,fontWeight:600,color:C.ink,cursor:"pointer",outline:"none"}}>
+        {keys.map(k=><option key={k} value={k}>{monthKeyToLabel(k)}{k===cur?" (Current)":""}</option>)}
+      </select>
+      {selectedMonth===cur
+        ? <span style={{fontSize:11,background:"#F0FDF4",color:C.green,border:"1px solid #86EFAC",borderRadius:99,padding:"4px 10px",fontWeight:600}}>📅 This Month</span>
+        : <span style={{fontSize:11,color:C.muted}}>Viewing past data · read-only</span>}
+    </div>
+  );
+}
+
+// ─── EDIT MODAL ───────────────────────────────────────────────────────────────
+function EditModal({expense,monthKey,onSave,onClose}) {
+  const [amount,setAmount]=useState(String(expense.amount));
+  const [label,setLabel]=useState(expense.label);
+  const [note,setNote]=useState(expense.note||"");
+  const existingDate=expense.date.split("T")[0];
+  const [date,setDate]=useState(existingDate);
+  const save=()=>{
+    const v=parseFloat(amount);
+    if(!v||v<=0) return;
+    const origTime=expense.date.includes("T")?expense.date.split("T")[1]:"00:00:00.000Z";
+    const newDate=`${date}T${origTime}`;
+    onSave(monthKey,expense.id,{amount:v,label,note:note.trim(),date:newDate});
+    onClose();
+  };
+  return (
+    <div onClick={e=>e.target===e.currentTarget&&onClose()} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+      <div style={{background:"#fff",borderRadius:16,padding:24,width:"100%",maxWidth:420,boxShadow:"0 20px 60px rgba(0,0,0,0.2)"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+          <p style={{fontSize:16,fontWeight:700,color:C.ink,margin:0}}>Edit Expense</p>
+          <button onClick={onClose} style={{background:"none",border:"none",fontSize:20,cursor:"pointer",color:C.muted}}>✕</button>
+        </div>
+        <Label>Amount (₹) *</Label>
+        <input type="number" value={amount} onChange={e=>setAmount(e.target.value)} autoFocus
+          style={{width:"100%",padding:"10px 12px",borderRadius:8,border:`1.5px solid ${C.border}`,fontFamily:"Georgia,serif",fontSize:20,background:C.bg,outline:"none",marginTop:6,marginBottom:12,boxSizing:"border-box"}} />
+        <Label>Category</Label>
+        <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:6,marginBottom:12}}>
+          {VARIABLE_CATS.map(c=><button key={c.name} onClick={()=>setLabel(c.name)} style={{padding:"5px 11px",borderRadius:99,border:`1.5px solid ${label===c.name?C.ink:C.border}`,background:label===c.name?C.ink:"#fff",color:label===c.name?"#fff":C.ink,fontSize:11,fontFamily:"inherit",fontWeight:600,cursor:"pointer"}}>{c.icon} {c.name}</button>)}
+        </div>
+        <Label>Date *</Label>
+        <input type="date" value={date} max={new Date().toISOString().split("T")[0]}
+          onChange={e=>setDate(e.target.value)}
+          style={{width:"100%",padding:"10px 12px",borderRadius:8,border:`1.5px solid ${C.border}`,fontFamily:"inherit",fontSize:14,background:C.bg,outline:"none",marginTop:6,marginBottom:12,boxSizing:"border-box"}} />
+        <Label>Note (optional)</Label>
+        <input type="text" value={note} onChange={e=>setNote(e.target.value)} placeholder="Optional note"
+          style={{width:"100%",padding:"10px 12px",borderRadius:8,border:`1.5px solid ${C.border}`,fontFamily:"inherit",fontSize:14,background:C.bg,outline:"none",marginTop:6,marginBottom:14,boxSizing:"border-box"}} />
+        <div style={{display:"flex",gap:10}}>
+          <button onClick={onClose} style={{flex:1,padding:11,borderRadius:10,border:`1px solid ${C.border}`,background:"#fff",color:C.muted,fontFamily:"inherit",fontSize:13,cursor:"pointer"}}>Cancel</button>
+          <button onClick={save} style={{flex:2,padding:11,borderRadius:10,border:"none",background:C.ink,color:"#fff",fontFamily:"inherit",fontSize:13,fontWeight:700,cursor:"pointer"}}>Save Changes ✓</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── 3-DOT MENU ───────────────────────────────────────────────────────────────
+function ExpenseDotMenu({onEdit, onDelete}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+  return (
+    <div ref={ref} style={{position:"relative",flexShrink:0}}>
+      <button onClick={e=>{e.stopPropagation();setOpen(p=>!p);}}
+        style={{background:"none",border:"none",cursor:"pointer",padding:"4px 8px",borderRadius:8,fontSize:16,color:C.muted,lineHeight:1}}>
+        ···
+      </button>
+      {open&&(
+        <div style={{position:"absolute",right:0,top:"100%",background:"#fff",borderRadius:10,border:`1px solid ${C.border}`,boxShadow:"0 4px 16px rgba(0,0,0,0.12)",zIndex:50,minWidth:120,overflow:"hidden"}}>
+          <button onClick={e=>{e.stopPropagation();setOpen(false);onEdit();}}
+            style={{display:"block",width:"100%",padding:"10px 14px",background:"none",border:"none",textAlign:"left",fontSize:13,cursor:"pointer",color:C.ink,fontFamily:"inherit"}}>
+            ✏ Edit
+          </button>
+          <button onClick={e=>{e.stopPropagation();setOpen(false);onDelete();}}
+            style={{display:"block",width:"100%",padding:"10px 14px",background:"none",border:"none",textAlign:"left",fontSize:13,cursor:"pointer",color:C.red,fontFamily:"inherit"}}>
+            🗑 Delete
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── EXPENSE LIST ─────────────────────────────────────────────────────────────
+function ExpenseList({expenses, monthKey, onEdit, onDelete, isCurrentMonth}) {
+  const [editingExp, setEditingExp] = useState(null);
+  const grouped = useMemo(() => groupByDate(expenses), [expenses]);
+  if (!expenses.length) return (
+    <div style={{background:"#fff",borderRadius:12,border:`1px solid ${C.border}`,textAlign:"center",padding:"40px 20px"}}>
+      <p style={{fontSize:32,margin:"0 0 8px"}}>📋</p>
+      <p style={{color:C.muted,fontSize:13,margin:0}}>No expenses logged{isCurrentMonth?" yet":""} for this month.</p>
+    </div>
+  );
+  return (
+    <>
+      {editingExp&&<EditModal expense={editingExp} monthKey={monthKey} onSave={onEdit} onClose={()=>setEditingExp(null)}/>}
+      {grouped.map(({dateLabel,items,dayTotal})=>(
+        <div key={dateLabel} style={{marginBottom:12}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+            <p style={{margin:0,fontSize:11,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:"0.8px"}}>{dateLabel}</p>
+            <p style={{margin:0,fontSize:11,fontWeight:600,color:C.ink,fontFamily:"Georgia,serif"}}>−{fmt(dayTotal)}</p>
+          </div>
+          <div style={{background:"#fff",borderRadius:12,border:`1px solid ${C.border}`,overflow:"hidden"}}>
+            {items.map((e,i)=>{
+              const icon=ICONS[e.label]||"💸";
+              return (
+                <div key={e.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderBottom:i<items.length-1?`1px solid ${C.bg}`:"none"}}>
+                  <div style={{width:32,height:32,borderRadius:8,background:C.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0}}>{icon}</div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <p style={{margin:0,fontSize:13,fontWeight:600,color:C.ink,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.label}</p>
+                    {e.note&&<p style={{margin:0,fontSize:11,color:C.muted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.note}</p>}
+                    {e.auto&&<p style={{margin:0,fontSize:9,color:C.blue}}>🔁 auto-logged</p>}
+                  </div>
+                  <p style={{margin:0,fontSize:14,fontWeight:700,color:C.red,fontFamily:"Georgia,serif",flexShrink:0}}>{fmt(e.amount)}</p>
+                  {isCurrentMonth&&<ExpenseDotMenu onEdit={()=>setEditingExp(e)} onDelete={()=>{if(window.confirm(`Delete ₹${e.amount} ${e.label}?`))onDelete(monthKey,e.id);}}/>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
+
+// ─── LOG EXPENSE FORM ─────────────────────────────────────────────────────────
+function LogExpenseForm({onAdd, disabled, currentExpenses=[], dailyLimit=0}) {
+  const [amount,setAmount]=useState("");
+  const [label,setLabel]=useState("Food");
+  const [note,setNote]=useState("");
+  const [err,setErr]=useState("");
+
+  const todayStr   = new Date().toISOString().split("T")[0];
+  const todaySpent = currentExpenses.filter(e=>e.date.startsWith(todayStr)).reduce((s,e)=>s+e.amount,0);
+  const limitLeft  = dailyLimit>0?dailyLimit-todaySpent:null;
+  const overLimit  = limitLeft!==null&&limitLeft<0;
+
+  const submit=()=>{
+    if(disabled) return;
+    const v=parseFloat(amount);
+    if(!v||v<=0||!isFinite(v)){setErr("Enter a valid amount greater than ₹0");return;}
+    if(v>10000000){setErr("Amount seems unusually large — please check");return;}
+    setErr("");
+    onAdd({amount:v,label,note:note.trim()});
+    setAmount("");
+    setNote("");
+  };
+
+  const chip=(cat)=><button key={cat.name} onClick={()=>!disabled&&setLabel(cat.name)} disabled={disabled}
+    style={{padding:"5px 11px",borderRadius:99,border:`1.5px solid ${label===cat.name?C.ink:C.border}`,background:label===cat.name?C.ink:"#fff",color:label===cat.name?"#fff":C.ink,fontSize:11,fontFamily:"inherit",fontWeight:600,cursor:"pointer",whiteSpace:"nowrap",opacity:disabled?0.5:1}}>
+    {cat.icon} {cat.name}</button>;
+
+  return (
+    <div style={{background:"#fff",borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 1px 3px rgba(0,0,0,0.06)",padding:18,opacity:disabled?0.65:1}}>
+      <p style={{fontSize:15,fontWeight:700,color:C.ink,margin:"0 0 14px"}}>+ Log Daily Expense</p>
+      {disabled&&<div style={{marginBottom:10,padding:"7px 11px",borderRadius:8,background:"#FFFBEB",border:"1px solid #FCD34D",fontSize:12,color:C.amber}}>⚠️ Switch to current month to add expenses.</div>}
+      <Label>Amount (₹) *</Label>
+      <input type="number" value={amount} min="0.01" step="any"
+        onChange={e=>{setAmount(e.target.value);if(err)setErr("");}}
+        placeholder="e.g. 250" disabled={disabled}
+        onKeyDown={e=>e.key==="Enter"&&submit()}
+        style={{width:"100%",padding:"10px 12px",borderRadius:8,border:`1.5px solid ${err?C.red:C.border}`,fontFamily:"Georgia,serif",fontSize:20,background:C.bg,outline:"none",marginTop:6,marginBottom:err?4:12,boxSizing:"border-box"}} />
+      {err&&<p style={{margin:"0 0 10px",fontSize:11,color:C.red,fontWeight:600}}>{err}</p>}
+      <Label>Category</Label>
+      <p style={{fontSize:11,color:C.muted,margin:"2px 0 6px"}}>For fixed bills like Rent or EMI, use the <strong>Plan tab</strong>.</p>
+      <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>{VARIABLE_CATS.map(chip)}</div>
+      <Label>Note (optional)</Label>
+      <input type="text" value={note} onChange={e=>setNote(e.target.value)} placeholder={NOTE_PLACEHOLDER[label]||"e.g. Misc expense"} disabled={disabled}
+        style={{width:"100%",padding:"8px 12px",borderRadius:8,border:`1.5px solid ${C.border}`,fontFamily:"inherit",fontSize:14,background:C.bg,outline:"none",marginTop:6,marginBottom:10,boxSizing:"border-box"}} />
+      {!disabled&&dailyLimit>0&&(
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 11px",borderRadius:8,marginBottom:10,background:overLimit?"#FFF1F2":todaySpent>0?"#F0FDF4":C.bg,border:`1px solid ${overLimit?"#FECACA":todaySpent>0?"#86EFAC":C.border}`}}>
+          <p style={{margin:0,fontSize:11,color:C.muted,fontWeight:500}}>{overLimit?"⚠ Over daily limit":"Today spent"}</p>
+          <p style={{margin:0,fontSize:12,fontWeight:700,fontFamily:"Georgia,serif",color:overLimit?C.red:todaySpent>0?C.green:C.muted}}>
+            {fmt(todaySpent)}<span style={{fontSize:10,fontWeight:400,color:C.muted,marginLeft:4}}>/ {fmt(dailyLimit)}</span>
+          </p>
+        </div>
+      )}
+      <button onClick={submit} disabled={disabled} style={{width:"100%",padding:"10px",borderRadius:10,background:C.ink,color:"#fff",border:"none",fontSize:14,fontFamily:"inherit",fontWeight:700,cursor:"pointer",opacity:disabled?0.5:1}}>Save Expense ✓</button>
+    </div>
+  );
+}
 
 // ─── RECURRING EXPENSES TAB ───────────────────────────────────────────────
 function RecurringTab({ recurringExpenses, allExpenses, onAdd, onUpdate, onDelete, onToggle, showToast }) {
