@@ -1,7 +1,6 @@
-// ─── SpendingChart.jsx — Donut chart + category breakdown + drill-down ────
+// ─── SpendingChart.jsx — Charts tab components ──────────────────────────────
 import { useMemo, useState } from "react";
 
-// ── Colour palette per category ──────────────────────────────────────────
 export const CATEGORY_CONFIG = {
   Food:          { icon:"🍽", color:"#F97316" },
   Travel:        { icon:"🚗", color:"#3B82F6" },
@@ -22,8 +21,31 @@ export const CATEGORY_CONFIG = {
 
 const C   = { ink:"#111827", muted:"#6B7280", border:"#E5E7EB", bg:"#F8FAFC" };
 const fmt = (n) => `₹${Math.abs(Math.round(n)).toLocaleString("en-IN")}`;
+const fmt2 = (n) => n>=100000?`₹${(n/100000).toFixed(1)}L`:n>=1000?`₹${(n/1000).toFixed(0)}k`:`₹${n}`;
 
-// ── Aggregate expenses into per-category totals ──────────────────────────
+// ── Card wrapper ──────────────────────────────────────────────────────────────
+function Card({ title, subtitle, children, accent }) {
+  return (
+    <div style={{
+      background:"#fff", borderRadius:14, border:`1px solid ${C.border}`,
+      boxShadow:"0 1px 3px rgba(0,0,0,0.05)", overflow:"hidden", marginBottom:12,
+    }}>
+      <div style={{
+        padding:"10px 14px", borderBottom:`1px solid ${C.bg}`,
+        background: accent ? `${accent}08` : undefined,
+        display:"flex", justifyContent:"space-between", alignItems:"center",
+      }}>
+        <div>
+          <p style={{margin:0, fontSize:13, fontWeight:700, color:C.ink}}>{title}</p>
+          {subtitle && <p style={{margin:"1px 0 0", fontSize:10, color:C.muted}}>{subtitle}</p>}
+        </div>
+      </div>
+      <div style={{padding:"12px 14px"}}>{children}</div>
+    </div>
+  );
+}
+
+// ── Aggregate expenses into per-category totals ───────────────────────────────
 function aggregate(expenses) {
   if (!expenses?.length) return [];
   const grand = expenses.reduce((s,e) => s+e.amount, 0);
@@ -46,560 +68,371 @@ function aggregate(expenses) {
   })).sort((a,b) => b.total - a.total);
 }
 
-// ── Pure SVG donut — no recharts dependency ──────────────────────────────
+// ── Pure SVG donut ────────────────────────────────────────────────────────────
 function DonutChart({ data, grandTotal, selectedCat, onSelect }) {
-  const SIZE = 220;
-  const CX   = SIZE / 2;
-  const CY   = SIZE / 2;
-  const R    = 80;   // outer radius
-  const r    = 52;   // inner radius (hole)
-  const GAP  = 1.5;  // degrees gap between segments
-
-  // Build segments from sorted data
+  const SIZE=200, CX=100, CY=100, R=74, r=50, GAP=1.5;
   const segments = useMemo(() => {
     if (!data.length) return [];
-    const total = data.reduce((s,d) => s+d.total, 0);
-    let angle = -90; // start at top
+    const total = data.reduce((s,d)=>s+d.total,0);
+    let angle=-90;
     return data.map(d => {
-      const sweep   = (d.total / total) * 360;
-      const start   = angle;
-      const end     = angle + sweep - GAP;
-      angle        += sweep;
-      // Arc path helper
-      const polar = (cx, cy, rad, deg) => {
-        const rad2 = (deg * Math.PI) / 180;
-        return [cx + rad * Math.cos(rad2), cy + rad * Math.sin(rad2)];
-      };
-      const [x1,y1] = polar(CX, CY, R, start);
-      const [x2,y2] = polar(CX, CY, R, end);
-      const [x3,y3] = polar(CX, CY, r, end);
-      const [x4,y4] = polar(CX, CY, r, start);
-      const large   = sweep - GAP > 180 ? 1 : 0;
-      const path    = `M${x1},${y1} A${R},${R} 0 ${large},1 ${x2},${y2} L${x3},${y3} A${r},${r} 0 ${large},0 ${x4},${y4} Z`;
-      return { ...d, path, sweep };
+      const sweep=(d.total/total)*360, start=angle, end=angle+sweep-GAP;
+      angle+=sweep;
+      const polar=(cx,cy,rad,deg)=>{const r2=(deg*Math.PI)/180;return[cx+rad*Math.cos(r2),cy+rad*Math.sin(r2)];};
+      const[x1,y1]=polar(CX,CY,R,start),[x2,y2]=polar(CX,CY,R,end);
+      const[x3,y3]=polar(CX,CY,r,end), [x4,y4]=polar(CX,CY,r,start);
+      const large=sweep-GAP>180?1:0;
+      return{...d,path:`M${x1},${y1}A${R},${R}0${large},1${x2},${y2}L${x3},${y3}A${r},${r}0${large},0${x4},${y4}Z`,sweep};
     });
-  }, [data]);
-
-  const selectedData = data.find(d => d.name === selectedCat);
-
+  },[data]);
+  const sel=data.find(d=>d.name===selectedCat);
   return (
-    <div style={{ display:"flex", justifyContent:"center", margin:"4px 0 8px" }}>
-      <svg width={SIZE} height={SIZE} style={{ overflow:"visible" }}>
-        {/* Segments */}
-        {segments.map(seg => {
-          const dimmed = selectedCat && selectedCat !== seg.name;
-          const active = selectedCat === seg.name;
-          return (
-            <path
-              key={seg.name}
-              d={seg.path}
-              fill={seg.color}
-              opacity={dimmed ? 0.25 : 1}
-              stroke={active ? "#111827" : "#fff"}
-              strokeWidth={active ? 2 : 1}
-              style={{ cursor:"pointer", transition:"opacity 0.2s" }}
-              onClick={() => onSelect(seg.name)}
-            />
-          );
-        })}
-        {/* Centre label */}
-        <text x={CX} y={CY - 12} textAnchor="middle"
-          style={{ fontSize:11, fill:C.muted, fontFamily:"inherit" }}>
-          {selectedData ? `${selectedData.pct}%` : "Total Spent"}
+    <div style={{display:"flex",justifyContent:"center",margin:"0 0 8px"}}>
+      <svg width={SIZE} height={SIZE} style={{overflow:"visible"}}>
+        {segments.map(seg=>(
+          <path key={seg.name} d={seg.path} fill={seg.color}
+            opacity={selectedCat&&selectedCat!==seg.name?0.2:1}
+            stroke={selectedCat===seg.name?"#111827":"#fff"}
+            strokeWidth={selectedCat===seg.name?2.5:1}
+            style={{cursor:"pointer",transition:"opacity 0.2s"}}
+            onClick={()=>onSelect(seg.name)}/>
+        ))}
+        <text x={CX} y={CY-14} textAnchor="middle" style={{fontSize:10,fill:C.muted,fontFamily:"inherit"}}>
+          {sel?`${sel.pct}% of spend`:"Total Spent"}
         </text>
-        <text x={CX} y={CY + 10} textAnchor="middle"
-          style={{ fontSize:selectedData?19:18, fontWeight:700, fill:C.ink, fontFamily:"Georgia,serif" }}>
-          {selectedData ? fmt(selectedData.total) : fmt(grandTotal)}
+        <text x={CX} y={CY+8} textAnchor="middle" style={{fontSize:sel?18:17,fontWeight:700,fill:C.ink,fontFamily:"Georgia,serif"}}>
+          {sel?fmt(sel.total):fmt(grandTotal)}
         </text>
-        {selectedData && (
-          <text x={CX} y={CY + 26} textAnchor="middle"
-            style={{ fontSize:10, fill:C.muted, fontFamily:"inherit" }}>
-            {selectedData.icon} {selectedData.name}
-          </text>
-        )}
+        {sel&&<text x={CX} y={CY+24} textAnchor="middle" style={{fontSize:11,fill:C.muted,fontFamily:"inherit"}}>{sel.icon} {sel.name}</text>}
       </svg>
     </div>
   );
 }
 
-// ── Drill-down: transactions for a single category ───────────────────────
+// ── Drill-down: transactions for one category ─────────────────────────────────
 function DrillDown({ cat, onClose }) {
   return (
-    <div style={{
-      background:"#fff", borderRadius:12, border:`1.5px solid ${cat.color}55`,
-      marginBottom:12, overflow:"hidden",
-    }}>
-      {/* Header */}
-      <div style={{
-        padding:"10px 14px", background:`${cat.color}0E`,
-        borderBottom:`1px solid ${cat.color}22`,
-        display:"flex", justifyContent:"space-between", alignItems:"center",
-      }}>
+    <div style={{background:"#fff",borderRadius:12,border:`1.5px solid ${cat.color}44`,marginBottom:12,overflow:"hidden"}}>
+      <div style={{padding:"10px 14px",background:`${cat.color}0E`,borderBottom:`1px solid ${cat.color}22`,
+                   display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <div>
-          <p style={{margin:0, fontSize:13, fontWeight:700, color:C.ink}}>
-            {cat.icon} {cat.name}
-          </p>
-          <p style={{margin:0, fontSize:10, color:C.muted}}>
-            {cat.count} transaction{cat.count!==1?"s":""} · {cat.pct}% of spend
-          </p>
+          <p style={{margin:0,fontSize:13,fontWeight:700,color:C.ink}}>{cat.icon} {cat.name}</p>
+          <p style={{margin:0,fontSize:10,color:C.muted}}>{cat.count} transaction{cat.count!==1?"s":""} · {cat.pct}%</p>
         </div>
-        <div style={{display:"flex", alignItems:"center", gap:12}}>
-          <p style={{margin:0, fontSize:16, fontWeight:700, color:cat.color, fontFamily:"Georgia,serif"}}>
-            {fmt(cat.total)}
-          </p>
-          <button onClick={onClose}
-            style={{background:"none", border:"none", cursor:"pointer", fontSize:16, color:C.muted, lineHeight:1}}>
-            ✕
-          </button>
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          <p style={{margin:0,fontSize:16,fontWeight:700,color:cat.color,fontFamily:"Georgia,serif"}}>{fmt(cat.total)}</p>
+          <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",fontSize:16,color:C.muted}}>✕</button>
         </div>
       </div>
-      {/* Transaction rows */}
-      <div>
-        {cat.items.map((e,i) => {
-          const time    = new Date(e.date).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"});
-          const dateStr = new Date(e.date).toLocaleDateString("en-IN",{day:"numeric",month:"short"});
-          return (
-            <div key={e.id} style={{
-              display:"flex", justifyContent:"space-between", alignItems:"center",
-              padding:"8px 14px",
-              borderBottom: i<cat.items.length-1 ? `1px solid ${C.bg}` : "none",
-            }}>
-              <div>
-                <p style={{margin:0, fontSize:12, fontWeight:600, color:C.ink}}>
-                  {e.note || cat.name}
-                </p>
-                <p style={{margin:0, fontSize:10, color:C.muted}}>{dateStr} · {time}</p>
-              </div>
-              <p style={{margin:0, fontSize:13, fontWeight:700, color:cat.color, fontFamily:"Georgia,serif"}}>
-                {fmt(e.amount)}
-              </p>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ── Monthly Trend Chart — last 6 months bar chart ────────────────────────
-export function TrendChart({ allExpenses, monthlyIncome = 0 }) {
-  const months = useMemo(() => {
-    const result = [];
-    const now    = new Date();
-    for (let i = 5; i >= 0; i--) {
-      const d   = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
-      const exps = allExpenses[key] || [];
-      const total = exps.reduce((s,e) => s+e.amount, 0);
-      const label = d.toLocaleDateString("en-IN",{month:"short"});
-      const isCurrent = i === 0;
-      result.push({ key, label, total: Math.round(total), isCurrent });
-    }
-    return result;
-  }, [allExpenses]);
-
-  const maxVal  = Math.max(...months.map(m => m.total), monthlyIncome || 1);
-  const hasData = months.some(m => m.total > 0);
-
-  if (!hasData) return null;
-
-  const fmt2 = (n) => n >= 100000
-    ? `₹${(n/100000).toFixed(1)}L`
-    : n >= 1000
-    ? `₹${(n/1000).toFixed(0)}k`
-    : `₹${n}`;
-
-  return (
-    <div style={{
-      background:"#fff", borderRadius:14, border:`1px solid ${C.border}`,
-      boxShadow:"0 1px 3px rgba(0,0,0,0.06)", padding:"14px 16px", marginBottom:12,
-    }}>
-      <div style={{ marginBottom:12 }}>
-        <p style={{ margin:0, fontSize:12, fontWeight:700, color:C.ink }}>Monthly Spending Trend</p>
-        <p style={{ margin:"1px 0 0", fontSize:10, color:C.muted }}>Last 6 months · variable expenses</p>
-      </div>
-
-      {/* Bar chart */}
-      <div style={{ display:"flex", alignItems:"flex-end", gap:6, height:100 }}>
-        {months.map(m => {
-          const barH    = maxVal > 0 ? Math.round((m.total / maxVal) * 100) : 0;
-          const isEmpty = m.total === 0;
-          return (
-            <div key={m.key} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}>
-              {/* Value label */}
-              <p style={{ margin:0, fontSize:8, color: m.isCurrent ? C.ink : C.muted,
-                          fontWeight: m.isCurrent ? 700 : 400, whiteSpace:"nowrap" }}>
-                {isEmpty ? "" : fmt2(m.total)}
-              </p>
-              {/* Bar */}
-              <div style={{ width:"100%", height:72, display:"flex", alignItems:"flex-end" }}>
-                <div style={{
-                  width:"100%",
-                  height: isEmpty ? 3 : `${Math.max(barH, 4)}%`,
-                  background: m.isCurrent
-                    ? "linear-gradient(180deg, #3B82F6 0%, #1D4ED8 100%)"
-                    : "#CBD5E1",
-                  borderRadius:"4px 4px 0 0",
-                  transition:"height 0.4s ease",
-                  position:"relative",
-                }}/>
-              </div>
-              {/* Month label */}
-              <p style={{ margin:0, fontSize:9, color: m.isCurrent ? C.ink : C.muted,
-                          fontWeight: m.isCurrent ? 700 : 400 }}>
-                {m.label}
-                {m.isCurrent && <span style={{ display:"block", fontSize:7, color:C.blue, textAlign:"center" }}>now</span>}
-              </p>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Income reference line label */}
-      {monthlyIncome > 0 && (
-        <div style={{ marginTop:8, display:"flex", alignItems:"center", gap:6 }}>
-          <div style={{ width:16, height:2, background:"#EF4444", borderRadius:99 }} />
-          <p style={{ margin:0, fontSize:9, color:C.muted }}>
-            Income: {fmt2(monthlyIncome)} — bars above this mean overspend
-          </p>
-        </div>
-      )}
-
-      {/* Month-on-month change summary */}
-      {(() => {
-        const last2 = months.filter(m => m.total > 0).slice(-2);
-        if (last2.length < 2) return null;
-        const [prev, curr] = last2;
-        const diff  = curr.total - prev.total;
-        const pctD  = Math.round((Math.abs(diff) / prev.total) * 100);
-        const up    = diff > 0;
-        return (
-          <div style={{
-            marginTop:10, padding:"7px 11px", borderRadius:8,
-            background: up ? "#FFF1F2" : "#F0FDF4",
-            border: `1px solid ${up ? "#FECACA" : "#86EFAC"}`,
-            display:"flex", alignItems:"center", gap:8,
-          }}>
-            <span style={{ fontSize:14 }}>{up ? "📈" : "📉"}</span>
-            <p style={{ margin:0, fontSize:11, color:C.ink }}>
-              Spending {up ? "up" : "down"} <strong>{pctD}%</strong> vs last month
-              <span style={{ color:C.muted }}> ({up ? "+" : "-"}₹{Math.abs(diff).toLocaleString("en-IN")})</span>
-            </p>
+      {cat.items.map((e,i)=>(
+        <div key={e.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 14px",borderBottom:i<cat.items.length-1?`1px solid ${C.bg}`:"none"}}>
+          <div>
+            <p style={{margin:0,fontSize:12,fontWeight:600,color:C.ink}}>{e.note||cat.name}</p>
+            <p style={{margin:0,fontSize:10,color:C.muted}}>{new Date(e.date).toLocaleDateString("en-IN",{day:"numeric",month:"short"})} · {new Date(e.date).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"})}</p>
           </div>
-        );
-      })()}
+          <p style={{margin:0,fontSize:13,fontWeight:700,color:cat.color,fontFamily:"Georgia,serif"}}>{fmt(e.amount)}</p>
+        </div>
+      ))}
     </div>
   );
 }
 
-// ── Main component ────────────────────────────────────────────────────────
-export default function SpendingChart({ expenses = [], monthlyIncome = 0 }) {
+// ═════════════════════════════════════════════════════════════════════════════
+// MAIN SpendingChart — Donut + Category list + Drill-down
+// ═════════════════════════════════════════════════════════════════════════════
+export default function SpendingChart({ expenses=[], monthlyIncome=0 }) {
   const [selectedCat, setSelectedCat] = useState(null);
+  const data       = useMemo(()=>aggregate(expenses),[expenses]);
+  const grandTotal = useMemo(()=>expenses.reduce((s,e)=>s+e.amount,0),[expenses]);
+  const selected   = data.find(d=>d.name===selectedCat)||null;
+  const toggle     = (name)=>setSelectedCat(p=>p===name?null:name);
 
-  const data       = useMemo(() => aggregate(expenses), [expenses]);
-  const grandTotal = useMemo(() => expenses.reduce((s,e) => s+e.amount, 0), [expenses]);
-  const selected   = data.find(d => d.name === selectedCat) || null;
-
-  const toggle = (name) => setSelectedCat(p => p===name ? null : name);
-
-  // ── Empty state ──
-  if (data.length === 0) {
-    return (
-      <div style={{
-        background:"#fff", borderRadius:14, border:`1px solid ${C.border}`,
-        textAlign:"center", padding:"44px 20px",
-      }}>
-        <p style={{fontSize:36, margin:"0 0 10px"}}>📊</p>
-        <p style={{color:C.muted, fontSize:13, margin:0}}>
-          Log at least one expense to see your spending breakdown.
-        </p>
-      </div>
-    );
-  }
+  if (data.length===0) return (
+    <div style={{background:"#fff",borderRadius:14,border:`1px solid ${C.border}`,textAlign:"center",padding:"44px 20px"}}>
+      <p style={{fontSize:32,margin:"0 0 8px"}}>📊</p>
+      <p style={{color:C.muted,fontSize:13,margin:0}}>Log expenses to see your spending breakdown.</p>
+    </div>
+  );
 
   return (
     <div>
-      {/* ══ DONUT CARD ══ */}
-      <div style={{
-        background:"#fff", borderRadius:14, border:`1px solid ${C.border}`,
-        boxShadow:"0 1px 3px rgba(0,0,0,0.06)", padding:"16px 16px 12px",
-        marginBottom:12,
-      }}>
-        {/* Card header */}
-        <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:4}}>
+      {/* Donut + Legend */}
+      <div style={{background:"#fff",borderRadius:14,border:`1px solid ${C.border}`,
+                   boxShadow:"0 1px 3px rgba(0,0,0,0.05)",padding:"14px",marginBottom:12}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
           <div>
-            <p style={{margin:0, fontSize:12, fontWeight:700, color:C.ink}}>Spending Breakdown</p>
-            <p style={{margin:0, fontSize:10, color:C.muted}}>
+            <p style={{margin:0,fontSize:13,fontWeight:700,color:C.ink}}>Spending Breakdown</p>
+            <p style={{margin:0,fontSize:10,color:C.muted}}>
               {data.length} categories · {expenses.length} expense{expenses.length!==1?"s":""}
-              {monthlyIncome>0 && (
-                <span style={{
-                  marginLeft:6, fontWeight:700,
-                  color: grandTotal>monthlyIncome ? "#DC2626" : "#16A34A",
-                }}>
-                  · {Math.round((grandTotal/monthlyIncome)*100)}% of income
-                </span>
-              )}
+              {monthlyIncome>0&&<span style={{marginLeft:6,fontWeight:700,color:grandTotal>monthlyIncome?"#DC2626":"#16A34A"}}>
+                · {Math.round((grandTotal/monthlyIncome)*100)}% of income
+              </span>}
             </p>
           </div>
-          {selectedCat && (
-            <button onClick={()=>setSelectedCat(null)}
-              style={{background:"none", border:`1px solid ${C.border}`, borderRadius:99,
-                padding:"3px 10px", fontSize:11, color:C.muted, cursor:"pointer",
-                fontFamily:"inherit"}}>
-              Clear ✕
-            </button>
-          )}
+          {selectedCat&&<button onClick={()=>setSelectedCat(null)} style={{background:"none",border:`1px solid ${C.border}`,borderRadius:99,padding:"3px 10px",fontSize:11,color:C.muted,cursor:"pointer",fontFamily:"inherit"}}>All ✕</button>}
         </div>
-
-        {/* Donut */}
-        <DonutChart
-          data={data}
-          grandTotal={grandTotal}
-          selectedCat={selectedCat}
-          onSelect={toggle}
-        />
-
+        <DonutChart data={data} grandTotal={grandTotal} selectedCat={selectedCat} onSelect={toggle}/>
         {/* Legend dots */}
-        <div style={{display:"flex", flexWrap:"wrap", gap:"4px 10px", justifyContent:"center"}}>
-          {data.map(d => (
-            <button key={d.name} onClick={()=>toggle(d.name)}
-              style={{
-                display:"flex", alignItems:"center", gap:4,
-                background:"none", border:"none", cursor:"pointer",
-                padding:"2px 0", fontFamily:"inherit",
-                opacity: selectedCat && selectedCat!==d.name ? 0.35 : 1,
-                transition:"opacity 0.2s",
-              }}>
-              <div style={{width:8, height:8, borderRadius:"50%", background:d.color, flexShrink:0}} />
-              <span style={{fontSize:10, color:C.muted, whiteSpace:"nowrap"}}>{d.name}</span>
+        <div style={{display:"flex",flexWrap:"wrap",gap:"4px 10px",justifyContent:"center"}}>
+          {data.map(d=>(
+            <button key={d.name} onClick={()=>toggle(d.name)} style={{display:"flex",alignItems:"center",gap:4,background:"none",border:"none",cursor:"pointer",padding:"2px 0",fontFamily:"inherit",opacity:selectedCat&&selectedCat!==d.name?0.3:1,transition:"opacity 0.2s"}}>
+              <div style={{width:8,height:8,borderRadius:"50%",background:d.color}}/>
+              <span style={{fontSize:10,color:C.muted}}>{d.name}</span>
             </button>
           ))}
         </div>
       </div>
 
-      {/* ══ DRILL-DOWN (shown when category selected) ══ */}
-      {selected && (
-        <DrillDown cat={selected} onClose={()=>setSelectedCat(null)} />
-      )}
+      {/* Drill-down */}
+      {selected&&<DrillDown cat={selected} onClose={()=>setSelectedCat(null)}/>}
 
-      {/* ══ CATEGORY BREAKDOWN LIST ══ */}
-      <div style={{
-        background:"#fff", borderRadius:14, border:`1px solid ${C.border}`,
-        boxShadow:"0 1px 3px rgba(0,0,0,0.06)", overflow:"hidden",
-      }}>
-        <div style={{padding:"10px 14px", borderBottom:`1px solid ${C.bg}`}}>
-          <p style={{margin:0, fontSize:12, fontWeight:700, color:C.ink}}>By Category</p>
-          <p style={{margin:0, fontSize:10, color:C.muted}}>Tap a row to see transactions</p>
+      {/* Category list */}
+      <div style={{background:"#fff",borderRadius:14,border:`1px solid ${C.border}`,
+                   boxShadow:"0 1px 3px rgba(0,0,0,0.05)",overflow:"hidden"}}>
+        <div style={{padding:"10px 14px",borderBottom:`1px solid ${C.bg}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <p style={{margin:0,fontSize:13,fontWeight:700,color:C.ink}}>By Category</p>
+          <p style={{margin:0,fontSize:10,color:C.muted}}>tap to see transactions</p>
         </div>
-
-        {data.map((cat, i) => {
-          const isActive = selectedCat === cat.name;
+        {data.map((cat,i)=>{
+          const isActive=selectedCat===cat.name;
           return (
             <div key={cat.name} onClick={()=>toggle(cat.name)}
-              style={{
-                display:"flex", alignItems:"center", gap:10,
-                padding:"10px 14px", cursor:"pointer",
-                borderBottom: i<data.length-1?`1px solid ${C.bg}`:"none",
-                background: isActive ? `${cat.color}08` : "transparent",
-                transition:"background 0.15s",
-              }}>
-
-              {/* Icon bubble */}
-              <div style={{
-                width:34, height:34, borderRadius:9, flexShrink:0,
-                background: `${cat.color}18`,
-                display:"flex", alignItems:"center", justifyContent:"center",
-                fontSize:16,
-                border: isActive ? `1.5px solid ${cat.color}66` : "1.5px solid transparent",
-              }}>
+              style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",cursor:"pointer",
+                      borderBottom:i<data.length-1?`1px solid ${C.bg}`:"none",
+                      background:isActive?`${cat.color}08`:"transparent",transition:"background 0.15s"}}>
+              <div style={{width:34,height:34,borderRadius:9,flexShrink:0,background:`${cat.color}18`,
+                           display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,
+                           border:isActive?`1.5px solid ${cat.color}55`:"1.5px solid transparent"}}>
                 {cat.icon}
               </div>
-
-              {/* Name + bar */}
-              <div style={{flex:1, minWidth:0}}>
-                <div style={{display:"flex", justifyContent:"space-between", marginBottom:4}}>
-                  <p style={{margin:0, fontSize:12, fontWeight:isActive?700:600, color:C.ink}}>
-                    {cat.name}
-                  </p>
-                  <div style={{display:"flex", alignItems:"baseline", gap:5}}>
-                    <p style={{margin:0, fontSize:13, fontWeight:700, color:cat.color, fontFamily:"Georgia,serif"}}>
-                      {fmt(cat.total)}
-                    </p>
-                    <p style={{margin:0, fontSize:10, color:C.muted}}>({cat.pct}%)</p>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                  <p style={{margin:0,fontSize:12,fontWeight:isActive?700:600,color:C.ink}}>{cat.name}</p>
+                  <div style={{display:"flex",alignItems:"baseline",gap:4}}>
+                    <p style={{margin:0,fontSize:13,fontWeight:700,color:cat.color,fontFamily:"Georgia,serif"}}>{fmt(cat.total)}</p>
+                    <p style={{margin:0,fontSize:10,color:C.muted}}>({cat.pct}%)</p>
                   </div>
                 </div>
-                {/* Progress bar */}
-                <div style={{height:3, borderRadius:99, background:C.bg, overflow:"hidden"}}>
-                  <div style={{
-                    height:"100%", borderRadius:99,
-                    width:`${cat.pct}%`, background:cat.color,
-                    transition:"width 0.4s",
-                  }} />
+                <div style={{height:3,borderRadius:99,background:C.bg,overflow:"hidden"}}>
+                  <div style={{height:"100%",borderRadius:99,width:`${cat.pct}%`,background:cat.color,transition:"width 0.4s"}}/>
                 </div>
-                <p style={{margin:"3px 0 0", fontSize:10, color:C.muted}}>
+                <p style={{margin:"3px 0 0",fontSize:10,color:C.muted}}>
                   {cat.count} transaction{cat.count!==1?"s":""}
-                  {cat.count>0 && ` · avg ${fmt(Math.round(cat.total/cat.count))}`}
+                  {cat.count>0&&` · avg ${fmt(Math.round(cat.total/cat.count))}`}
                 </p>
               </div>
-
-              {/* Chevron */}
-              <p style={{margin:0, fontSize:12, color:C.muted, flexShrink:0, transform:isActive?"rotate(90deg)":"none", transition:"transform 0.15s"}}>›</p>
+              <p style={{margin:0,fontSize:12,color:C.muted,flexShrink:0,transform:isActive?"rotate(90deg)":"none",transition:"transform 0.15s"}}>›</p>
             </div>
           );
         })}
-
-        {/* Footer totals */}
-        <div style={{
-          padding:"9px 14px", background:C.bg,
-          display:"flex", justifyContent:"space-between", alignItems:"center",
-        }}>
-          <p style={{margin:0, fontSize:10, color:C.muted, textTransform:"uppercase", letterSpacing:"0.8px", fontWeight:600}}>
-            Total Spent
-          </p>
-          <p style={{margin:0, fontSize:15, fontWeight:700, color:C.ink, fontFamily:"Georgia,serif"}}>
-            {fmt(grandTotal)}
-          </p>
+        <div style={{padding:"9px 14px",background:C.bg,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <p style={{margin:0,fontSize:10,color:C.muted,textTransform:"uppercase",letterSpacing:"0.8px",fontWeight:600}}>Total Spent</p>
+          <p style={{margin:0,fontSize:15,fontWeight:700,color:C.ink,fontFamily:"Georgia,serif"}}>{fmt(grandTotal)}</p>
         </div>
       </div>
     </div>
   );
 }
-// ── Category History Chart — 4 months per category ───────────────────────
+
+// ═════════════════════════════════════════════════════════════════════════════
+// TREND CHART — 6 months total spend with avg line + income reference
+// ═════════════════════════════════════════════════════════════════════════════
+export function TrendChart({ allExpenses, monthlyIncome=0 }) {
+  const months = useMemo(() => {
+    const now=new Date(), result=[];
+    for(let i=5;i>=0;i--){
+      const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+      const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+      const exps=allExpenses[key]||[];
+      const total=exps.reduce((s,e)=>s+e.amount,0);
+      result.push({key,label:d.toLocaleDateString("en-IN",{month:"short"}),total:Math.round(total),isCurrent:i===0});
+    }
+    return result;
+  },[allExpenses]);
+
+  const withData=months.filter(m=>m.total>0);
+  if(withData.length===0) return null;
+
+  const maxVal=Math.max(...months.map(m=>m.total),monthlyIncome||1);
+  const avgSpend=withData.length>0?Math.round(withData.reduce((s,m)=>s+m.total,0)/withData.length):0;
+
+  // MoM change
+  const last2=withData.slice(-2);
+  const momChange=last2.length===2?last2[1].total-last2[0].total:null;
+
+  return (
+    <Card title="Monthly Spending Trend" subtitle={`Last 6 months${avgSpend>0?` · avg ${fmt2(avgSpend)}/month`:""}`} accent="#2563EB">
+      <div style={{position:"relative"}}>
+        {/* Bars */}
+        <div style={{display:"flex",alignItems:"flex-end",gap:6,height:110,marginBottom:4}}>
+          {months.map(m=>{
+            const barH=maxVal>0?Math.max(m.total>0?Math.round((m.total/maxVal)*100):0,0):0;
+            const isEmpty=m.total===0;
+            const isOver=monthlyIncome>0&&m.total>monthlyIncome;
+            return (
+              <div key={m.key} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+                <p style={{margin:0,fontSize:8,color:m.isCurrent?C.ink:C.muted,fontWeight:m.isCurrent?700:400,whiteSpace:"nowrap"}}>
+                  {isEmpty?"":fmt2(m.total)}
+                </p>
+                <div style={{width:"100%",height:84,display:"flex",alignItems:"flex-end"}}>
+                  <div style={{
+                    width:"100%",
+                    height:isEmpty?2:`${barH}%`,
+                    background: m.isCurrent
+                      ? isOver ? "#DC2626" : "linear-gradient(180deg,#3B82F6 0%,#1D4ED8 100%)"
+                      : isOver ? "#FCA5A5" : "#CBD5E1",
+                    borderRadius:"4px 4px 0 0",
+                    transition:"height 0.45s ease",
+                    position:"relative",
+                  }}/>
+                </div>
+                <p style={{margin:0,fontSize:9,color:m.isCurrent?C.ink:C.muted,fontWeight:m.isCurrent?700:400}}>
+                  {m.label}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Average line indicator */}
+        {avgSpend>0&&(
+          <div style={{marginTop:8,display:"flex",alignItems:"center",gap:6}}>
+            <div style={{width:16,height:2,background:"#94A3B8",borderRadius:99}}/>
+            <p style={{margin:0,fontSize:9,color:C.muted}}>6-month avg: {fmt2(avgSpend)}</p>
+            {momChange!==null&&(
+              <span style={{
+                fontSize:9,fontWeight:700,marginLeft:"auto",
+                color:momChange>0?"#DC2626":"#16A34A",
+                background:momChange>0?"#FFF1F2":"#F0FDF4",
+                border:`1px solid ${momChange>0?"#FECACA":"#86EFAC"}`,
+                borderRadius:99,padding:"1px 7px",
+              }}>
+                {momChange>0?"▲":"▼"} {fmt2(Math.abs(momChange))} vs last month
+              </span>
+            )}
+          </div>
+        )}
+        {monthlyIncome>0&&(
+          <div style={{marginTop:4,display:"flex",alignItems:"center",gap:6}}>
+            <div style={{width:16,height:2,background:"#EF4444",borderRadius:99}}/>
+            <p style={{margin:0,fontSize:9,color:C.muted}}>Income: {fmt2(monthlyIncome)}</p>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// CATEGORY HISTORY — 4 months, one category per row with bars
+// ═════════════════════════════════════════════════════════════════════════════
 export function CategoryHistoryChart({ allExpenses }) {
   const [selectedCat, setSelectedCat] = useState(null);
 
-  const { months, categories, data } = useMemo(() => {
-    const now    = new Date();
-    const months = [];
-    for (let i = 3; i >= 0; i--) {
-      const d   = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
-      months.push({ key, label: d.toLocaleDateString("en-IN",{month:"short"}), isCurrent: i===0 });
+  const { months, categories, data, maxVal } = useMemo(() => {
+    const now=new Date(), months=[];
+    for(let i=3;i>=0;i--){
+      const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+      const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+      months.push({key,label:d.toLocaleDateString("en-IN",{month:"short"}),isCurrent:i===0});
     }
-
-    // All categories that appear in any of the 4 months
-    const catSet = new Set();
-    months.forEach(m => {
-      (allExpenses[m.key]||[]).forEach(e => catSet.add(e.label));
-    });
-    const categories = [...catSet];
-
-    // Build data: { cat -> { monthKey -> total } }
-    const data = {};
-    categories.forEach(cat => {
-      data[cat] = {};
-      months.forEach(m => {
-        const total = (allExpenses[m.key]||[])
-          .filter(e => e.label === cat)
-          .reduce((s,e) => s+e.amount, 0);
-        data[cat][m.key] = Math.round(total);
+    const catSet=new Set();
+    months.forEach(m=>(allExpenses[m.key]||[]).forEach(e=>catSet.add(e.label)));
+    const categories=[...catSet].filter(c=>CATEGORY_CONFIG[c]||c); // keep all
+    const data={};
+    categories.forEach(cat=>{
+      data[cat]={};
+      months.forEach(m=>{
+        data[cat][m.key]=Math.round((allExpenses[m.key]||[]).filter(e=>e.label===cat).reduce((s,e)=>s+e.amount,0));
       });
     });
+    const allVals=categories.flatMap(cat=>months.map(m=>data[cat][m.key]||0));
+    return{months,categories,data,maxVal:Math.max(...allVals,1)};
+  },[allExpenses]);
 
-    return { months, categories, data };
-  }, [allExpenses]);
+  if(categories.length===0) return null;
 
-  const hasData = categories.length > 0;
-  if (!hasData) return null;
-
-  const fmt2 = (n) => n >= 100000 ? `₹${(n/100000).toFixed(1)}L` : n >= 1000 ? `₹${(n/1000).toFixed(0)}k` : `₹${n}`;
-
-  // Max value across all cats + months for scaling
-  const allVals = categories.flatMap(cat => months.map(m => data[cat][m.key]||0));
-  const maxVal  = Math.max(...allVals, 1);
-
-  const displayCats = selectedCat ? [selectedCat] : categories;
+  // Sort by total across all months descending
+  const sorted=[...categories].sort((a,b)=>{
+    const ta=months.reduce((s,m)=>s+(data[a][m.key]||0),0);
+    const tb=months.reduce((s,m)=>s+(data[b][m.key]||0),0);
+    return tb-ta;
+  });
+  const display=selectedCat?[selectedCat]:sorted;
 
   return (
-    <div style={{
-      background:"#fff", borderRadius:14, border:`1px solid ${C.border}`,
-      boxShadow:"0 1px 3px rgba(0,0,0,0.06)", padding:"14px 16px", marginBottom:12,
-    }}>
-      {/* Header */}
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:12 }}>
-        <div>
-          <p style={{ margin:0, fontSize:12, fontWeight:700, color:C.ink }}>Category History</p>
-          <p style={{ margin:"1px 0 0", fontSize:10, color:C.muted }}>Last 4 months · tap a category to focus</p>
-        </div>
-        {selectedCat && (
-          <button onClick={()=>setSelectedCat(null)} style={{
-            background:"none", border:`1px solid ${C.border}`, borderRadius:99,
-            padding:"3px 10px", fontSize:11, color:C.muted, cursor:"pointer", fontFamily:"inherit",
-          }}>All ✕</button>
-        )}
-      </div>
-
-      {/* Category filter pills */}
-      <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:12 }}>
-        {categories.map(cat => {
-          const cfg = CATEGORY_CONFIG[cat] || { icon:"💸", color:"#6B7280" };
-          const active = selectedCat === cat;
+    <Card title="Category History" subtitle="Last 4 months · tap category to focus" accent="#D97706">
+      {/* Category pills */}
+      <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:12}}>
+        {sorted.map(cat=>{
+          const cfg=CATEGORY_CONFIG[cat]||{icon:"💸",color:"#6B7280"};
+          const active=selectedCat===cat;
           return (
-            <button key={cat} onClick={()=>setSelectedCat(active ? null : cat)} style={{
-              display:"flex", alignItems:"center", gap:4, padding:"3px 9px",
-              borderRadius:99, fontSize:11, fontWeight:600, cursor:"pointer",
-              fontFamily:"inherit",
-              border:`1.5px solid ${active ? cfg.color : C.border}`,
-              background: active ? `${cfg.color}18` : "#fff",
-              color: active ? cfg.color : C.muted,
+            <button key={cat} onClick={()=>setSelectedCat(active?null:cat)} style={{
+              display:"flex",alignItems:"center",gap:4,padding:"3px 9px",borderRadius:99,
+              fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"inherit",
+              border:`1.5px solid ${active?cfg.color:C.border}`,
+              background:active?`${cfg.color}15`:"#fff",
+              color:active?cfg.color:C.muted,
             }}>
-              <span style={{fontSize:12}}>{cfg.icon}</span>
-              {cat}
+              <span>{cfg.icon}</span>{cat}
             </button>
           );
         })}
       </div>
 
-      {/* Grouped bars per month */}
-      <div style={{ display:"flex", gap:8, alignItems:"flex-end" }}>
-        {months.map(m => {
-          const monthTotal = displayCats.reduce((s,cat) => s+(data[cat][m.key]||0), 0);
+      {/* One row per category */}
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {display.map(cat=>{
+          const cfg=CATEGORY_CONFIG[cat]||{icon:"💸",color:"#6B7280"};
+          const totals=months.map(m=>data[cat][m.key]||0);
+          const catMax=Math.max(...totals,1);
+          // Trend: last vs prev
+          const last2=totals.filter(v=>v>0).slice(-2);
+          const trend=last2.length===2?last2[1]-last2[0]:null;
           return (
-            <div key={m.key} style={{ flex:1, display:"flex", flexDirection:"column", gap:3, alignItems:"center" }}>
-              {/* Value label */}
-              <p style={{ margin:0, fontSize:8, color:m.isCurrent?C.ink:C.muted, fontWeight:m.isCurrent?700:400 }}>
-                {monthTotal > 0 ? fmt2(monthTotal) : ""}
-              </p>
-              {/* Stacked bars */}
-              <div style={{ width:"100%", height:80, display:"flex", flexDirection:"column", justifyContent:"flex-end", gap:1 }}>
-                {displayCats.map(cat => {
-                  const val = data[cat][m.key] || 0;
-                  if (val === 0) return null;
-                  const cfg = CATEGORY_CONFIG[cat] || { color:"#6B7280" };
-                  const barH = Math.max(Math.round((val/maxVal)*76), 2);
+            <div key={cat}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:5}}>
+                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                  <span style={{fontSize:15}}>{cfg.icon}</span>
+                  <span style={{fontSize:12,fontWeight:700,color:C.ink}}>{cat}</span>
+                  {trend!==null&&(
+                    <span style={{
+                      fontSize:9,fontWeight:700,borderRadius:99,padding:"1px 7px",
+                      background:trend>0?"#FFF1F2":"#F0FDF4",
+                      border:`1px solid ${trend>0?"#FECACA":"#86EFAC"}`,
+                      color:trend>0?"#DC2626":"#16A34A",
+                    }}>
+                      {trend>0?"▲":"▼"} {fmt2(Math.abs(trend))}
+                    </span>
+                  )}
+                </div>
+                <span style={{fontSize:10,color:C.muted,fontWeight:600}}>
+                  {fmt2(totals[totals.length-1]||0)} this month
+                </span>
+              </div>
+              {/* 4 bars side by side */}
+              <div style={{display:"flex",gap:4,alignItems:"flex-end",height:36}}>
+                {months.map((m,i)=>{
+                  const val=data[cat][m.key]||0;
+                  const h=val>0?Math.max(Math.round((val/catMax)*32),3):0;
                   return (
-                    <div key={cat} style={{
-                      width:"100%", height:barH,
-                      background: m.isCurrent ? cfg.color : `${cfg.color}70`,
-                      borderRadius: "3px 3px 0 0",
-                      transition:"height 0.4s",
-                    }} title={`${cat}: ${fmt2(val)}`} />
+                    <div key={m.key} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+                      <div style={{
+                        width:"100%",height:h||2,
+                        background:val>0?(m.isCurrent?cfg.color:`${cfg.color}55`):"#E5E7EB",
+                        borderRadius:"3px 3px 0 0",transition:"height 0.4s",
+                      }} title={`${m.label}: ${fmt(val)}`}/>
+                      <p style={{margin:0,fontSize:8,color:m.isCurrent?C.ink:C.muted,
+                                 fontWeight:m.isCurrent?700:400}}>{m.label}</p>
+                    </div>
                   );
                 })}
               </div>
-              {/* Month label */}
-              <p style={{ margin:0, fontSize:9, color:m.isCurrent?C.ink:C.muted, fontWeight:m.isCurrent?700:400, textAlign:"center" }}>
-                {m.label}
-              </p>
             </div>
           );
         })}
       </div>
-
-      {/* Legend */}
-      {!selectedCat && (
-        <div style={{ display:"flex", flexWrap:"wrap", gap:"4px 10px", justifyContent:"center", marginTop:10 }}>
-          {categories.map(cat => {
-            const cfg = CATEGORY_CONFIG[cat] || { icon:"💸", color:"#6B7280" };
-            return (
-              <div key={cat} style={{ display:"flex", alignItems:"center", gap:4 }}>
-                <div style={{ width:8, height:8, borderRadius:2, background:cfg.color }} />
-                <span style={{ fontSize:9, color:C.muted }}>{cat}</span>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
+    </Card>
   );
 }
