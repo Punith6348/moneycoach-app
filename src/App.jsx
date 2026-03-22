@@ -197,57 +197,61 @@ function SetupChecklist({ totalIncome, fixedExpenses, savingsPlans, onNavigate }
 }
 
 // ─── QUICK-ADD TEMPLATES ──────────────────────────────────────────────────────
-// Derives top 5 most-repeated expense entries from the last 60 days.
-// Shows as tappable chips above the log form — pre-fills form on tap.
+// Shows top 5 most-used categories from last 60 days as tappable chips.
+// Each chip pre-fills the category + average amount. No notes shown.
 function QuickAddTemplates({ allExpenses, onQuickAdd, disabled }) {
   const templates = useMemo(() => {
-    const now     = new Date();
-    const cutoff  = new Date(now - 60 * 24 * 60 * 60 * 1000);
-    const counts  = {};
+    const now    = new Date();
+    const cutoff = new Date(now - 60 * 24 * 60 * 60 * 1000);
+    const cats   = {};
     Object.values(allExpenses).flat().forEach(e => {
       if (new Date(e.date) < cutoff) return;
-      if (!e.note) return; // only entries with a note are useful as templates
-      const key = `${e.label}||${e.note}||${e.amount}`;
-      counts[key] = (counts[key] || { label:e.label, note:e.note, amount:e.amount, count:0 });
-      counts[key].count++;
+      if (!cats[e.label]) cats[e.label] = { label:e.label, total:0, count:0 };
+      cats[e.label].total  += e.amount;
+      cats[e.label].count  += 1;
     });
-    return Object.values(counts)
+    return Object.values(cats)
+      .map(c => ({ ...c, avg: Math.round(c.total / c.count) }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
   }, [allExpenses]);
 
   if (templates.length === 0 || disabled) return null;
 
-  const ICONS = { Food:"🍽",Travel:"🚗",Coffee:"☕",Grocery:"🛒",Medical:"💊",Entertainment:"🎬",Other:"💸" };
+  const ICONS = {
+    Food:"🍽", Travel:"🚗", Coffee:"☕", Grocery:"🛒", Medical:"💊",
+    Entertainment:"🎬", Other:"💸", Rent:"🏠", Electricity:"⚡",
+    Water:"💧", Internet:"📶", "EMI/Loan":"🏦", Insurance:"🛡",
+    "School Fees":"🎓", Maintenance:"🔧", Subscription:"📺", Gym:"💪", Mobile:"📱",
+  };
 
   return (
     <div style={{ marginBottom:10 }}>
       <p style={{ margin:"0 0 6px", fontSize:9, color:C.muted, fontWeight:700,
                   textTransform:"uppercase", letterSpacing:"0.8px" }}>
-        Quick Add
+        Quick Add · tap to pre-fill
       </p>
       <div style={{ display:"flex", gap:6, overflowX:"auto", scrollbarWidth:"none", paddingBottom:2 }}>
         {templates.map((t, i) => (
           <button key={i}
-            onClick={() => onQuickAdd({ amount:t.amount, label:t.label, note:t.note })}
+            onClick={() => onQuickAdd({ amount:t.avg, label:t.label, note:"" })}
             style={{
               flexShrink:0, display:"flex", alignItems:"center", gap:5,
-              padding:"5px 10px", borderRadius:99,
+              padding:"6px 12px", borderRadius:99,
               border:`1.5px solid ${C.border}`, background:"#fff",
               cursor:"pointer", fontFamily:"inherit",
               transition:"border-color 0.12s, background 0.12s",
             }}
             onMouseEnter={e => { e.currentTarget.style.borderColor=C.ink; e.currentTarget.style.background=C.bg; }}
             onMouseLeave={e => { e.currentTarget.style.borderColor=C.border; e.currentTarget.style.background="#fff"; }}
-            title={`Add ${t.label} · ${t.note} · ₹${t.amount}`}
           >
-            <span style={{ fontSize:13 }}>{ICONS[t.label] || "💸"}</span>
-            <span style={{ fontSize:11, fontWeight:600, color:C.ink }}>
-              {t.note.length > 14 ? t.note.slice(0,13)+"…" : t.note}
-            </span>
-            <span style={{ fontSize:10, color:C.muted, fontFamily:"Georgia,serif" }}>
-              ₹{Math.round(t.amount).toLocaleString("en-IN")}
-            </span>
+            <span style={{ fontSize:14 }}>{ICONS[t.label] || "💸"}</span>
+            <div style={{ textAlign:"left" }}>
+              <p style={{ margin:0, fontSize:11, fontWeight:700, color:C.ink, lineHeight:1.2 }}>{t.label}</p>
+              <p style={{ margin:0, fontSize:9, color:C.muted, fontFamily:"Georgia,serif" }}>
+                avg ₹{t.avg.toLocaleString("en-IN")} · {t.count}×
+              </p>
+            </div>
           </button>
         ))}
       </div>
