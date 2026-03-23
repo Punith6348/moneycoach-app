@@ -35,13 +35,15 @@ const groupByDate = (expenses) => {
   }));
 };
 
-// Fix #2: Only variable/daily categories in the log form.
-// Fixed expenses are managed exclusively in the Plan tab.
+// Daily expense categories (shown in log form)
 const VARIABLE_CATS = [{name:"Food",icon:"🍽"},{name:"Travel",icon:"🚗"},{name:"Coffee",icon:"☕"},{name:"Grocery",icon:"🛒"},{name:"Medical",icon:"💊"},{name:"Entertainment",icon:"🎬"},{name:"Other",icon:"💸"}];
+// Recurring/fixed categories (used in edit modal + recurring tab)
+const RECURRING_CATS = [{name:"Rent",icon:"🏠"},{name:"EMI/Loan",icon:"🏦"},{name:"Electricity",icon:"⚡"},{name:"Internet",icon:"📶"},{name:"Mobile",icon:"📱"},{name:"Insurance",icon:"🛡"},{name:"Subscription",icon:"📺"},{name:"Gym",icon:"💪"},{name:"School Fees",icon:"🎓"},{name:"Maintenance",icon:"🔧"},{name:"Water",icon:"💧"}];
+// ALL categories combined — used in EditModal so any expense can be edited correctly
+const ALL_CATS = [...VARIABLE_CATS, ...RECURRING_CATS];
 const NOTE_PLACEHOLDER = {Food:"e.g. Lunch at Zomato",Travel:"e.g. Auto to office",Coffee:"e.g. Starbucks coffee",Grocery:"e.g. Vegetables from market",Medical:"e.g. Pharmacy medicines",Entertainment:"e.g. Movie tickets",Other:"e.g. Misc expense"};
-// ICONS keeps fixed cats too so existing logged entries render correctly
-const FIXED_ICONS   = {Rent:"🏠",Electricity:"⚡",Water:"💧",Internet:"📶","EMI/Loan":"🏦",Insurance:"🛡",Maintenance:"🔧","School Fees":"🎓"};
-const ICONS         = {...Object.fromEntries(VARIABLE_CATS.map(c=>[c.name,c.icon])), ...FIXED_ICONS};
+const FIXED_ICONS   = {Rent:"🏠",Electricity:"⚡",Water:"💧",Internet:"📶","EMI/Loan":"🏦",Insurance:"🛡",Maintenance:"🔧","School Fees":"🎓",Mobile:"📱",Subscription:"📺",Gym:"💪"};
+const ICONS         = {...Object.fromEntries(ALL_CATS.map(c=>[c.name,c.icon])), ...FIXED_ICONS};
 const C = {ink:"#111827",muted:"#6B7280",border:"#E5E7EB",bg:"#F8FAFC",red:"#DC2626",green:"#16A34A",amber:"#D97706",blue:"#2563EB",purple:"#7C3AED"};
 
 // Responsive CSS injected once into <head> equivalent via a style tag in the app shell
@@ -346,7 +348,7 @@ function EditModal({expense,monthKey,onSave,onClose}) {
           style={{width:"100%",padding:"10px 12px",borderRadius:8,border:`1.5px solid ${C.border}`,fontFamily:"Georgia,serif",fontSize:20,background:C.bg,outline:"none",marginTop:6,marginBottom:12,boxSizing:"border-box"}} />
         <Label>Category</Label>
         <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:6,marginBottom:12}}>
-          {VARIABLE_CATS.map(c=><button key={c.name} onClick={()=>setLabel(c.name)} style={{padding:"5px 11px",borderRadius:99,border:`1.5px solid ${label===c.name?C.ink:C.border}`,background:label===c.name?C.ink:"#fff",color:label===c.name?"#fff":C.ink,fontSize:11,fontFamily:"inherit",fontWeight:600,cursor:"pointer"}}>{c.icon} {c.name}</button>)}
+          {ALL_CATS.map(c=><button key={c.name} onClick={()=>setLabel(c.name)} style={{padding:"5px 11px",borderRadius:99,border:`1.5px solid ${label===c.name?C.ink:C.border}`,background:label===c.name?C.ink:"#fff",color:label===c.name?"#fff":C.ink,fontSize:11,fontFamily:"inherit",fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}}>{c.icon} {c.name}</button>)}
         </div>
         <Label>Date *</Label>
         <input type="date" value={date} max={new Date().toISOString().split("T")[0]}
@@ -635,6 +637,7 @@ function LogExpenseForm({onAdd, disabled, currentExpenses=[], dailyLimit=0}) {
   const [label,setLabel]=useState("Food");
   const [note,setNote]=useState("");
   const [err,setErr]=useState("");
+  const [saved,setSaved]=useState(false);
 
   const todayStr   = new Date().toISOString().split("T")[0];
   const todaySpent = currentExpenses.filter(e=>e.date.startsWith(todayStr)).reduce((s,e)=>s+e.amount,0);
@@ -650,6 +653,8 @@ function LogExpenseForm({onAdd, disabled, currentExpenses=[], dailyLimit=0}) {
     onAdd({amount:v,label,note:note.trim()});
     setAmount("");
     setNote("");
+    setSaved(true);
+    setTimeout(()=>setSaved(false), 1500);
   };
 
   const chip=(cat)=><button key={cat.name} onClick={()=>!disabled&&setLabel(cat.name)} disabled={disabled}
@@ -681,7 +686,14 @@ function LogExpenseForm({onAdd, disabled, currentExpenses=[], dailyLimit=0}) {
           </p>
         </div>
       )}
-      <button onClick={submit} disabled={disabled} style={{width:"100%",padding:"10px",borderRadius:10,background:C.ink,color:"#fff",border:"none",fontSize:14,fontFamily:"inherit",fontWeight:700,cursor:"pointer",opacity:disabled?0.5:1}}>Save Expense ✓</button>
+      <button onClick={()=>{submit();}} disabled={disabled}
+        style={{width:"100%",padding:"10px",borderRadius:10,
+                background:saved?"#16A34A":C.ink,
+                color:"#fff",border:"none",fontSize:14,fontFamily:"inherit",
+                fontWeight:700,cursor:"pointer",opacity:disabled?0.5:1,
+                transition:"background 0.2s"}}>
+        {saved ? "✓ Saved!" : "Save Expense ✓"}
+      </button>
     </div>
   );
 }
@@ -715,7 +727,7 @@ function RecurringTab({ recurringExpenses, allExpenses, onAdd, onUpdate, onDelet
   const ordinal = (d) => { const s=["th","st","nd","rd"]; const v=d%100; return d+(s[(v-20)%10]||s[v]||s[0]); };
   const inp2 = { width:"100%", padding:"9px 11px", borderRadius:8, border:`1px solid ${C.border}`, fontFamily:"inherit", fontSize:13, background:"#fff", outline:"none", boxSizing:"border-box" };
 
-  const openNew  = () => { setFLabel(""); setFCat("Food"); setFAmt(""); setFDay(1); setFNote(""); setEditId(null); setShowForm(true); };
+  const openNew  = () => { setFLabel(""); setFCat("Rent"); setFAmt(""); setFDay(1); setFNote(""); setEditId(null); setShowForm(true); };
   const openEdit = (r) => { setFLabel(r.label); setFCat(r.category); setFAmt(String(r.amount)); setFDay(r.dayOfMonth); setFNote(r.note||""); setEditId(r.id); setShowForm(true); };
   const cancel   = () => { setShowForm(false); setEditId(null); };
 
@@ -1224,7 +1236,7 @@ function DashboardScreen(props) {
             <div className="mc-plan-top">
               <div>
                 <IncomeSources sources={incomeSources} totalIncome={totalIncome}
-                  onAdd={src=>{addIncomeSource(src);showToast("Income source saved ✓");}}
+                  onAdd={src=>{if(!src.amount||src.amount<=0){showToast("⚠ Enter a valid amount");return;}addIncomeSource(src);showToast("Income source saved ✓");}}
                   onUpdate={(id,upd)=>{updateIncomeSource(id,upd);showToast("Income updated ✓");}}
                   onDelete={deleteIncomeSource}/>
               </div>
