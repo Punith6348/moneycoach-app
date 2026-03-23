@@ -480,92 +480,75 @@ function DateFilter({ expenses, onFiltered, monthKey }) {
   const yest    = new Date(); yest.setDate(yest.getDate()-1);
   const yestStr = yest.toISOString().split("T")[0];
 
-  const [active,     setActive]     = useState("today");
-  const [customDate, setCustomDate] = useState(today);
-  const [showCal,    setShowCal]    = useState(false);
+  const [mode, setMode]           = useState("today");   // "today"|"yesterday"|"calendar"
+  const [selDate, setSelDate]     = useState(today);
+  const [showCal, setShowCal]     = useState(false);
 
-  // Days that have expenses
-  const datesWithData = useMemo(() =>
-    new Set(expenses.map(e=>e.date.split("T")[0])), [expenses]
-  );
+  const datesWithData = useMemo(()=>
+    new Set(expenses.map(e=>e.date.split("T")[0])), [expenses]);
 
-  useEffect(() => {
-    let filtered;
-    if      (active==="today")     filtered = expenses.filter(e=>e.date.startsWith(today));
-    else if (active==="yesterday") filtered = expenses.filter(e=>e.date.startsWith(yestStr));
-    else if (active==="custom")    filtered = expenses.filter(e=>e.date.startsWith(customDate));
-    onFiltered(filtered);
-  }, [active, customDate, expenses]);
+  useEffect(()=>{
+    if      (mode==="today")     onFiltered(expenses.filter(e=>e.date.startsWith(today)));
+    else if (mode==="yesterday") onFiltered(expenses.filter(e=>e.date.startsWith(yestStr)));
+    else                         onFiltered(expenses.filter(e=>e.date.startsWith(selDate)));
+  },[mode, selDate, expenses]);
 
-  // Calendar grid
-  const CalendarGrid = () => {
+  // Display label for dropdown header
+  const headerLabel =
+    mode==="today"     ? "Today" :
+    mode==="yesterday" ? "Yesterday" :
+    new Date(selDate+"T12:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"});
+
+  // ── Inline Calendar Grid ──────────────────────────────────────────────────
+  if (showCal) {
     const [year, mon] = monthKey.split("-").map(Number);
-    const firstDay    = new Date(year, mon-1, 1).getDay(); // 0=Sun
-    const daysInMonth = new Date(year, mon, 0).getDate();
-    const weeks       = [];
-    let   cells       = Array(firstDay).fill(null);
-    for (let d=1; d<=daysInMonth; d++) cells.push(d);
-    while (cells.length % 7 !== 0) cells.push(null);
-    for (let i=0; i<cells.length; i+=7) weeks.push(cells.slice(i,i+7));
-
-    const DAY_LABELS = ["Su","Mo","Tu","We","Th","Fr","Sa"];
+    const firstDay    = new Date(year,mon-1,1).getDay();
+    const daysInMonth = new Date(year,mon,0).getDate();
+    let cells = Array(firstDay).fill(null);
+    for(let d=1;d<=daysInMonth;d++) cells.push(d);
+    while(cells.length%7!==0) cells.push(null);
+    const weeks=[];
+    for(let i=0;i<cells.length;i+=7) weeks.push(cells.slice(i,i+7));
+    const DAY_HDRS=["Su","Mo","Tu","We","Th","Fr","Sa"];
 
     return (
-      <div style={{
-        background:"#fff", borderRadius:14, border:`1px solid ${C.border}`,
-        boxShadow:"0 4px 20px rgba(0,0,0,0.10)", padding:"14px",
-        marginBottom:10,
-      }}>
-        {/* Month label + close */}
+      <div style={{background:"#fff",borderRadius:14,border:`1px solid ${C.border}`,
+                   boxShadow:"0 4px 20px rgba(0,0,0,0.10)",padding:"14px",marginBottom:12}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
           <p style={{margin:0,fontSize:13,fontWeight:700,color:C.ink}}>
             {new Date(year,mon-1,1).toLocaleDateString("en-IN",{month:"long",year:"numeric"})}
           </p>
-          <button onClick={()=>setShowCal(false)} style={{
-            background:"none",border:"none",fontSize:18,cursor:"pointer",color:C.muted,lineHeight:1,padding:4,
-          }}>✕</button>
+          <button onClick={()=>setShowCal(false)} style={{background:"none",border:"none",
+            fontSize:20,cursor:"pointer",color:C.muted,lineHeight:1,padding:4}}>✕</button>
         </div>
-
-        {/* Day headers */}
-        <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",marginBottom:4}}>
-          {DAY_LABELS.map(d=>(
+        <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",marginBottom:6}}>
+          {DAY_HDRS.map(d=>(
             <p key={d} style={{margin:0,textAlign:"center",fontSize:10,fontWeight:700,color:C.muted}}>{d}</p>
           ))}
         </div>
-
-        {/* Weeks */}
         {weeks.map((week,wi)=>(
           <div key={wi} style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,marginBottom:2}}>
             {week.map((d,di)=>{
-              if (!d) return <div key={di}/>;
-              const dateStr = `${monthKey}-${String(d).padStart(2,"0")}`;
-              const hasData = datesWithData.has(dateStr);
-              const isToday = dateStr===today;
-              const isSel   = dateStr===customDate && active==="custom";
-              const isFuture= dateStr>today;
+              if(!d) return <div key={di}/>;
+              const ds=`${monthKey}-${String(d).padStart(2,"0")}`;
+              const has=datesWithData.has(ds);
+              const isT=ds===today, isSel=ds===selDate&&mode==="calendar", isFut=ds>today;
               return (
                 <button key={di} onClick={()=>{
-                  if(isFuture||!hasData) return;
-                  setCustomDate(dateStr);
-                  setActive("custom");
-                  setShowCal(false);
+                  if(isFut||!has) return;
+                  setSelDate(ds); setMode("calendar"); setShowCal(false);
                 }} style={{
-                  position:"relative",
-                  padding:"6px 2px",borderRadius:8,
-                  border:`1.5px solid ${isSel?C.ink:isToday?"#93C5FD":"transparent"}`,
-                  background: isSel?C.ink : isToday?"#EFF6FF" : "transparent",
-                  color: isSel?"#fff" : isFuture?"#D1D5DB" : hasData?C.ink:C.muted,
-                  fontFamily:"inherit",fontSize:12,fontWeight:hasData?700:400,
-                  cursor:isFuture||!hasData?"default":"pointer",
-                  textAlign:"center",
+                  position:"relative",padding:"7px 2px",borderRadius:8,textAlign:"center",
+                  border:`1.5px solid ${isSel?C.ink:isT?"#93C5FD":"transparent"}`,
+                  background:isSel?C.ink:isT?"#EFF6FF":"transparent",
+                  color:isSel?"#fff":isFut?"#D1D5DB":has?C.ink:"#CBD5E1",
+                  fontFamily:"inherit",fontSize:12,fontWeight:has?700:400,
+                  cursor:isFut||!has?"default":"pointer",
                 }}>
                   {d}
-                  {/* Dot indicator for days with data */}
-                  {hasData&&!isSel&&(
-                    <span style={{
-                      position:"absolute",bottom:2,left:"50%",transform:"translateX(-50%)",
-                      width:4,height:4,borderRadius:"50%",background:C.blue,display:"block",
-                    }}/>
+                  {has&&!isSel&&(
+                    <span style={{position:"absolute",bottom:2,left:"50%",transform:"translateX(-50%)",
+                      width:4,height:4,borderRadius:"50%",background:C.blue,display:"block"}}/>
                   )}
                 </button>
               );
@@ -573,66 +556,75 @@ function DateFilter({ expenses, onFiltered, monthKey }) {
           </div>
         ))}
         <p style={{margin:"8px 0 0",fontSize:10,color:C.muted,textAlign:"center"}}>
-          Tap a date with <span style={{color:C.blue}}>●</span> to view expenses
+          Bold dates with <span style={{color:C.blue}}>●</span> have expenses
         </p>
-      </div>
-    );
-  };
-
-  // Show calendar overlay
-  if (showCal) return <CalendarGrid/>;
-
-  // Custom date selected — show summary + back button
-  if (active === "custom") {
-    const dayExp   = expenses.filter(e=>e.date.startsWith(customDate));
-    const dayTotal = dayExp.reduce((s,e)=>s+e.amount,0);
-    return (
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,
-                   padding:"8px 12px",borderRadius:10,background:"#EFF6FF",border:`1px solid #BFDBFE`}}>
-        <div>
-          <p style={{margin:0,fontSize:12,fontWeight:700,color:C.ink}}>
-            📅 {new Date(customDate+"T12:00:00").toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"})}
-          </p>
-          <p style={{margin:0,fontSize:10,color:C.muted}}>
-            {dayExp.length} expense{dayExp.length!==1?"s":""}{dayExp.length>0?` · ${fmt(dayTotal)}`:""}
-          </p>
-        </div>
-        <div style={{display:"flex",gap:6}}>
-          <button onClick={()=>setShowCal(true)} style={{
-            padding:"5px 10px",borderRadius:8,border:`1px solid ${C.border}`,
-            background:"#fff",color:C.ink,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"inherit",
-          }}>Change</button>
-          <button onClick={()=>setActive("today")} style={{
-            padding:"5px 10px",borderRadius:8,border:`1px solid ${C.border}`,
-            background:"#fff",color:C.muted,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"inherit",
-          }}>✕</button>
-        </div>
       </div>
     );
   }
 
-  // Default: Today / Yesterday / Calendar
+  // ── Dropdown selector ─────────────────────────────────────────────────────
+  const [open, setOpen] = useState(false);
+  const dropRef = useRef(null);
+  useEffect(()=>{
+    if(!open) return;
+    const h=(e)=>{if(dropRef.current&&!dropRef.current.contains(e.target))setOpen(false);};
+    document.addEventListener("mousedown",h);
+    document.addEventListener("touchstart",h);
+    return()=>{document.removeEventListener("mousedown",h);document.removeEventListener("touchstart",h);};
+  },[open]);
+
   return (
-    <div style={{display:"flex",gap:6,marginBottom:12}}>
-      {[
-        {key:"today",    label:"Today"},
-        {key:"yesterday",label:"Yesterday"},
-      ].map(({key,label})=>(
-        <button key={key} onClick={()=>setActive(key)} style={{
-          padding:"7px 14px",borderRadius:99,fontSize:12,fontWeight:600,
-          cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap",
-          border:`1.5px solid ${active===key?C.ink:C.border}`,
-          background:active===key?C.ink:"#fff",
-          color:active===key?"#fff":C.muted,
-          transition:"all 0.12s",
-        }}>{label}</button>
-      ))}
-      <button onClick={()=>setShowCal(true)} style={{
-        padding:"7px 14px",borderRadius:99,fontSize:12,fontWeight:600,
-        cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap",
-        border:`1.5px solid ${C.border}`,background:"#fff",color:C.muted,
-        transition:"all 0.12s",
-      }}>📅 Calendar</button>
+    <div ref={dropRef} style={{position:"relative",marginBottom:12}}>
+      {/* Selector button */}
+      <button onClick={()=>setOpen(p=>!p)} style={{
+        display:"flex",alignItems:"center",gap:6,
+        padding:"8px 14px",borderRadius:10,
+        border:`1.5px solid ${open?C.ink:C.border}`,
+        background:"#fff",cursor:"pointer",fontFamily:"inherit",
+        boxShadow:"0 1px 3px rgba(0,0,0,0.06)",
+      }}>
+        <span style={{fontSize:13,fontWeight:700,color:C.ink}}>{headerLabel}</span>
+        <span style={{fontSize:10,color:C.muted,marginLeft:2}}>{open?"▲":"▼"}</span>
+      </button>
+
+      {/* Dropdown */}
+      {open&&(
+        <div style={{
+          position:"absolute",top:"calc(100% + 4px)",left:0,zIndex:999,
+          background:"#fff",borderRadius:12,border:`1px solid ${C.border}`,
+          boxShadow:"0 8px 24px rgba(0,0,0,0.12)",
+          minWidth:180,overflow:"hidden",
+        }}>
+          {[
+            {key:"today",    icon:"☀️", label:"Today"},
+            {key:"yesterday",icon:"🕐", label:"Yesterday"},
+          ].map(({key,icon,label})=>(
+            <button key={key} onClick={()=>{setMode(key);setOpen(false);}} style={{
+              display:"flex",alignItems:"center",gap:10,width:"100%",
+              padding:"12px 16px",background:mode===key?"#F8FAFC":"none",
+              border:"none",textAlign:"left",cursor:"pointer",fontFamily:"inherit",
+              borderBottom:`1px solid ${C.bg}`,
+            }}>
+              <span style={{fontSize:16}}>{icon}</span>
+              <span style={{fontSize:13,fontWeight:mode===key?700:500,color:C.ink}}>{label}</span>
+              {mode===key&&<span style={{marginLeft:"auto",fontSize:12,color:C.blue}}>✓</span>}
+            </button>
+          ))}
+          <button onClick={()=>{setOpen(false);setShowCal(true);}} style={{
+            display:"flex",alignItems:"center",gap:10,width:"100%",
+            padding:"12px 16px",background:mode==="calendar"?"#F8FAFC":"none",
+            border:"none",textAlign:"left",cursor:"pointer",fontFamily:"inherit",
+          }}>
+            <span style={{fontSize:16}}>📅</span>
+            <span style={{fontSize:13,fontWeight:mode==="calendar"?700:500,color:C.ink}}>
+              {mode==="calendar"
+                ? new Date(selDate+"T12:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short"})
+                : "Select Date"}
+            </span>
+            {mode==="calendar"&&<span style={{marginLeft:"auto",fontSize:12,color:C.blue}}>✓</span>}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
