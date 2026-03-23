@@ -482,10 +482,11 @@ function DateFilter({ expenses, onFiltered, monthKey }) {
 
   const [active,     setActive]     = useState("today");
   const [customDate, setCustomDate] = useState(today);
+  const [showCal,    setShowCal]    = useState(false);
 
+  // Days that have expenses
   const datesWithData = useMemo(() =>
-    [...new Set(expenses.map(e=>e.date.split("T")[0]))].sort((a,b)=>b.localeCompare(a)),
-    [expenses]
+    new Set(expenses.map(e=>e.date.split("T")[0])), [expenses]
   );
 
   useEffect(() => {
@@ -493,60 +494,124 @@ function DateFilter({ expenses, onFiltered, monthKey }) {
     if      (active==="today")     filtered = expenses.filter(e=>e.date.startsWith(today));
     else if (active==="yesterday") filtered = expenses.filter(e=>e.date.startsWith(yestStr));
     else if (active==="custom")    filtered = expenses.filter(e=>e.date.startsWith(customDate));
-    else                           filtered = expenses;
     onFiltered(filtered);
   }, [active, customDate, expenses]);
 
-  if (active === "custom") {
-    const dayExp   = expenses.filter(e=>e.date.startsWith(customDate));
-    const dayTotal = dayExp.reduce((s,e)=>s+e.amount, 0);
+  // Calendar grid
+  const CalendarGrid = () => {
+    const [year, mon] = monthKey.split("-").map(Number);
+    const firstDay    = new Date(year, mon-1, 1).getDay(); // 0=Sun
+    const daysInMonth = new Date(year, mon, 0).getDate();
+    const weeks       = [];
+    let   cells       = Array(firstDay).fill(null);
+    for (let d=1; d<=daysInMonth; d++) cells.push(d);
+    while (cells.length % 7 !== 0) cells.push(null);
+    for (let i=0; i<cells.length; i+=7) weeks.push(cells.slice(i,i+7));
+
+    const DAY_LABELS = ["Su","Mo","Tu","We","Th","Fr","Sa"];
+
     return (
-      <div style={{marginBottom:12}}>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-          <p style={{margin:0,fontSize:11,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:"0.8px"}}>
-            Select a date
+      <div style={{
+        background:"#fff", borderRadius:14, border:`1px solid ${C.border}`,
+        boxShadow:"0 4px 20px rgba(0,0,0,0.10)", padding:"14px",
+        marginBottom:10,
+      }}>
+        {/* Month label + close */}
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+          <p style={{margin:0,fontSize:13,fontWeight:700,color:C.ink}}>
+            {new Date(year,mon-1,1).toLocaleDateString("en-IN",{month:"long",year:"numeric"})}
           </p>
-          <button onClick={()=>setActive("today")} style={{
-            padding:"4px 10px",borderRadius:99,fontSize:11,fontWeight:600,
-            cursor:"pointer",fontFamily:"inherit",
-            border:`1px solid ${C.border}`,background:"#fff",color:C.muted,
-          }}>✕ Close</button>
+          <button onClick={()=>setShowCal(false)} style={{
+            background:"none",border:"none",fontSize:18,cursor:"pointer",color:C.muted,lineHeight:1,padding:4,
+          }}>✕</button>
         </div>
-        {datesWithData.length > 0 ? (
-          <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
-            {datesWithData.map(d => {
-              const label = d===today ? "Today"
-                : d===yestStr ? "Yesterday"
-                : new Date(d+"T12:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short"});
-              const isAct = customDate===d;
-              const cnt = expenses.filter(e=>e.date.startsWith(d)).length;
+
+        {/* Day headers */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",marginBottom:4}}>
+          {DAY_LABELS.map(d=>(
+            <p key={d} style={{margin:0,textAlign:"center",fontSize:10,fontWeight:700,color:C.muted}}>{d}</p>
+          ))}
+        </div>
+
+        {/* Weeks */}
+        {weeks.map((week,wi)=>(
+          <div key={wi} style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,marginBottom:2}}>
+            {week.map((d,di)=>{
+              if (!d) return <div key={di}/>;
+              const dateStr = `${monthKey}-${String(d).padStart(2,"0")}`;
+              const hasData = datesWithData.has(dateStr);
+              const isToday = dateStr===today;
+              const isSel   = dateStr===customDate && active==="custom";
+              const isFuture= dateStr>today;
               return (
-                <button key={d} onClick={()=>setCustomDate(d)} style={{
-                  padding:"7px 12px",borderRadius:10,fontSize:12,fontWeight:600,
-                  cursor:"pointer",fontFamily:"inherit",textAlign:"center",
-                  border:`1.5px solid ${isAct?C.ink:C.border}`,
-                  background:isAct?C.ink:"#fff",color:isAct?"#fff":C.ink,
+                <button key={di} onClick={()=>{
+                  if(isFuture||!hasData) return;
+                  setCustomDate(dateStr);
+                  setActive("custom");
+                  setShowCal(false);
+                }} style={{
+                  position:"relative",
+                  padding:"6px 2px",borderRadius:8,
+                  border:`1.5px solid ${isSel?C.ink:isToday?"#93C5FD":"transparent"}`,
+                  background: isSel?C.ink : isToday?"#EFF6FF" : "transparent",
+                  color: isSel?"#fff" : isFuture?"#D1D5DB" : hasData?C.ink:C.muted,
+                  fontFamily:"inherit",fontSize:12,fontWeight:hasData?700:400,
+                  cursor:isFuture||!hasData?"default":"pointer",
+                  textAlign:"center",
                 }}>
-                  <p style={{margin:0,fontSize:12,fontWeight:700}}>{label}</p>
-                  <p style={{margin:"1px 0 0",fontSize:9,color:isAct?"rgba(255,255,255,0.7)":C.muted}}>
-                    {cnt} item{cnt!==1?"s":""}
-                  </p>
+                  {d}
+                  {/* Dot indicator for days with data */}
+                  {hasData&&!isSel&&(
+                    <span style={{
+                      position:"absolute",bottom:2,left:"50%",transform:"translateX(-50%)",
+                      width:4,height:4,borderRadius:"50%",background:C.blue,display:"block",
+                    }}/>
+                  )}
                 </button>
               );
             })}
           </div>
-        ) : (
-          <p style={{fontSize:12,color:C.muted,margin:"0 0 8px"}}>No expenses logged this month yet.</p>
-        )}
-        {dayExp.length > 0 && (
-          <p style={{margin:0,fontSize:11,color:C.muted,paddingTop:6,borderTop:`1px solid ${C.bg}`}}>
-            {new Date(customDate+"T12:00:00").toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"long"})} · {fmt(dayTotal)}
+        ))}
+        <p style={{margin:"8px 0 0",fontSize:10,color:C.muted,textAlign:"center"}}>
+          Tap a date with <span style={{color:C.blue}}>●</span> to view expenses
+        </p>
+      </div>
+    );
+  };
+
+  // Show calendar overlay
+  if (showCal) return <CalendarGrid/>;
+
+  // Custom date selected — show summary + back button
+  if (active === "custom") {
+    const dayExp   = expenses.filter(e=>e.date.startsWith(customDate));
+    const dayTotal = dayExp.reduce((s,e)=>s+e.amount,0);
+    return (
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,
+                   padding:"8px 12px",borderRadius:10,background:"#EFF6FF",border:`1px solid #BFDBFE`}}>
+        <div>
+          <p style={{margin:0,fontSize:12,fontWeight:700,color:C.ink}}>
+            📅 {new Date(customDate+"T12:00:00").toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"})}
           </p>
-        )}
+          <p style={{margin:0,fontSize:10,color:C.muted}}>
+            {dayExp.length} expense{dayExp.length!==1?"s":""}{dayExp.length>0?` · ${fmt(dayTotal)}`:""}
+          </p>
+        </div>
+        <div style={{display:"flex",gap:6}}>
+          <button onClick={()=>setShowCal(true)} style={{
+            padding:"5px 10px",borderRadius:8,border:`1px solid ${C.border}`,
+            background:"#fff",color:C.ink,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"inherit",
+          }}>Change</button>
+          <button onClick={()=>setActive("today")} style={{
+            padding:"5px 10px",borderRadius:8,border:`1px solid ${C.border}`,
+            background:"#fff",color:C.muted,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"inherit",
+          }}>✕</button>
+        </div>
       </div>
     );
   }
 
+  // Default: Today / Yesterday / Calendar
   return (
     <div style={{display:"flex",gap:6,marginBottom:12}}>
       {[
@@ -562,12 +627,12 @@ function DateFilter({ expenses, onFiltered, monthKey }) {
           transition:"all 0.12s",
         }}>{label}</button>
       ))}
-      <button onClick={()=>setActive("custom")} style={{
+      <button onClick={()=>setShowCal(true)} style={{
         padding:"7px 14px",borderRadius:99,fontSize:12,fontWeight:600,
         cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap",
         border:`1.5px solid ${C.border}`,background:"#fff",color:C.muted,
         transition:"all 0.12s",
-      }}>📅 Pick Date</button>
+      }}>📅 Calendar</button>
     </div>
   );
 }
