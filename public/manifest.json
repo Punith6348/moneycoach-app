@@ -1,4 +1,5 @@
 {
+  "id": "com.turingsxyz.moneycoach",
   "name": "Money Coach",
   "short_name": "Money Coach",
   "description": "Personal finance tracker for daily spending, savings, loans and budgets",
@@ -8,6 +9,7 @@
   "orientation": "portrait-primary",
   "background_color": "#1E293B",
   "theme_color": "#1E293B",
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/icon-192.png",
@@ -26,6 +28,15 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Money Coach Dashboard"
     }
   ],
   "categories": ["finance", "productivity"],
