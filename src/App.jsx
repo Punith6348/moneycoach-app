@@ -480,9 +480,12 @@ function DateFilter({ expenses, onFiltered, monthKey }) {
   const yest    = new Date(); yest.setDate(yest.getDate()-1);
   const yestStr = yest.toISOString().split("T")[0];
 
-  const [mode, setMode]           = useState("today");   // "today"|"yesterday"|"calendar"
-  const [selDate, setSelDate]     = useState(today);
-  const [showCal, setShowCal]     = useState(false);
+  // ── ALL hooks at top — no hooks after any conditional return ──
+  const [mode,    setMode]    = useState("today");
+  const [selDate, setSelDate] = useState(today);
+  const [showCal, setShowCal] = useState(false);
+  const [open,    setOpen]    = useState(false);
+  const dropRef               = useRef(null);
 
   const datesWithData = useMemo(()=>
     new Set(expenses.map(e=>e.date.split("T")[0])), [expenses]);
@@ -493,24 +496,29 @@ function DateFilter({ expenses, onFiltered, monthKey }) {
     else                         onFiltered(expenses.filter(e=>e.date.startsWith(selDate)));
   },[mode, selDate, expenses]);
 
-  // Display label for dropdown header
+  useEffect(()=>{
+    if(!open) return;
+    const h=(e)=>{ if(dropRef.current&&!dropRef.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", h);
+    document.addEventListener("touchstart", h);
+    return()=>{ document.removeEventListener("mousedown",h); document.removeEventListener("touchstart",h); };
+  },[open]);
+
   const headerLabel =
     mode==="today"     ? "Today" :
     mode==="yesterday" ? "Yesterday" :
     new Date(selDate+"T12:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"});
 
-  // ── Inline Calendar Grid ──────────────────────────────────────────────────
-  if (showCal) {
+  // ── Calendar grid (rendered when showCal=true) ───────────────────────────
+  const renderCalendar = () => {
     const [year, mon] = monthKey.split("-").map(Number);
     const firstDay    = new Date(year,mon-1,1).getDay();
     const daysInMonth = new Date(year,mon,0).getDate();
     let cells = Array(firstDay).fill(null);
     for(let d=1;d<=daysInMonth;d++) cells.push(d);
     while(cells.length%7!==0) cells.push(null);
-    const weeks=[];
-    for(let i=0;i<cells.length;i+=7) weeks.push(cells.slice(i,i+7));
+    const weeks=[]; for(let i=0;i<cells.length;i+=7) weeks.push(cells.slice(i,i+7));
     const DAY_HDRS=["Su","Mo","Tu","We","Th","Fr","Sa"];
-
     return (
       <div style={{background:"#fff",borderRadius:14,border:`1px solid ${C.border}`,
                    boxShadow:"0 4px 20px rgba(0,0,0,0.10)",padding:"14px",marginBottom:12}}>
@@ -560,28 +568,18 @@ function DateFilter({ expenses, onFiltered, monthKey }) {
         </p>
       </div>
     );
-  }
+  };
 
-  // ── Dropdown selector ─────────────────────────────────────────────────────
-  const [open, setOpen] = useState(false);
-  const dropRef = useRef(null);
-  useEffect(()=>{
-    if(!open) return;
-    const h=(e)=>{if(dropRef.current&&!dropRef.current.contains(e.target))setOpen(false);};
-    document.addEventListener("mousedown",h);
-    document.addEventListener("touchstart",h);
-    return()=>{document.removeEventListener("mousedown",h);document.removeEventListener("touchstart",h);};
-  },[open]);
+  // ── Render ────────────────────────────────────────────────────────────────
+  if (showCal) return renderCalendar();
 
   return (
     <div ref={dropRef} style={{position:"relative",marginBottom:12}}>
       {/* Selector button */}
       <button onClick={()=>setOpen(p=>!p)} style={{
-        display:"flex",alignItems:"center",gap:6,
-        padding:"8px 14px",borderRadius:10,
-        border:`1.5px solid ${open?C.ink:C.border}`,
-        background:"#fff",cursor:"pointer",fontFamily:"inherit",
-        boxShadow:"0 1px 3px rgba(0,0,0,0.06)",
+        display:"flex",alignItems:"center",gap:6,padding:"8px 14px",borderRadius:10,
+        border:`1.5px solid ${open?C.ink:C.border}`,background:"#fff",
+        cursor:"pointer",fontFamily:"inherit",boxShadow:"0 1px 3px rgba(0,0,0,0.06)",
       }}>
         <span style={{fontSize:13,fontWeight:700,color:C.ink}}>{headerLabel}</span>
         <span style={{fontSize:10,color:C.muted,marginLeft:2}}>{open?"▲":"▼"}</span>
@@ -592,18 +590,16 @@ function DateFilter({ expenses, onFiltered, monthKey }) {
         <div style={{
           position:"absolute",top:"calc(100% + 4px)",left:0,zIndex:999,
           background:"#fff",borderRadius:12,border:`1px solid ${C.border}`,
-          boxShadow:"0 8px 24px rgba(0,0,0,0.12)",
-          minWidth:180,overflow:"hidden",
+          boxShadow:"0 8px 24px rgba(0,0,0,0.12)",minWidth:180,overflow:"hidden",
         }}>
           {[
             {key:"today",    icon:"☀️", label:"Today"},
             {key:"yesterday",icon:"🕐", label:"Yesterday"},
           ].map(({key,icon,label})=>(
             <button key={key} onClick={()=>{setMode(key);setOpen(false);}} style={{
-              display:"flex",alignItems:"center",gap:10,width:"100%",
-              padding:"12px 16px",background:mode===key?"#F8FAFC":"none",
-              border:"none",textAlign:"left",cursor:"pointer",fontFamily:"inherit",
-              borderBottom:`1px solid ${C.bg}`,
+              display:"flex",alignItems:"center",gap:10,width:"100%",padding:"12px 16px",
+              background:mode===key?"#F8FAFC":"none",border:"none",borderBottom:`1px solid ${C.bg}`,
+              textAlign:"left",cursor:"pointer",fontFamily:"inherit",
             }}>
               <span style={{fontSize:16}}>{icon}</span>
               <span style={{fontSize:13,fontWeight:mode===key?700:500,color:C.ink}}>{label}</span>
@@ -611,9 +607,9 @@ function DateFilter({ expenses, onFiltered, monthKey }) {
             </button>
           ))}
           <button onClick={()=>{setOpen(false);setShowCal(true);}} style={{
-            display:"flex",alignItems:"center",gap:10,width:"100%",
-            padding:"12px 16px",background:mode==="calendar"?"#F8FAFC":"none",
-            border:"none",textAlign:"left",cursor:"pointer",fontFamily:"inherit",
+            display:"flex",alignItems:"center",gap:10,width:"100%",padding:"12px 16px",
+            background:mode==="calendar"?"#F8FAFC":"none",border:"none",
+            textAlign:"left",cursor:"pointer",fontFamily:"inherit",
           }}>
             <span style={{fontSize:16}}>📅</span>
             <span style={{fontSize:13,fontWeight:mode==="calendar"?700:500,color:C.ink}}>
