@@ -12,7 +12,7 @@ const C = {
 };
 const STORAGE_KEY = "moneyCoachData_v3";
 
-// ── Export ────────────────────────────────────────────────────────────────────
+// ── Export JSON ───────────────────────────────────────────────────────────────
 function exportData() {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) return false;
@@ -25,6 +25,38 @@ function exportData() {
   a.click();
   URL.revokeObjectURL(url);
   return true;
+}
+
+// ── Export CSV ────────────────────────────────────────────────────────────────
+function exportCSV() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw) return false;
+  try {
+    const data = JSON.parse(raw);
+    const allExp = data.allExpenses || {};
+    const rows = [["Date","Month","Category","Note","Amount (₹)"]];
+    Object.entries(allExp)
+      .sort((a,b)=>b[0].localeCompare(a[0]))
+      .forEach(([monthKey, expenses]) => {
+        const monthLabel = new Date(monthKey+"-01").toLocaleDateString("en-IN",{month:"long",year:"numeric"});
+        (expenses||[])
+          .sort((a,b)=>new Date(b.date)-new Date(a.date))
+          .forEach(e => {
+            const d = new Date(e.date).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"});
+            rows.push([d, monthLabel, e.label, e.note||"", e.amount]);
+          });
+      });
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
+    const date = new Date().toISOString().split("T")[0];
+    const blob = new Blob(["\uFEFF"+csv], { type:"text/csv;charset=utf-8;" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = `moneycoach-expenses-${date}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    return true;
+  } catch { return false; }
 }
 
 // ── Import ────────────────────────────────────────────────────────────────────
@@ -88,9 +120,10 @@ function Btn({ label, onClick, variant = "default" }) {
 // ══════════════════════════════════════════════════════════════════════════════
 // MAIN EXPORT
 // ══════════════════════════════════════════════════════════════════════════════
-export default function SettingsPanel({ name, onClose, onResetAll, onNameChange }) {
-  const [importStatus, setImportStatus] = useState(null); // null | "success" | string(error)
+export default function SettingsPanel({ name, onClose, onResetAll, onNameChange, darkMode = false, onToggleDark }) {
+  const [importStatus, setImportStatus] = useState(null);
   const [exportDone,   setExportDone]   = useState(false);
+  const [csvDone,      setCsvDone]      = useState(false);
   const [resetArmed,   setResetArmed]   = useState(false);
   const [editingName,  setEditingName]  = useState(false);
   const [draftName,    setDraftName]    = useState(name || "");
@@ -99,6 +132,11 @@ export default function SettingsPanel({ name, onClose, onResetAll, onNameChange 
   const handleExport = () => {
     const ok = exportData();
     if (ok) { setExportDone(true); setTimeout(() => setExportDone(false), 3000); }
+  };
+
+  const handleExportCSV = () => {
+    const ok = exportCSV();
+    if (ok) { setCsvDone(true); setTimeout(() => setCsvDone(false), 3000); }
   };
 
   const handleFileChange = (e) => {
@@ -160,8 +198,27 @@ export default function SettingsPanel({ name, onClose, onResetAll, onNameChange 
         {/* Scrollable body */}
         <div style={{ flex:1, overflowY:"auto", padding:"0 18px 24px" }}>
 
+          {/* ── PREFERENCES ── */}
+          <p style={{ margin:"20px 0 4px", fontSize:10, fontWeight:700, color:C.muted,
+                      textTransform:"uppercase", letterSpacing:"1px" }}>Preferences</p>
+
+          <SettingRow icon="🌙" title="Dark Mode"
+            subtitle="Easier on eyes at night">
+            <button onClick={() => onToggleDark && onToggleDark(!darkMode)} style={{
+              width:44, height:24, borderRadius:99, border:"none", cursor:"pointer",
+              background: darkMode ? "#2563EB" : "#D1D5DB",
+              position:"relative", transition:"background 0.2s", flexShrink:0,
+            }}>
+              <div style={{
+                position:"absolute", top:2, left: darkMode ? 22 : 2,
+                width:20, height:20, borderRadius:99, background:"#fff",
+                transition:"left 0.2s", boxShadow:"0 1px 3px rgba(0,0,0,0.2)",
+              }}/>
+            </button>
+          </SettingRow>
+
           {/* ── PROFILE ── */}
-          <p style={{ margin:"16px 0 4px", fontSize:10, fontWeight:700, color:C.muted,
+          <p style={{ margin:"20px 0 4px", fontSize:10, fontWeight:700, color:C.muted,
                       textTransform:"uppercase", letterSpacing:"1px" }}>Profile</p>
 
           <SettingRow icon="👤" title="Your Name"
@@ -191,13 +248,23 @@ export default function SettingsPanel({ name, onClose, onResetAll, onNameChange 
           <p style={{ margin:"20px 0 4px", fontSize:10, fontWeight:700, color:C.muted,
                       textTransform:"uppercase", letterSpacing:"1px" }}>Data</p>
 
-          {/* Export */}
+          {/* Export JSON */}
           <SettingRow icon="📤" title="Export Backup"
             subtitle="Download all your data as a JSON file">
             <Btn
               label={exportDone ? "✓ Saved!" : "Export"}
               onClick={handleExport}
               variant={exportDone ? "primary" : "default"}
+            />
+          </SettingRow>
+
+          {/* Export CSV */}
+          <SettingRow icon="📊" title="Export to Excel / CSV"
+            subtitle="Download expenses as a spreadsheet">
+            <Btn
+              label={csvDone ? "✓ Downloaded!" : "CSV"}
+              onClick={handleExportCSV}
+              variant={csvDone ? "primary" : "default"}
             />
           </SettingRow>
 

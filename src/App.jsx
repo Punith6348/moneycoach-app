@@ -698,6 +698,155 @@ function LogExpenseForm({onAdd, disabled, currentExpenses=[], dailyLimit=0}) {
   );
 }
 
+// ─── ANNUAL SUMMARY ───────────────────────────────────────────────────────────
+function AnnualSummary({ allExpenses, totalIncome, totalSavings }) {
+  const now  = new Date();
+  const year = now.getFullYear();
+
+  // Build monthly data for current year
+  const months = useMemo(() => {
+    const result = [];
+    for (let m = 1; m <= 12; m++) {
+      const key   = `${year}-${String(m).padStart(2,"0")}`;
+      const exps  = allExpenses[key] || [];
+      const spent = exps.reduce((s,e)=>s+e.amount, 0);
+      const label = new Date(year,m-1,1).toLocaleDateString("en-IN",{month:"short"});
+      const isPast   = m < now.getMonth()+1;
+      const isCurrent= m === now.getMonth()+1;
+      result.push({ key, label, spent:Math.round(spent), count:exps.length, isPast, isCurrent, m });
+    }
+    return result;
+  }, [allExpenses, year]);
+
+  const activeMonths = months.filter(m=>(m.isPast||m.isCurrent)&&m.spent>0);
+  const totalSpent   = activeMonths.reduce((s,m)=>s+m.spent, 0);
+  const totalIncomeSoFar = totalIncome * activeMonths.length;
+  const totalSavedSoFar  = totalSavings * activeMonths.length;
+  const netBalance   = totalIncomeSoFar - totalSpent - totalSavedSoFar;
+  const avgMonthly   = activeMonths.length > 0 ? Math.round(totalSpent/activeMonths.length) : 0;
+  const bestMonth    = activeMonths.length > 0 ? activeMonths.reduce((a,b)=>a.spent<b.spent?a:b) : null;
+  const worstMonth   = activeMonths.length > 0 ? activeMonths.reduce((a,b)=>a.spent>b.spent?a:b) : null;
+  const maxSpent     = Math.max(...months.map(m=>m.spent), 1);
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{marginBottom:16}}>
+        <h2 style={{margin:"0 0 2px",fontSize:17,fontWeight:700,color:C.ink,fontFamily:"Georgia,serif"}}>
+          {year} Annual Summary
+        </h2>
+        <p style={{margin:0,fontSize:11,color:C.muted}}>
+          {activeMonths.length} month{activeMonths.length!==1?"s":""} tracked so far
+        </p>
+      </div>
+
+      {/* Top 4 stats */}
+      {activeMonths.length > 0 ? (
+        <>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
+            {[
+              {label:"Total Spent",     value:fmt(totalSpent),        color:C.red,    icon:"💸"},
+              {label:"Avg / Month",     value:fmt(avgMonthly),        color:C.amber,  icon:"📅"},
+              {label:"Income (est.)",   value:fmt(totalIncomeSoFar),  color:C.green,  icon:"💰"},
+              {label:"Net Balance",     value:netBalance>=0?fmt(netBalance):`−${fmt(Math.abs(netBalance))}`,
+                                        color:netBalance>=0?C.green:C.red, icon:"⚖️"},
+            ].map(t=>(
+              <div key={t.label} style={{background:"#fff",borderRadius:12,border:`1px solid ${C.border}`,
+                                         padding:"11px 13px",boxShadow:"0 1px 2px rgba(0,0,0,0.04)"}}>
+                <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:3}}>
+                  <span style={{fontSize:13}}>{t.icon}</span>
+                  <p style={{margin:0,fontSize:9,color:C.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.7px"}}>{t.label}</p>
+                </div>
+                <p style={{margin:0,fontSize:16,fontWeight:700,color:t.color,fontFamily:"Georgia,serif"}}>{t.value}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Best / Worst month */}
+          {bestMonth && worstMonth && bestMonth.key !== worstMonth.key && (
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
+              <div style={{background:"#F0FDF4",borderRadius:11,border:"1px solid #86EFAC",padding:"10px 12px"}}>
+                <p style={{margin:0,fontSize:9,color:C.green,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.7px"}}>Best Month 🏆</p>
+                <p style={{margin:"3px 0 0",fontSize:15,fontWeight:700,color:C.ink}}>{bestMonth.label}</p>
+                <p style={{margin:"1px 0 0",fontSize:12,color:C.green,fontFamily:"Georgia,serif",fontWeight:700}}>{fmt(bestMonth.spent)}</p>
+              </div>
+              <div style={{background:"#FFF1F2",borderRadius:11,border:"1px solid #FECACA",padding:"10px 12px"}}>
+                <p style={{margin:0,fontSize:9,color:C.red,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.7px"}}>Highest Spend 📈</p>
+                <p style={{margin:"3px 0 0",fontSize:15,fontWeight:700,color:C.ink}}>{worstMonth.label}</p>
+                <p style={{margin:"1px 0 0",fontSize:12,color:C.red,fontFamily:"Georgia,serif",fontWeight:700}}>{fmt(worstMonth.spent)}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Monthly bar chart */}
+          <div style={{background:"#fff",borderRadius:13,border:`1px solid ${C.border}`,
+                       boxShadow:"0 1px 3px rgba(0,0,0,0.05)",padding:"12px 14px",marginBottom:12}}>
+            <p style={{margin:"0 0 12px",fontSize:12,fontWeight:700,color:C.ink}}>Monthly Breakdown</p>
+            <div style={{display:"flex",alignItems:"flex-end",gap:4,height:80}}>
+              {months.map(m=>{
+                const barH  = m.spent>0 ? Math.max(Math.round((m.spent/maxSpent)*72),4) : 0;
+                const color = m.isCurrent ? C.blue : m.isPast && m.spent>0 ? "#94A3B8" : "#E5E7EB";
+                return (
+                  <div key={m.key} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+                    <p style={{margin:0,fontSize:7,color:m.isCurrent?C.ink:C.muted,fontWeight:m.isCurrent?700:400,whiteSpace:"nowrap"}}>
+                      {m.spent>0?`₹${Math.round(m.spent/1000)}k`:""}
+                    </p>
+                    <div style={{width:"100%",height:m.spent>0?barH:2,background:color,borderRadius:"3px 3px 0 0",transition:"height 0.4s"}}/>
+                    <p style={{margin:0,fontSize:8,color:m.isCurrent?C.ink:C.muted,fontWeight:m.isCurrent?700:400}}>{m.label}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Month-by-month list */}
+          <div style={{background:"#fff",borderRadius:13,border:`1px solid ${C.border}`,
+                       boxShadow:"0 1px 3px rgba(0,0,0,0.05)",overflow:"hidden"}}>
+            <div style={{padding:"10px 14px",borderBottom:`1px solid ${C.bg}`}}>
+              <p style={{margin:0,fontSize:12,fontWeight:700,color:C.ink}}>Month-by-Month</p>
+            </div>
+            {months.filter(m=>m.isPast||m.isCurrent).map((m,i,arr)=>{
+              const pct = totalIncome>0 ? Math.round((m.spent/totalIncome)*100) : 0;
+              return (
+                <div key={m.key} style={{
+                  display:"flex",alignItems:"center",gap:10,padding:"10px 14px",
+                  borderBottom:i<arr.length-1?`1px solid ${C.bg}`:"none",
+                  background:m.isCurrent?"#FAFAFA":"transparent",
+                }}>
+                  <div style={{width:36,flexShrink:0}}>
+                    <p style={{margin:0,fontSize:12,fontWeight:m.isCurrent?700:600,color:C.ink}}>{m.label}</p>
+                    {m.isCurrent&&<p style={{margin:0,fontSize:8,color:C.blue,fontWeight:600}}>Current</p>}
+                  </div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{height:4,borderRadius:99,background:C.bg,overflow:"hidden"}}>
+                      <div style={{height:"100%",borderRadius:99,width:`${Math.min(pct,100)}%`,
+                                   background:m.isCurrent?C.blue:"#94A3B8",transition:"width 0.4s"}}/>
+                    </div>
+                  </div>
+                  <div style={{textAlign:"right",flexShrink:0}}>
+                    {m.spent>0
+                      ? <p style={{margin:0,fontSize:13,fontWeight:700,color:m.isCurrent?C.ink:C.muted,fontFamily:"Georgia,serif"}}>{fmt(m.spent)}</p>
+                      : <p style={{margin:0,fontSize:11,color:C.muted}}>—</p>
+                    }
+                    {m.count>0&&<p style={{margin:0,fontSize:9,color:C.muted}}>{m.count} txn{m.count!==1?"s":""}</p>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      ) : (
+        <div style={{background:"#fff",borderRadius:13,border:`1px solid ${C.border}`,
+                     textAlign:"center",padding:"48px 20px"}}>
+          <p style={{fontSize:36,margin:"0 0 10px"}}>🗓</p>
+          <p style={{color:C.ink,fontSize:14,fontWeight:600,margin:"0 0 6px"}}>No data for {year} yet</p>
+          <p style={{color:C.muted,fontSize:12,margin:0}}>Start logging expenses to see your annual summary here.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── RECURRING EXPENSES TAB ───────────────────────────────────────────────
 function RecurringTab({ recurringExpenses, allExpenses, onAdd, onUpdate, onDelete, onToggle, showToast }) {
   const CATS = [
@@ -922,6 +1071,7 @@ function DashboardScreen(props) {
     { key:"plan",      icon:"🗂",  label:"Plan"      },
     { key:"home",      icon:"🏠",  label:"Expenses"  },
     { key:"loans",     icon:"🏦",  label:"Loans"     },
+    { key:"annual",    icon:"🗓",  label:"Annual"    },
     { key:"recurring", icon:"🔁",  label:"Recurring" },
     { key:"catbudget", icon:"🎯",  label:"Budgets"   },
     { key:"charts",    icon:"📈",  label:"Charts"    },
@@ -1258,6 +1408,49 @@ function DashboardScreen(props) {
                 onUpdate={(id,upd)=>{updateFuturePayment(id,upd);showToast("Future payment updated ✓");}}
                 onDelete={deleteFuturePayment}/>
             </div>
+
+            {/* ── Budget Summary Row ── */}
+            {totalIncome > 0 && (
+              <div style={{
+                background:"linear-gradient(135deg,#1E293B,#334155)",
+                borderRadius:14, padding:"14px 16px", marginTop:4,
+              }}>
+                <p style={{margin:"0 0 10px",fontSize:9,color:"#94A3B8",
+                           textTransform:"uppercase",letterSpacing:"1px",fontWeight:700}}>
+                  Monthly Budget Flow
+                </p>
+                <div style={{display:"flex",alignItems:"center",flexWrap:"wrap",gap:4}}>
+                  {[
+                    {label:"Income",  value:fmt(totalIncome),  color:"#6EE7B7"},
+                    {label:"Fixed",   value:fmt(totalFixed),   color:"#FCA5A5", prefix:"−"},
+                    {label:"Savings", value:fmt(totalSavings), color:"#93C5FD", prefix:"−"},
+                    {label:"Reserve", value:fmt(totalReserve), color:"#FCD34D", prefix:"−", hide:totalReserve===0},
+                    {label:"Daily Budget", value:dailyLimit>0?`${fmt(dailyLimit)}/day`:"₹0", color:"#fff", isResult:true},
+                  ].filter(t=>!t.hide).map((t,i,arr)=>(
+                    <div key={t.label} style={{display:"flex",alignItems:"center",gap:4}}>
+                      <div style={{
+                        padding:"6px 10px", borderRadius:8,
+                        background: t.isResult ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.06)",
+                        border:`1px solid ${t.isResult?"rgba(255,255,255,0.2)":"rgba(255,255,255,0.08)"}`,
+                      }}>
+                        <p style={{margin:0,fontSize:8,color:"#94A3B8",textTransform:"uppercase",letterSpacing:"0.6px"}}>{t.label}</p>
+                        <p style={{margin:"2px 0 0",fontSize:13,fontWeight:700,color:t.color,fontFamily:"Georgia,serif"}}>
+                          {t.prefix}{t.value}
+                        </p>
+                      </div>
+                      {i < arr.length-1 && (
+                        <span style={{fontSize:12,color:"#475569",fontWeight:700}}>→</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {remaining < 0 && (
+                  <p style={{margin:"8px 0 0",fontSize:11,color:"#FCA5A5"}}>
+                    ⚠ Commitments exceed income by {fmt(Math.abs(remaining))} — review your fixed expenses or savings.
+                  </p>
+                )}
+              </div>
+            )}
           </>
         )}
 
@@ -1320,6 +1513,11 @@ function DashboardScreen(props) {
           />
         )}
 
+
+        {/* ══ ANNUAL SUMMARY ══ */}
+        {tab==="annual"&&(
+          <AnnualSummary allExpenses={allExpenses} totalIncome={totalIncome} totalSavings={totalSavings}/>
+        )}
 
         {/* ══ RECURRING EXPENSES ══ */}
         {tab==="recurring"&&(
