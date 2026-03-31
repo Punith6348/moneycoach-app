@@ -1,5 +1,8 @@
 // ─── useAppData.js — Extended with financial planning data ───────────────
 import { useState, useEffect } from "react";
+import { doc, setDoc } from "firebase/firestore";
+import { db } from "./firebase.js";
+import { loadFromFirestore, migrateLocalToFirestore } from "./useFirestoreSync.js";
 
 const STORAGE_KEY = "moneyCoachData_v3";
 
@@ -210,7 +213,7 @@ export function useAppData(firebaseUser = null) {
   // ── Load from Firestore when user logs in ────────────────────────────────
   useEffect(() => {
     if (!firebaseUser) return;
-    import("./useFirestoreSync.js").then(async ({ loadFromFirestore, migrateLocalToFirestore }) => {
+    (async () => {
       await migrateLocalToFirestore(firebaseUser.uid);
       const cloudData = await loadFromFirestore(firebaseUser.uid);
       if (cloudData) {
@@ -230,7 +233,7 @@ export function useAppData(firebaseUser = null) {
         setData(merged);
         persist(merged);
       }
-    });
+    })();
   }, [firebaseUser?.uid]);
 
   const commit = (fn) => {
@@ -239,13 +242,9 @@ export function useAppData(firebaseUser = null) {
       persist(next);
       // Sync to Firestore if logged in
       if (firebaseUser) {
-        import("./useFirestoreSync.js").then(async ({ loadFromFirestore }) => {
-          const { doc, setDoc } = await import("firebase/firestore");
-          const { db } = await import("./firebase.js");
-          const ref = doc(db, "users", firebaseUser.uid);
-          setDoc(ref, { data: JSON.stringify(next), updatedAt: Date.now() })
-            .catch(e => console.warn("Sync failed:", e));
-        });
+        const ref = doc(db, "users", firebaseUser.uid);
+        setDoc(ref, { data: JSON.stringify(next), updatedAt: Date.now() })
+          .catch(e => console.warn("Sync failed:", e));
       }
       return next;
     });
