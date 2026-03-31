@@ -48,48 +48,101 @@ const C = {ink:"#111827",muted:"#6B7280",border:"#E5E7EB",bg:"#F8FAFC",red:"#DC2
 
 // Responsive CSS injected once into <head> equivalent via a style tag in the app shell
 const APP_CSS = `
-  .mc-app  { display:flex; flex-direction:column; min-height:100vh; background:#F8FAFC; }
-  .mc-body { display:flex; flex:1; min-height:0; }
-  .mc-main { flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden; }
-  .mc-scroll { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; }
-  .mc-content { padding:18px 18px 24px; max-width:960px; width:100%; margin:0 auto; }
+  /* ── Reset ── */
+  html, body { margin:0; padding:0; height:100%; overflow:hidden; background:#F8FAFC; }
+  #root { height:100%; }
 
+  /* ── App shell — fills entire screen edge to edge ── */
+  .mc-app {
+    display:flex; flex-direction:column;
+    position:fixed; inset:0;
+    background:#F8FAFC;
+    overflow:hidden;
+  }
+
+  /* ── Body row (sidebar + main) ── */
+  .mc-body { display:flex; flex:1; min-height:0; overflow:hidden; }
+
+  /* ── Main content area ── */
+  .mc-main {
+    flex:1; min-width:0;
+    display:flex; flex-direction:column;
+    overflow:hidden;
+  }
+
+  /* ── Scrollable content ── */
+  .mc-scroll {
+    flex:1;
+    overflow-y:auto;
+    overflow-x:hidden;
+    -webkit-overflow-scrolling:touch;
+    overscroll-behavior:contain;
+  }
+
+  /* ── Content padding ── */
+  .mc-content {
+    padding:16px 16px 16px;
+    max-width:960px;
+    width:100%;
+    margin:0 auto;
+    box-sizing:border-box;
+  }
+
+  /* ── Mobile bottom nav — safe area aware ── */
+  .mc-bnav {
+    flex-shrink:0;
+    background:#fff;
+    border-top:1px solid #E5E7EB;
+    padding-bottom:env(safe-area-inset-bottom, 0px);
+  }
+  .mc-bnav-inner {
+    display:flex;
+    height:56px;
+    align-items:stretch;
+  }
+  .mc-bnav-item:active { opacity:0.7; }
+
+  /* ── Sidebar ── */
   .mc-sidebar {
     width:220px; min-width:220px; background:#1E293B;
     display:flex; flex-direction:column;
-    position:sticky; top:0; height:100vh;
     overflow-y:auto; flex-shrink:0;
+    height:100%;
   }
   @media(max-width:900px){ .mc-sidebar { width:180px; min-width:180px; } }
 
+  /* ── Mobile header safe area ── */
+  .mc-mobile-header {
+    flex-shrink:0;
+    padding-top:env(safe-area-inset-top, 0px);
+  }
+
+  /* ── Grid helpers ── */
   .mc-plan-top  { display:grid; grid-template-columns:1fr; gap:0; }
   .mc-plan-full { width:100%; }
   @media(min-width:768px){ .mc-plan-top { grid-template-columns:1fr 1fr; gap:12px; } }
 
   .mc-expense-row { display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px solid #F8FAFC; gap:8px; }
   .mc-expense-row:last-child { border-bottom:none; }
+
+  /* ── Hide scrollbars ── */
   ::-webkit-scrollbar { display:none; }
   * { scrollbar-width:none; }
 
+  /* ── Animations ── */
   @keyframes fadeUp  { from{opacity:0;transform:translateX(-50%) translateY(-8px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
   @keyframes slideIn { from{opacity:0;transform:translateX(-4px)} to{opacity:1;transform:translateX(0)} }
   @keyframes slideUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
 
-  .mc-bnav-item:active { opacity:0.7; }
-
-  /* ── Dark mode overrides ── */
+  /* ── Dark mode ── */
+  [data-theme="dark"] html,
+  [data-theme="dark"] body,
+  [data-theme="dark"] #root { background:#0F172A; }
   [data-theme="dark"] .mc-app { background:#0F172A; }
+  [data-theme="dark"] .mc-bnav { background:#1E293B; border-color:#334155; }
   [data-theme="dark"] .mc-content { color:#E2E8F0; }
-
-  /* Cards */
-  [data-theme="dark"] div[style*="background:\"#fff\""],
-  [data-theme="dark"] div[style*='background:"#fff"'] { background:#1E293B !important; border-color:#334155 !important; }
-
-  /* Generic white bg → dark card */
   [data-theme="dark"] .mc-summary-card { background:#1E293B !important; border-color:#334155 !important; }
   [data-theme="dark"] .mc-dark-card    { background:#1E293B !important; border-color:#334155 !important; color:#E2E8F0 !important; }
-
-  /* Inputs */
   [data-theme="dark"] input, [data-theme="dark"] select, [data-theme="dark"] textarea {
     background:#1E293B !important; color:#E2E8F0 !important; border-color:#334155 !important;
   }
@@ -1254,7 +1307,12 @@ function DashboardScreen(props) {
           {isMobile && (
             <header style={{
               display:"flex", alignItems:"center", justifyContent:"space-between",
-              gap:6, padding:"6px 12px", flexShrink:0,
+              gap:6,
+              paddingTop:`calc(env(safe-area-inset-top, 0px) + 6px)`,
+              paddingBottom:"6px",
+              paddingLeft:"12px",
+              paddingRight:"12px",
+              flexShrink:0,
               background:"#fff", borderBottom:"1px solid #E5E7EB",
               position:"sticky", top:0, zIndex:100,
             }}>
@@ -1321,7 +1379,7 @@ function DashboardScreen(props) {
 
           {/* ── SCROLLABLE PAGE CONTENT ── */}
           <div className="mc-scroll">
-            <div className="mc-content" style={{paddingBottom: isMobile ? `${NAV_HEIGHT + 16}px` : "40px"}}>
+            <div className="mc-content" style={{paddingBottom: isMobile ? `calc(${NAV_HEIGHT + 16}px + env(safe-area-inset-bottom, 0px))` : "40px"}}>
               <div style={{animation:"slideIn 0.18s ease"}}>
 
               {/* ══ BUDGET DASHBOARD ══ */}
@@ -1607,16 +1665,18 @@ function DashboardScreen(props) {
             </div>{/* /mc-content */}
           </div>{/* /mc-scroll */}
 
-          {/* ════════ MOBILE BOTTOM NAV — fully inline, no CSS class dependency ════════ */}
+          {/* ════════ MOBILE BOTTOM NAV ════════ */}
           {isMobile && (
             <nav style={{
               position:"fixed", bottom:0, left:0, right:0,
               zIndex:9999,
               display:"flex",
+              flexDirection:"column",
               background:NAV_BG,
               borderTop:NAV_BORDER,
-              height:`${NAV_HEIGHT}px`,
+              paddingBottom:"env(safe-area-inset-bottom, 0px)",
             }}>
+              <div style={{ display:"flex", height:`${NAV_HEIGHT}px` }}>
               {PRIMARY_TABS.map(({key,icon,label}) => {
                 const active = tab === key;
                 return (
@@ -1669,6 +1729,7 @@ function DashboardScreen(props) {
                   {moreActive ? TABS.find(t=>t.key===tab)?.label : "More"}
                 </span>
               </button>
+              </div>{/* /nav inner */}
             </nav>
           )}
 
