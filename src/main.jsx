@@ -1,7 +1,7 @@
 // ─── main.jsx ────────────────────────────────────────────────────────────────
 import { StrictMode, useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import { onAuthStateChanged, signOut, getRedirectResult } from "firebase/auth";
 import { auth } from "./firebase";
 import App from "./App.jsx";
 import AuthScreen from "./AuthScreen.jsx";
@@ -29,31 +29,70 @@ globalStyle.textContent = `
 document.head.appendChild(globalStyle);
 
 function Root() {
-  const [user,        setUser]        = useState(undefined); // undefined=loading
-  const [guestMode,   setGuestMode]   = useState(false);
+  // undefined = still checking, null = not logged in, object = logged in
+  const [user,      setUser]      = useState(undefined);
+  const [guestMode, setGuestMode] = useState(false);
+  const [checking,  setChecking]  = useState(true);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-    });
-    return unsub;
+    // Step 1: Handle Google redirect result first (if returning from Google login)
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result?.user) {
+          // User just came back from Google redirect — set them immediately
+          setUser(result.user);
+        }
+      })
+      .catch((err) => {
+        console.warn("Redirect result error:", err);
+      })
+      .finally(() => {
+        // Step 2: Then listen for ongoing auth state changes
+        const unsub = onAuthStateChanged(auth, (u) => {
+          setUser(u ?? null);
+          setChecking(false);
+        });
+        // Store unsub for cleanup
+        window._authUnsub = unsub;
+      });
+
+    return () => {
+      if (window._authUnsub) window._authUnsub();
+    };
   }, []);
 
-  // Loading spinner while Firebase checks auth
-  if (user === undefined && !guestMode) {
+  // Show loading while checking auth
+  if (checking && !guestMode) {
     return (
-      <div className="auth-root" style={{ display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column", gap:16 }}>
-        <div style={{ width:64, height:64, borderRadius:16, overflow:"hidden", boxShadow:"0 8px 24px rgba(37,99,235,0.4)" }}>
-          <img src="/icon-512.png" alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}
-            onError={e=>{e.target.parentNode.style.background="linear-gradient(135deg,#1E40AF,#06B6D4)";e.target.style.display="none";e.target.parentNode.innerHTML='<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:28px;color:#fff;font-family:Georgia,serif;font-weight:700">₹</div>';}}
+      <div className="auth-root" style={{
+        display:"flex", alignItems:"center",
+        justifyContent:"center", flexDirection:"column", gap:16,
+      }}>
+        <div style={{
+          width:72, height:72, borderRadius:18,
+          overflow:"hidden", boxShadow:"0 8px 24px rgba(37,99,235,0.4)",
+        }}>
+          <img src="/icon-512.png" alt="Money Coach"
+            style={{ width:"100%", height:"100%", objectFit:"cover" }}
+            onError={e=>{
+              const p = e.target.parentNode;
+              p.style.background = "linear-gradient(135deg,#1E40AF,#06B6D4)";
+              p.style.display = "flex";
+              p.style.alignItems = "center";
+              p.style.justifyContent = "center";
+              e.target.style.display = "none";
+              p.innerHTML += '<span style="font-size:32px;color:#fff;font-family:Georgia,serif;font-weight:700">₹</span>';
+            }}
           />
         </div>
-        <p style={{ color:"#64748B", fontSize:13, margin:0 }}>Loading...</p>
+        <p style={{ color:"#64748B", fontSize:13, margin:0, fontFamily:"sans-serif" }}>
+          Loading...
+        </p>
       </div>
     );
   }
 
-  // Show login if not authenticated and not guest
+  // Not logged in and not guest — show auth screen
   if (!user && !guestMode) {
     return (
       <div className="auth-root">
@@ -62,10 +101,10 @@ function Root() {
     );
   }
 
-  // Show main app
+  // Logged in or guest — show main app
   return (
     <App
-      firebaseUser={user}
+      firebaseUser={user || null}
       isGuest={guestMode}
       onSignOut={async () => {
         if (user) await signOut(auth);

@@ -1,7 +1,7 @@
 // ─── AuthScreen.jsx — Mobile-first, top-aligned, scrollable ──────────────────
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { auth } from "./firebase";
-import { GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
+import { GoogleAuthProvider, signInWithPopup, signInWithRedirect, RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
 
 // Detect mobile — use redirect on mobile, popup on desktop
 const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -380,22 +380,6 @@ export default function AuthScreen({ onGuest }) {
   const [phone,   setPhone2]  = useState("");
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState("");
-
-  // Handle Google redirect result when returning from Google login page
-  useEffect(() => {
-    setLoading(true);
-    getRedirectResult(auth)
-      .then(result => {
-        // If result exists, Firebase auth state will update via onAuthStateChanged
-        if (result?.user) {
-          // Successfully signed in via redirect — auth state handled in main.jsx
-        }
-      })
-      .catch(() => {
-        // No redirect result or error — normal startup
-      })
-      .finally(() => setLoading(false));
-  }, []);
 
   const handleGoogle = async () => {
     setLoading(true); setError("");
