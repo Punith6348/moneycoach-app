@@ -3,9 +3,6 @@ import { useState } from "react";
 import { auth } from "./firebase";
 import { GoogleAuthProvider, signInWithPopup, signInWithRedirect, RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
 
-// Detect mobile — use redirect on mobile, popup on desktop
-const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
 // ── Base layout — parent .auth-root handles bg, scroll, safe-area ────────────
 const pageStyle = {
   fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
@@ -385,17 +382,27 @@ export default function AuthScreen({ onGuest }) {
     setLoading(true); setError("");
     try {
       const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: "select_account" });
-      if (isMobile) {
-        // On mobile — redirect to Google (full page, no popup)
-        await signInWithRedirect(auth, provider);
-        // Page will redirect — no code runs after this
-      } else {
-        // On desktop — popup works fine
-        await signInWithPopup(auth, provider);
-      }
+      // Force account chooser to show ALL accounts every time
+      provider.setCustomParameters({
+        prompt: "select_account",
+      });
+      // Always use popup — works on both mobile and desktop
+      // On mobile PWA, popup opens in browser tab which works correctly
+      await signInWithPopup(auth, provider);
     } catch (e) {
-      setError("Google sign-in failed. Try again.");
+      console.error("Google login error:", e.code, e.message);
+      if (e.code === "auth/popup-blocked") {
+        // Popup was blocked — fall back to redirect
+        setError("Popup blocked. Trying redirect...");
+        const provider2 = new GoogleAuthProvider();
+        provider2.setCustomParameters({ prompt: "select_account" });
+        await signInWithRedirect(auth, provider2);
+      } else if (e.code === "auth/cancelled-popup-request" || e.code === "auth/popup-closed-by-user") {
+        // User closed popup — just reset
+        setError("");
+      } else {
+        setError("Google sign-in failed. Try again.");
+      }
       setLoading(false);
     }
   };

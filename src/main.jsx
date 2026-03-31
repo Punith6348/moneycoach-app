@@ -7,7 +7,6 @@ import App from "./App.jsx";
 import AuthScreen from "./AuthScreen.jsx";
 import "./App.css";
 
-// Global reset
 const globalStyle = document.createElement("style");
 globalStyle.textContent = `
   *, *::before, *::after { box-sizing: border-box; }
@@ -15,10 +14,8 @@ globalStyle.textContent = `
   body { margin:0; padding:0; min-height:100%; overscroll-behavior:none; -webkit-text-size-adjust:100%; }
   #root { min-height:100vh; min-height:100dvh; }
   .auth-root {
-    position: fixed;
-    inset: 0;
-    overflow-y: auto;
-    overflow-x: hidden;
+    position: fixed; inset: 0;
+    overflow-y: auto; overflow-x: hidden;
     background: linear-gradient(160deg,#0F172A 0%,#1E293B 60%,#0F172A 100%);
     z-index: 9999;
   }
@@ -28,71 +25,43 @@ globalStyle.textContent = `
 `;
 document.head.appendChild(globalStyle);
 
+function LoadingScreen() {
+  return (
+    <div className="auth-root" style={{ display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column", gap:16 }}>
+      <div style={{ width:72, height:72, borderRadius:18, overflow:"hidden", boxShadow:"0 8px 24px rgba(37,99,235,0.4)" }}>
+        <img src="/icon-512.png" alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}
+          onError={e=>{ const p=e.target.parentNode; p.style.cssText="background:linear-gradient(135deg,#1E40AF,#06B6D4);display:flex;align-items:center;justify-content:center;width:72px;height:72px;border-radius:18px"; e.target.remove(); p.innerHTML='<span style="font-size:32px;color:#fff;font-family:Georgia,serif;font-weight:700">₹</span>'; }}
+        />
+      </div>
+      <p style={{ color:"#64748B", fontSize:13, margin:0, fontFamily:"sans-serif" }}>Loading...</p>
+    </div>
+  );
+}
+
 function Root() {
-  // undefined = still checking, null = not logged in, object = logged in
   const [user,      setUser]      = useState(undefined);
   const [guestMode, setGuestMode] = useState(false);
-  const [checking,  setChecking]  = useState(true);
 
   useEffect(() => {
-    // Step 1: Handle Google redirect result first (if returning from Google login)
+    // First check for redirect result (Google login returning)
     getRedirectResult(auth)
-      .then((result) => {
+      .then(result => {
         if (result?.user) {
-          // User just came back from Google redirect — set them immediately
-          setUser(result.user);
+          console.log("Redirect login success:", result.user.email);
         }
       })
-      .catch((err) => {
-        console.warn("Redirect result error:", err);
-      })
-      .finally(() => {
-        // Step 2: Then listen for ongoing auth state changes
-        const unsub = onAuthStateChanged(auth, (u) => {
-          setUser(u ?? null);
-          setChecking(false);
-        });
-        // Store unsub for cleanup
-        window._authUnsub = unsub;
-      });
+      .catch(err => console.warn("Redirect error:", err));
 
-    return () => {
-      if (window._authUnsub) window._authUnsub();
-    };
+    // Listen for auth state
+    const unsub = onAuthStateChanged(auth, u => {
+      console.log("Auth state:", u?.email || "null");
+      setUser(u ?? null);
+    });
+    return unsub;
   }, []);
 
-  // Show loading while checking auth
-  if (checking && !guestMode) {
-    return (
-      <div className="auth-root" style={{
-        display:"flex", alignItems:"center",
-        justifyContent:"center", flexDirection:"column", gap:16,
-      }}>
-        <div style={{
-          width:72, height:72, borderRadius:18,
-          overflow:"hidden", boxShadow:"0 8px 24px rgba(37,99,235,0.4)",
-        }}>
-          <img src="/icon-512.png" alt="Money Coach"
-            style={{ width:"100%", height:"100%", objectFit:"cover" }}
-            onError={e=>{
-              const p = e.target.parentNode;
-              p.style.background = "linear-gradient(135deg,#1E40AF,#06B6D4)";
-              p.style.display = "flex";
-              p.style.alignItems = "center";
-              p.style.justifyContent = "center";
-              e.target.style.display = "none";
-              p.innerHTML += '<span style="font-size:32px;color:#fff;font-family:Georgia,serif;font-weight:700">₹</span>';
-            }}
-          />
-        </div>
-        <p style={{ color:"#64748B", fontSize:13, margin:0, fontFamily:"sans-serif" }}>
-          Loading...
-        </p>
-      </div>
-    );
-  }
+  if (user === undefined && !guestMode) return <LoadingScreen/>;
 
-  // Not logged in and not guest — show auth screen
   if (!user && !guestMode) {
     return (
       <div className="auth-root">
@@ -101,7 +70,6 @@ function Root() {
     );
   }
 
-  // Logged in or guest — show main app
   return (
     <App
       firebaseUser={user || null}
@@ -116,7 +84,5 @@ function Root() {
 }
 
 createRoot(document.getElementById("root")).render(
-  <StrictMode>
-    <Root />
-  </StrictMode>
+  <StrictMode><Root/></StrictMode>
 );
