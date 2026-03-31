@@ -3,6 +3,7 @@ import { StrictMode, useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { onAuthStateChanged, signOut, getRedirectResult } from "firebase/auth";
 import { auth } from "./firebase";
+import { registerUserProfile } from "./useFirestoreSync";
 import App from "./App.jsx";
 import AuthScreen from "./AuthScreen.jsx";
 import "./App.css";
@@ -53,8 +54,9 @@ function Root() {
       .catch(err => console.warn("Redirect error:", err));
 
     // Listen for auth state
-    const unsub = onAuthStateChanged(auth, u => {
-      console.log("Auth state:", u?.email || "null");
+    const unsub = onAuthStateChanged(auth, async u => {
+      console.log("Auth state:", u?.email || u?.phoneNumber || "null");
+      if (u) await registerUserProfile(u);
       setUser(u ?? null);
     });
     return unsub;
@@ -75,6 +77,9 @@ function Root() {
       firebaseUser={user || null}
       isGuest={guestMode}
       onSignOut={async () => {
+        // Clear local data before signing out
+        localStorage.removeItem("moneyCoachData_v3");
+        localStorage.removeItem("moneyCoachUID");
         if (user) await signOut(auth);
         setGuestMode(false);
         setUser(null);
