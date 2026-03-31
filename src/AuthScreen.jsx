@@ -3,19 +3,10 @@ import { useState } from "react";
 import { auth } from "./firebase";
 import { GoogleAuthProvider, signInWithPopup, RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
 
-// ── Base layout — top-aligned, scrollable, safe-area aware ───────────────────
+// ── Base layout — parent .auth-root handles bg, scroll, safe-area ────────────
 const pageStyle = {
-  position: "relative",
-  overflowY: "auto",
-  overflowX: "hidden",
   fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
   boxSizing: "border-box",
-  paddingTop: "env(safe-area-inset-top, 0px)",
-  paddingBottom: "env(safe-area-inset-bottom, 0px)",
-  // Background fills entire screen always, independent of content height
-  backgroundColor: "#0F172A",
-  backgroundImage: "linear-gradient(160deg,#0F172A 0%,#1E293B 60%,#0F172A 100%)",
-  backgroundAttachment: "fixed",
 };
 
 const containerStyle = {

@@ -7,21 +7,24 @@ import App from "./App.jsx";
 import AuthScreen from "./AuthScreen.jsx";
 import "./App.css";
 
-// Fix blank space — body/html fill screen, content scrolls naturally
+// Global reset
 const globalStyle = document.createElement("style");
 globalStyle.textContent = `
   *, *::before, *::after { box-sizing: border-box; }
-  html, body {
-    margin: 0; padding: 0;
-    background: #0F172A;
-    overscroll-behavior: none;
-    -webkit-text-size-adjust: 100%;
+  html { margin:0; padding:0; height:100%; }
+  body { margin:0; padding:0; min-height:100%; overscroll-behavior:none; -webkit-text-size-adjust:100%; }
+  #root { min-height:100vh; min-height:100dvh; }
+  .auth-root {
+    position: fixed;
+    inset: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background: linear-gradient(160deg,#0F172A 0%,#1E293B 60%,#0F172A 100%);
+    z-index: 9999;
   }
-  body { background: #0F172A; }
-  #root { background: #0F172A; }
   input[type=number]::-webkit-inner-spin-button,
-  input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-  input[type=number] { -moz-appearance: textfield; }
+  input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
+  input[type=number] { -moz-appearance:textfield; }
 `;
 document.head.appendChild(globalStyle);
 
@@ -39,25 +42,24 @@ function Root() {
   // Loading spinner while Firebase checks auth
   if (user === undefined && !guestMode) {
     return (
-      <div style={{
-        minHeight:"100vh", background:"#0F172A",
-        display:"flex", alignItems:"center", justifyContent:"center",
-        flexDirection:"column", gap:16,
-      }}>
-        <div style={{
-          width:56, height:56, borderRadius:14,
-          background:"linear-gradient(135deg,#1E40AF,#0EA5E9)",
-          display:"flex", alignItems:"center", justifyContent:"center",
-          fontSize:28, color:"#fff",
-        }}>₹</div>
-        <p style={{color:"#64748B", fontSize:13, margin:0}}>Loading...</p>
+      <div className="auth-root" style={{ display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column", gap:16 }}>
+        <div style={{ width:64, height:64, borderRadius:16, overflow:"hidden", boxShadow:"0 8px 24px rgba(37,99,235,0.4)" }}>
+          <img src="/icon-512.png" alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}
+            onError={e=>{e.target.parentNode.style.background="linear-gradient(135deg,#1E40AF,#06B6D4)";e.target.style.display="none";e.target.parentNode.innerHTML='<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:28px;color:#fff;font-family:Georgia,serif;font-weight:700">₹</div>';}}
+          />
+        </div>
+        <p style={{ color:"#64748B", fontSize:13, margin:0 }}>Loading...</p>
       </div>
     );
   }
 
   // Show login if not authenticated and not guest
   if (!user && !guestMode) {
-    return <AuthScreen onGuest={() => setGuestMode(true)} />;
+    return (
+      <div className="auth-root">
+        <AuthScreen onGuest={() => setGuestMode(true)} />
+      </div>
+    );
   }
 
   // Show main app
