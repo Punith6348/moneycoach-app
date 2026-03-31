@@ -5,7 +5,7 @@ import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCi2YckhXYnZk8Fis4PE3SB7A2QrGdn_wI",
-  authDomain: "money-coach-aaa8c.firebaseapp.com",
+  authDomain: "moneycoach-app.vercel.app",
   projectId: "money-coach-aaa8c",
   storageBucket: "money-coach-aaa8c.firebasestorage.app",
   messagingSenderId: "39662562896",
