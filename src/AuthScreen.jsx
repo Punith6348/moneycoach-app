@@ -5,21 +5,23 @@ import { GoogleAuthProvider, signInWithPopup, RecaptchaVerifier, signInWithPhone
 
 // ── Base layout — top-aligned, scrollable, safe-area aware ───────────────────
 const pageStyle = {
-  minHeight: "100vh",
-  minHeight: "100dvh",
+  position: "relative",
   overflowY: "auto",
   overflowX: "hidden",
-  background: "linear-gradient(160deg,#0F172A 0%,#1E293B 60%,#0F172A 100%)",
   fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
   boxSizing: "border-box",
   paddingTop: "env(safe-area-inset-top, 0px)",
   paddingBottom: "env(safe-area-inset-bottom, 0px)",
+  // Background fills entire screen always, independent of content height
+  backgroundColor: "#0F172A",
+  backgroundImage: "linear-gradient(160deg,#0F172A 0%,#1E293B 60%,#0F172A 100%)",
+  backgroundAttachment: "fixed",
 };
 
 const containerStyle = {
   maxWidth: 420,
   margin: "0 auto",
-  padding: "32px 20px 40px",
+  padding: "28px 20px 28px",
   boxSizing: "border-box",
   width: "100%",
 };
@@ -122,7 +124,7 @@ function WelcomeScreen({ onStart }) {
       <div style={containerStyle}>
 
         {/* Logo + Brand */}
-        <div style={{ display:"flex", flexDirection:"column", alignItems:"center", paddingTop:16, marginBottom:32 }}>
+        <div style={{ display:"flex", flexDirection:"column", alignItems:"center", paddingTop:8, marginBottom:24 }}>
           <AppLogo size={88}/>
           <h1 style={{ margin:"16px 0 6px", fontSize:30, fontWeight:800, color:"#F1F5F9", fontFamily:"Georgia,serif", letterSpacing:"-0.5px", textAlign:"center" }}>
             Money Coach
@@ -133,7 +135,7 @@ function WelcomeScreen({ onStart }) {
         </div>
 
         {/* Feature cards */}
-        <div style={{ marginBottom:32 }}>
+        <div style={{ marginBottom:24 }}>
           {[
             { icon:"💸", title:"Daily Expense Tracking", desc:"Log every expense in seconds" },
             { icon:"📊", title:"Smart Budgets & Loans",  desc:"Set limits, track EMIs easily" },
