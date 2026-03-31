@@ -1,5 +1,5 @@
 // ─── useAppData.js — Extended with financial planning data ───────────────
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const STORAGE_KEY = "moneyCoachData_v3";
 
@@ -13,6 +13,7 @@ const DEFAULT_STATE = {
   loans:            [],  // [{id, name, principal, rate, tenureMonths, emi, startDate}]
   categoryBudgets:  {},  // { "Food": 3000, "Travel": 1500, ... }
   recurringExpenses:[],  // [{id, label, category, amount, dayOfMonth, note, active}]
+  assets:           [],  // [{id, label, type, value, note}]  type: savings|fd|stocks|gold|property|other
   allExpenses:   {},
   checkIns:      [],
 };
@@ -186,11 +187,10 @@ export const getActiveMonthKeys = (allExpenses) => {
 };
 
 // ── HOOK ──────────────────────────────────────────────────────────────────
-export function useAppData() {
+export function useAppData(firebaseUser = null) {
   const [data, setData] = useState(() => {
     const saved = load();
     if (!saved) return {...DEFAULT_STATE};
-    // Ensure all array fields exist even in old saved states that predate them
     return {
       ...DEFAULT_STATE,
       ...saved,
@@ -203,13 +203,50 @@ export function useAppData() {
       allExpenses:    (saved.allExpenses && typeof saved.allExpenses==="object") ? saved.allExpenses : {},
       categoryBudgets:(saved.categoryBudgets && typeof saved.categoryBudgets==="object") ? saved.categoryBudgets : {},
       recurringExpenses: Array.isArray(saved.recurringExpenses) ? saved.recurringExpenses : [],
+      assets:            Array.isArray(saved.assets)            ? saved.assets            : [],
     };
   });
+
+  // ── Load from Firestore when user logs in ────────────────────────────────
+  useEffect(() => {
+    if (!firebaseUser) return;
+    import("./useFirestoreSync.js").then(async ({ loadFromFirestore, migrateLocalToFirestore }) => {
+      await migrateLocalToFirestore(firebaseUser.uid);
+      const cloudData = await loadFromFirestore(firebaseUser.uid);
+      if (cloudData) {
+        const merged = {
+          ...DEFAULT_STATE, ...cloudData,
+          loans:             Array.isArray(cloudData.loans)             ? cloudData.loans             : [],
+          incomeSources:     Array.isArray(cloudData.incomeSources)     ? cloudData.incomeSources     : [],
+          fixedExpenses:     Array.isArray(cloudData.fixedExpenses)     ? cloudData.fixedExpenses     : [],
+          savingsPlans:      Array.isArray(cloudData.savingsPlans)      ? cloudData.savingsPlans      : [],
+          futurePayments:    Array.isArray(cloudData.futurePayments)    ? cloudData.futurePayments    : [],
+          checkIns:          Array.isArray(cloudData.checkIns)          ? cloudData.checkIns          : [],
+          allExpenses:       (cloudData.allExpenses && typeof cloudData.allExpenses==="object")       ? cloudData.allExpenses       : {},
+          categoryBudgets:   (cloudData.categoryBudgets && typeof cloudData.categoryBudgets==="object") ? cloudData.categoryBudgets : {},
+          recurringExpenses: Array.isArray(cloudData.recurringExpenses) ? cloudData.recurringExpenses : [],
+          assets:            Array.isArray(cloudData.assets)            ? cloudData.assets            : [],
+        };
+        setData(merged);
+        persist(merged);
+      }
+    });
+  }, [firebaseUser?.uid]);
 
   const commit = (fn) => {
     setData(prev => {
       const next = fn(prev);
       persist(next);
+      // Sync to Firestore if logged in
+      if (firebaseUser) {
+        import("./useFirestoreSync.js").then(async ({ loadFromFirestore }) => {
+          const { doc, setDoc } = await import("firebase/firestore");
+          const { db } = await import("./firebase.js");
+          const ref = doc(db, "users", firebaseUser.uid);
+          setDoc(ref, { data: JSON.stringify(next), updatedAt: Date.now() })
+            .catch(e => console.warn("Sync failed:", e));
+        });
+      }
       return next;
     });
   };
@@ -283,7 +320,10 @@ export function useAppData() {
   const deleteRecurring = (id)     => commit(prev=>({...prev, recurringExpenses:(prev.recurringExpenses||[]).filter(r=>r.id!==id)}));
   const toggleRecurring = (id)     => commit(prev=>({...prev, recurringExpenses:(prev.recurringExpenses||[]).map(r=>r.id===id?{...r,active:!r.active}:r)}));
 
-  // Auto-log recurring expenses for the current month if not already logged
+  // Assets (for Net Worth)
+  const addAsset    = (a)      => commit(prev=>({...prev, assets:[...(prev.assets||[]), {...a, id:Date.now()}]}));
+  const updateAsset = (id,upd) => commit(prev=>({...prev, assets:(prev.assets||[]).map(a=>a.id===id?{...a,...upd}:a)}));
+  const deleteAsset = (id)     => commit(prev=>({...prev, assets:(prev.assets||[]).filter(a=>a.id!==id)}));
   // Called once on app load — checks each active recurring item
   const autoLogRecurring = () => {
     const now   = new Date();
@@ -346,5 +386,7 @@ export function useAppData() {
     setCategoryBudget,
     updateName,
     addRecurring, updateRecurring, deleteRecurring, toggleRecurring, autoLogRecurring,
+    assets: data.assets || [],
+    addAsset, updateAsset, deleteAsset,
   };
 }

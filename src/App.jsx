@@ -1043,6 +1043,7 @@ function DashboardScreen(props) {
     addExpense, editExpense, deleteExpense, addCheckIn, resetAll,
     addLoan, updateLoan, deleteLoan,
     updateName,
+    firebaseUser, isGuest, onSignOut,
   } = props;
 
   const [selectedMonth,setSelectedMonth] = useState(currentMonthKey());
@@ -1152,6 +1153,9 @@ function DashboardScreen(props) {
           onNameChange={n => { updateName(n); setShowSettings(false); showToast("Name updated ✓"); }}
           darkMode={darkMode}
           onToggleDark={toggleDark}
+          firebaseUser={firebaseUser}
+          isGuest={isGuest}
+          onSignOut={onSignOut}
         />
       )}
 
@@ -1675,8 +1679,8 @@ function DashboardScreen(props) {
 }
 
 // ─── ROOT ─────────────────────────────────────────────────────────────────
-export default function App() {
-  const appData = useAppData();
+export default function App({ firebaseUser = null, isGuest = false, onSignOut = null }) {
+  const appData = useAppData(firebaseUser);
   if(appData.screen==="onboarding") return <OnboardingScreen onComplete={appData.completeOnboarding}/>;
-  return <DashboardScreen {...appData}/>;
+  return <DashboardScreen {...appData} firebaseUser={firebaseUser} isGuest={isGuest} onSignOut={onSignOut}/>;
 }

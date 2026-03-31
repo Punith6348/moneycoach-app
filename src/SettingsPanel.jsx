@@ -120,7 +120,7 @@ function Btn({ label, onClick, variant = "default" }) {
 // ══════════════════════════════════════════════════════════════════════════════
 // MAIN EXPORT
 // ══════════════════════════════════════════════════════════════════════════════
-export default function SettingsPanel({ name, onClose, onResetAll, onNameChange, darkMode = false, onToggleDark }) {
+export default function SettingsPanel({ name, onClose, onResetAll, onNameChange, darkMode = false, onToggleDark, firebaseUser = null, isGuest = false, onSignOut = null }) {
   const [importStatus, setImportStatus] = useState(null);
   const [exportDone,   setExportDone]   = useState(false);
   const [csvDone,      setCsvDone]      = useState(false);
@@ -310,6 +310,37 @@ export default function SettingsPanel({ name, onClose, onResetAll, onNameChange,
           }}>
             <p style={{ margin:0, fontSize:11, color:C.muted, lineHeight:1.6 }}>
               💡 <strong>Tip:</strong> Export a backup before resetting or switching devices. Your data is stored only on this device and browser.
+            </p>
+          </div>
+
+          {/* ── ACCOUNT ── */}
+          <p style={{ margin:"20px 0 4px", fontSize:10, fontWeight:700, color:C.muted,
+                      textTransform:"uppercase", letterSpacing:"1px" }}>Account</p>
+
+          {firebaseUser && (
+            <SettingRow icon="👤" title={firebaseUser.displayName || firebaseUser.phoneNumber || "Signed in"}
+              subtitle={firebaseUser.email || "Phone login"}>
+              <Btn label="Sign Out" onClick={async () => { onClose(); onSignOut && await onSignOut(); }} variant="danger"/>
+            </SettingRow>
+          )}
+
+          {isGuest && (
+            <SettingRow icon="👤" title="Guest Mode"
+              subtitle="Sign in to sync data across devices">
+              <Btn label="Sign In" onClick={() => { onClose(); onSignOut && onSignOut(); }} variant="primary"/>
+            </SettingRow>
+          )}
+
+          {/* Cloud sync status */}
+          <div style={{
+            marginTop:8, padding:"10px 12px", borderRadius:10,
+            background: firebaseUser ? "#F0FDF4" : "#FFFBEB",
+            border: `1px solid ${firebaseUser ? "#86EFAC" : "#FCD34D"}`,
+          }}>
+            <p style={{ margin:0, fontSize:11, color: firebaseUser ? C.green : "#D97706", lineHeight:1.6 }}>
+              {firebaseUser
+                ? "✓ Cloud sync ON — your data is backed up automatically"
+                : "⚠ Guest mode — data is only on this device. Sign in to enable cloud sync."}
             </p>
           </div>
 
