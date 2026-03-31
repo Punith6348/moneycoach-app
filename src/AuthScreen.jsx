@@ -1,7 +1,10 @@
 // ─── AuthScreen.jsx — Mobile-first, top-aligned, scrollable ──────────────────
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { auth } from "./firebase";
-import { GoogleAuthProvider, signInWithPopup, RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
+import { GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
+
+// Detect mobile — use redirect on mobile, popup on desktop
+const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
 // ── Base layout — parent .auth-root handles bg, scroll, safe-area ────────────
 const pageStyle = {
@@ -378,10 +381,39 @@ export default function AuthScreen({ onGuest }) {
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState("");
 
+  // Handle Google redirect result when returning from Google login page
+  useEffect(() => {
+    setLoading(true);
+    getRedirectResult(auth)
+      .then(result => {
+        // If result exists, Firebase auth state will update via onAuthStateChanged
+        if (result?.user) {
+          // Successfully signed in via redirect — auth state handled in main.jsx
+        }
+      })
+      .catch(() => {
+        // No redirect result or error — normal startup
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
   const handleGoogle = async () => {
     setLoading(true); setError("");
-    try { await signInWithPopup(auth, new GoogleAuthProvider()); }
-    catch { setError("Google sign-in failed. Try again."); setLoading(false); }
+    try {
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: "select_account" });
+      if (isMobile) {
+        // On mobile — redirect to Google (full page, no popup)
+        await signInWithRedirect(auth, provider);
+        // Page will redirect — no code runs after this
+      } else {
+        // On desktop — popup works fine
+        await signInWithPopup(auth, provider);
+      }
+    } catch (e) {
+      setError("Google sign-in failed. Try again.");
+      setLoading(false);
+    }
   };
 
   return (
