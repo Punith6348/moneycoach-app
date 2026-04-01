@@ -901,20 +901,17 @@ function AnnualSummary({ allExpenses, totalIncome, totalSavings }) {
 }
 
 // ─── RECURRING EXPENSES TAB ───────────────────────────────────────────────
-function RecurringTab({ recurringExpenses, allExpenses, onAdd, onUpdate, onDelete, onToggle, showToast }) {
+function RecurringTab({
+  recurringExpenses, allExpenses,
+  onAdd, onUpdate, onDelete, onToggle, showToast,
+  incomeSources=[], fixedExpenses=[], loans=[],
+  onUpdateIncomeSource, onUpdateFixedExpense,
+}) {
   const CATS = [
-    {name:"Rent",          icon:"🏠"},
-    {name:"EMI/Loan",      icon:"🏦"},
-    {name:"Electricity",   icon:"⚡"},
-    {name:"Internet",      icon:"📶"},
-    {name:"Mobile",        icon:"📱"},
-    {name:"Insurance",     icon:"🛡"},
-    {name:"Subscription",  icon:"📺"},
-    {name:"Gym",           icon:"💪"},
-    {name:"School Fees",   icon:"🎓"},
-    {name:"Maintenance",   icon:"🔧"},
-    {name:"Water",         icon:"💧"},
-    {name:"Other",         icon:"💸"},
+    {name:"Rent",icon:"🏠"},{name:"EMI/Loan",icon:"🏦"},{name:"Electricity",icon:"⚡"},
+    {name:"Internet",icon:"📶"},{name:"Mobile",icon:"📱"},{name:"Insurance",icon:"🛡"},
+    {name:"Subscription",icon:"📺"},{name:"Gym",icon:"💪"},{name:"School Fees",icon:"🎓"},
+    {name:"Maintenance",icon:"🔧"},{name:"Water",icon:"💧"},{name:"Other",icon:"💸"},
   ];
   const DAYS = Array.from({length:28},(_,i)=>i+1);
 
@@ -925,6 +922,8 @@ function RecurringTab({ recurringExpenses, allExpenses, onAdd, onUpdate, onDelet
   const [fAmt,     setFAmt]     = useState("");
   const [fDay,     setFDay]     = useState(1);
   const [fNote,    setFNote]    = useState("");
+  // Inline edit for carry-forward items
+  const [editingCF, setEditingCF] = useState(null); // {type, id, amount}
 
   const ordinal = (d) => { const s=["th","st","nd","rd"]; const v=d%100; return d+(s[(v-20)%10]||s[v]||s[0]); };
   const inp2 = { width:"100%", padding:"9px 11px", borderRadius:8, border:`1px solid ${C.border}`, fontFamily:"inherit", fontSize:13, background:"#fff", outline:"none", boxSizing:"border-box" };
@@ -942,18 +941,88 @@ function RecurringTab({ recurringExpenses, allExpenses, onAdd, onUpdate, onDelet
     cancel();
   };
 
-  const monthlyTotal = recurringExpenses.filter(r=>r.active).reduce((s,r)=>s+r.amount, 0);
+  const saveCFEdit = () => {
+    if (!editingCF) return;
+    const v = parseFloat(editingCF.amount);
+    if (!v || v <= 0) return;
+    if (editingCF.type === "income") onUpdateIncomeSource(editingCF.id, { amount: v });
+    if (editingCF.type === "fixed")  onUpdateFixedExpense(editingCF.id, { amount: v });
+    showToast("Amount updated ✓");
+    setEditingCF(null);
+  };
+
   const curMonthKey  = currentMonthKey();
+  const monthlyRecurring = recurringExpenses.filter(r=>r.active).reduce((s,r)=>s+r.amount, 0);
+  const monthlyFixed     = fixedExpenses.reduce((s,f)=>s+f.amount, 0);
+  const monthlyIncome    = incomeSources.reduce((s,i)=>s+i.amount, 0);
+  const monthlyLoans     = loans.reduce((s,l)=>s+(l.emi||0), 0);
+
+  // Carry-forward item row
+  const CFRow = ({ icon, label, amount, sublabel, type, id, onEditAmount }) => {
+    const isEditing = editingCF?.type === type && editingCF?.id === id;
+    return (
+      <div style={{
+        display:"flex", alignItems:"center", justifyContent:"space-between",
+        padding:"12px 14px", background:"#fff", borderRadius:12,
+        border:`1px solid ${C.border}`, marginBottom:8,
+        boxShadow:"0 1px 3px rgba(0,0,0,0.04)",
+      }}>
+        <div style={{ display:"flex", alignItems:"center", gap:12, flex:1, minWidth:0 }}>
+          <span style={{ fontSize:22, flexShrink:0 }}>{icon}</span>
+          <div style={{ flex:1, minWidth:0 }}>
+            <p style={{ margin:0, fontSize:13, fontWeight:700, color:C.ink,
+              overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{label}</p>
+            {sublabel && <p style={{ margin:"2px 0 0", fontSize:10, color:C.muted }}>{sublabel}</p>}
+          </div>
+        </div>
+        {isEditing ? (
+          <div style={{ display:"flex", alignItems:"center", gap:6, flexShrink:0 }}>
+            <input
+              autoFocus type="number"
+              value={editingCF.amount}
+              onChange={e=>setEditingCF(p=>({...p, amount:e.target.value}))}
+              onKeyDown={e=>{ if(e.key==="Enter") saveCFEdit(); if(e.key==="Escape") setEditingCF(null); }}
+              style={{ width:90, padding:"5px 8px", borderRadius:7, border:`1.5px solid ${C.blue}`,
+                outline:"none", fontFamily:"inherit", fontSize:13, textAlign:"right" }}
+            />
+            <button onClick={saveCFEdit} style={{
+              padding:"5px 10px", borderRadius:7, border:"none",
+              background:C.blue, color:"#fff", cursor:"pointer",
+              fontFamily:"inherit", fontSize:12, fontWeight:700,
+            }}>✓</button>
+            <button onClick={()=>setEditingCF(null)} style={{
+              padding:"5px 8px", borderRadius:7, border:`1px solid ${C.border}`,
+              background:"#fff", color:C.muted, cursor:"pointer",
+              fontFamily:"inherit", fontSize:12,
+            }}>✕</button>
+          </div>
+        ) : (
+          <div style={{ display:"flex", alignItems:"center", gap:8, flexShrink:0 }}>
+            <p style={{ margin:0, fontSize:14, fontWeight:700, color:C.ink,
+              fontFamily:"Georgia,serif" }}>{fmt(amount)}</p>
+            {onEditAmount && (
+              <button onClick={()=>setEditingCF({type, id, amount:String(amount)})} style={{
+                padding:"4px 8px", borderRadius:7, border:`1px solid ${C.border}`,
+                background:C.bg, cursor:"pointer", fontFamily:"inherit",
+                fontSize:11, color:C.muted, fontWeight:600,
+              }}>Edit</button>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div>
       {/* Header */}
       <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:14}}>
         <div>
-          <h2 style={{margin:"0 0 2px", fontSize:17, fontWeight:700, color:C.ink, fontFamily:"Georgia,serif"}}>Recurring Expenses</h2>
+          <h2 style={{margin:"0 0 2px", fontSize:17, fontWeight:700, color:C.ink, fontFamily:"Georgia,serif"}}>
+            Recurring & Monthly
+          </h2>
           <p style={{margin:0, fontSize:11, color:C.muted}}>
-            Auto-logged monthly · {recurringExpenses.filter(r=>r.active).length} active
-            {monthlyTotal > 0 && ` · ${fmt(monthlyTotal)}/month`}
+            Auto-carries every month · tap Edit to update amount
           </p>
         </div>
         {!showForm && (
@@ -965,121 +1034,185 @@ function RecurringTab({ recurringExpenses, allExpenses, onAdd, onUpdate, onDelet
         )}
       </div>
 
-      {/* Empty state banner */}
-      {recurringExpenses.length === 0 && !showForm && (
-        <div style={{background:"#EFF6FF", border:"1px solid #BFDBFE", borderRadius:11, padding:"12px 14px", marginBottom:14, display:"flex", alignItems:"flex-start", gap:10}}>
-          <span style={{fontSize:20, flexShrink:0}}>🔁</span>
-          <p style={{margin:0, fontSize:12, color:C.ink, lineHeight:1.6}}>
-            Add expenses that repeat every month — Netflix, gym, electricity. They'll be <strong>auto-logged</strong> on the day you set, so you never have to enter them manually.
+      {/* ── INCOME SOURCES ── */}
+      {incomeSources.length > 0 && (
+        <div style={{marginBottom:16}}>
+          <p style={{margin:"0 0 8px", fontSize:11, fontWeight:700, color:C.muted,
+            textTransform:"uppercase", letterSpacing:"0.8px"}}>
+            💰 Income Sources · {fmt(monthlyIncome)}/month
+          </p>
+          {incomeSources.map(src => (
+            <CFRow key={src.id}
+              icon="💰" label={src.label||src.name||"Income"} amount={src.amount}
+              sublabel="Monthly income · auto carry-forward"
+              type="income" id={src.id}
+              onEditAmount={onUpdateIncomeSource}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* ── FIXED EXPENSES ── */}
+      {fixedExpenses.length > 0 && (
+        <div style={{marginBottom:16}}>
+          <p style={{margin:"0 0 8px", fontSize:11, fontWeight:700, color:C.muted,
+            textTransform:"uppercase", letterSpacing:"0.8px"}}>
+            🏠 Fixed Expenses · {fmt(monthlyFixed)}/month
+          </p>
+          {fixedExpenses.map(exp => (
+            <CFRow key={exp.id}
+              icon="🏠" label={exp.label||exp.name||"Fixed"} amount={exp.amount}
+              sublabel="Fixed monthly · auto carry-forward"
+              type="fixed" id={exp.id}
+              onEditAmount={onUpdateFixedExpense}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* ── LOANS / EMI ── */}
+      {loans.length > 0 && (
+        <div style={{marginBottom:16}}>
+          <p style={{margin:"0 0 8px", fontSize:11, fontWeight:700, color:C.muted,
+            textTransform:"uppercase", letterSpacing:"0.8px"}}>
+            🏦 Loans & EMIs · {fmt(monthlyLoans)}/month
+          </p>
+          {loans.map(loan => (
+            <CFRow key={loan.id}
+              icon="🏦" label={loan.name||"Loan"} amount={loan.emi||0}
+              sublabel={`EMI · auto carry-forward`}
+              type="loan" id={loan.id}
+              onEditAmount={null} // loans edited in Loans tab
+            />
+          ))}
+          <p style={{margin:"4px 0 0", fontSize:10, color:C.muted}}>
+            * Edit loan EMI in the Loans tab
           </p>
         </div>
       )}
 
-      {/* Add / Edit form */}
-      {showForm && (
-        <div style={{background:"#fff", borderRadius:13, border:`1px solid ${C.border}`, boxShadow:"0 1px 4px rgba(0,0,0,0.06)", padding:16, marginBottom:14}}>
-          <p style={{margin:"0 0 14px", fontSize:14, fontWeight:700, color:C.ink}}>
-            {editId !== null ? "✏️ Edit Recurring" : "🔁 New Recurring Expense"}
-          </p>
-          <p style={{margin:"0 0 4px", fontSize:10, fontWeight:700, color:C.muted, textTransform:"uppercase", letterSpacing:"0.9px"}}>Label *</p>
-          <input value={fLabel} onChange={e=>setFLabel(e.target.value)} placeholder="e.g. Netflix, Gym, Electricity"
-            style={{...inp2, marginBottom:12}} />
+      {/* ── CUSTOM RECURRING EXPENSES ── */}
+      <div style={{marginBottom:8}}>
+        <p style={{margin:"0 0 8px", fontSize:11, fontWeight:700, color:C.muted,
+          textTransform:"uppercase", letterSpacing:"0.8px"}}>
+          🔁 Custom Recurring · {fmt(monthlyRecurring)}/month
+        </p>
 
-          <p style={{margin:"0 0 6px", fontSize:10, fontWeight:700, color:C.muted, textTransform:"uppercase", letterSpacing:"0.9px"}}>Category</p>
-          <div style={{display:"flex", flexWrap:"wrap", gap:5, marginBottom:12}}>
-            {CATS.map(c=>(
-              <button key={c.name} onClick={()=>setFCat(c.name)} style={{
-                padding:"4px 10px", borderRadius:99, fontSize:11, fontWeight:600,
-                cursor:"pointer", fontFamily:"inherit",
-                border:`1.5px solid ${fCat===c.name?C.ink:C.border}`,
-                background:fCat===c.name?C.ink:"#fff",
-                color:fCat===c.name?"#fff":C.ink,
-              }}>{c.icon} {c.name}</button>
-            ))}
+        {recurringExpenses.length === 0 && !showForm && (
+          <div style={{background:"#EFF6FF", border:"1px solid #BFDBFE", borderRadius:11, padding:"12px 14px", marginBottom:14, display:"flex", alignItems:"flex-start", gap:10}}>
+            <span style={{fontSize:20, flexShrink:0}}>🔁</span>
+            <p style={{margin:0, fontSize:12, color:C.ink, lineHeight:1.6}}>
+              Add expenses that repeat monthly — Netflix, gym, electricity. They'll be <strong>auto-logged</strong> on the day you set.
+            </p>
           </div>
+        )}
 
-          <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:12}}>
-            <div>
-              <p style={{margin:"0 0 4px", fontSize:10, fontWeight:700, color:C.muted, textTransform:"uppercase", letterSpacing:"0.9px"}}>Amount (₹) *</p>
-              <input type="number" value={fAmt} onChange={e=>setFAmt(e.target.value)} placeholder="e.g. 649" style={inp2} />
+        {/* Add / Edit form */}
+        {showForm && (
+          <div style={{background:"#fff", borderRadius:13, border:`1px solid ${C.border}`, boxShadow:"0 1px 4px rgba(0,0,0,0.06)", padding:16, marginBottom:14}}>
+            <p style={{margin:"0 0 14px", fontSize:14, fontWeight:700, color:C.ink}}>
+              {editId !== null ? "✏️ Edit Recurring" : "🔁 New Recurring Expense"}
+            </p>
+            <p style={{margin:"0 0 4px", fontSize:10, fontWeight:700, color:C.muted, textTransform:"uppercase", letterSpacing:"0.9px"}}>Label *</p>
+            <input value={fLabel} onChange={e=>setFLabel(e.target.value)} placeholder="e.g. Netflix, Gym, Electricity"
+              style={{...inp2, marginBottom:12}} />
+            <p style={{margin:"0 0 6px", fontSize:10, fontWeight:700, color:C.muted, textTransform:"uppercase", letterSpacing:"0.9px"}}>Category</p>
+            <div style={{display:"flex", flexWrap:"wrap", gap:5, marginBottom:12}}>
+              {CATS.map(c=>(
+                <button key={c.name} onClick={()=>setFCat(c.name)} style={{
+                  padding:"4px 10px", borderRadius:99, fontSize:11, fontWeight:600,
+                  cursor:"pointer", fontFamily:"inherit",
+                  border:`1.5px solid ${fCat===c.name?C.ink:C.border}`,
+                  background:fCat===c.name?C.ink:"#fff",
+                  color:fCat===c.name?"#fff":C.ink,
+                }}>{c.icon} {c.name}</button>
+              ))}
             </div>
-            <div>
-              <p style={{margin:"0 0 4px", fontSize:10, fontWeight:700, color:C.muted, textTransform:"uppercase", letterSpacing:"0.9px"}}>Day of Month</p>
-              <select value={fDay} onChange={e=>setFDay(Number(e.target.value))} style={inp2}>
-                {DAYS.map(d=><option key={d} value={d}>{ordinal(d)} of every month</option>)}
-              </select>
+            <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:12}}>
+              <div>
+                <p style={{margin:"0 0 4px", fontSize:10, fontWeight:700, color:C.muted, textTransform:"uppercase", letterSpacing:"0.9px"}}>Amount (₹) *</p>
+                <input type="number" value={fAmt} onChange={e=>setFAmt(e.target.value)} placeholder="e.g. 649" style={inp2} />
+              </div>
+              <div>
+                <p style={{margin:"0 0 4px", fontSize:10, fontWeight:700, color:C.muted, textTransform:"uppercase", letterSpacing:"0.9px"}}>Day of Month</p>
+                <select value={fDay} onChange={e=>setFDay(Number(e.target.value))} style={inp2}>
+                  {DAYS.map(d=><option key={d} value={d}>{ordinal(d)} of every month</option>)}
+                </select>
+              </div>
+            </div>
+            <p style={{margin:"0 0 4px", fontSize:10, fontWeight:700, color:C.muted, textTransform:"uppercase", letterSpacing:"0.9px"}}>Note (optional)</p>
+            <input value={fNote} onChange={e=>setFNote(e.target.value)} placeholder="e.g. Hotstar annual plan"
+              style={{...inp2, marginBottom:14}} />
+            <div style={{display:"flex", gap:9}}>
+              <button onClick={cancel} style={{flex:1, padding:"9px", borderRadius:9, border:`1px solid ${C.border}`, background:"#fff", color:C.muted, fontFamily:"inherit", fontSize:13, cursor:"pointer"}}>Cancel</button>
+              <button onClick={save}   style={{flex:2, padding:"9px", borderRadius:9, border:"none", background:C.ink, color:"#fff", fontFamily:"inherit", fontSize:13, fontWeight:700, cursor:"pointer"}}>
+                {editId !== null ? "Save Changes ✓" : "Add Recurring ✓"}
+              </button>
             </div>
           </div>
+        )}
 
-          <p style={{margin:"0 0 4px", fontSize:10, fontWeight:700, color:C.muted, textTransform:"uppercase", letterSpacing:"0.9px"}}>Note (optional)</p>
-          <input value={fNote} onChange={e=>setFNote(e.target.value)} placeholder="e.g. Hotstar annual plan"
-            style={{...inp2, marginBottom:14}} />
-
-          <div style={{display:"flex", gap:9}}>
-            <button onClick={cancel} style={{flex:1, padding:"9px", borderRadius:9, border:`1px solid ${C.border}`, background:"#fff", color:C.muted, fontFamily:"inherit", fontSize:13, cursor:"pointer"}}>Cancel</button>
-            <button onClick={save}   style={{flex:2, padding:"9px", borderRadius:9, border:"none", background:C.ink, color:"#fff", fontFamily:"inherit", fontSize:13, fontWeight:700, cursor:"pointer"}}>
-              {editId !== null ? "Save Changes ✓" : "Add Recurring ✓"}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* List */}
-      {recurringExpenses.length > 0 && (
-        <div style={{display:"flex", flexDirection:"column", gap:8}}>
-          {recurringExpenses.map(r => {
-            const cat        = CATS.find(c=>c.name===r.category) || {icon:"💸"};
-            const autoLogged = (allExpenses[curMonthKey]||[]).some(e=>e.recurringId===r.id);
-            return (
-              <div key={r.id} style={{
-                background:"#fff", borderRadius:12, border:`1px solid ${C.border}`,
-                boxShadow:"0 1px 2px rgba(0,0,0,0.04)", padding:"11px 14px",
-                opacity: r.active ? 1 : 0.55,
-              }}>
-                <div style={{display:"flex", alignItems:"center", gap:10}}>
-                  <div style={{width:36, height:36, borderRadius:9, flexShrink:0, fontSize:18,
-                               background:`${C.blue}10`, border:`1px solid ${C.blue}20`,
-                               display:"flex", alignItems:"center", justifyContent:"center"}}>
-                    {cat.icon}
-                  </div>
+        {/* Custom recurring list */}
+        {recurringExpenses.length > 0 && (
+          <div style={{display:"flex", flexDirection:"column", gap:8}}>
+            {recurringExpenses.map(r => {
+              const autoLogged = (allExpenses[curMonthKey]||[]).some(e=>e.recurringId===r.id);
+              const ICONS = {Rent:"🏠","EMI/Loan":"🏦",Electricity:"⚡",Internet:"📶",Mobile:"📱",Insurance:"🛡",Subscription:"📺",Gym:"💪","School Fees":"🎓",Maintenance:"🔧",Water:"💧",Other:"💸"};
+              const icon = ICONS[r.category] || "🔁";
+              return (
+                <div key={r.id} style={{
+                  display:"flex", alignItems:"center", gap:12,
+                  padding:"12px 14px", background:"#fff", borderRadius:12,
+                  border:`1px solid ${r.active ? C.border : "#F3F4F6"}`,
+                  opacity: r.active ? 1 : 0.6,
+                  boxShadow:"0 1px 3px rgba(0,0,0,0.04)",
+                }}>
+                  <span style={{fontSize:22, flexShrink:0}}>{icon}</span>
                   <div style={{flex:1, minWidth:0}}>
-                    <div style={{display:"flex", alignItems:"center", gap:6, flexWrap:"wrap", marginBottom:2}}>
-                      <p style={{margin:0, fontSize:13, fontWeight:700, color:C.ink}}>{r.label}</p>
-                      {autoLogged && (
-                        <span style={{fontSize:9, fontWeight:700, color:C.green, background:"#F0FDF4", border:"1px solid #86EFAC", borderRadius:99, padding:"1px 7px"}}>✓ logged this month</span>
-                      )}
-                      {!r.active && (
-                        <span style={{fontSize:9, color:C.muted, background:C.bg, border:`1px solid ${C.border}`, borderRadius:99, padding:"1px 7px"}}>paused</span>
-                      )}
-                    </div>
-                    <p style={{margin:0, fontSize:10, color:C.muted}}>
-                      {r.category} · {fmt(r.amount)}/month · {ordinal(r.dayOfMonth)} of month{r.note?` · ${r.note}`:""}
+                    <p style={{margin:0, fontSize:13, fontWeight:700, color:C.ink,
+                      overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{r.label}</p>
+                    <p style={{margin:"2px 0 0", fontSize:10, color:C.muted}}>
+                      {ordinal(r.dayOfMonth)} of month
+                      {autoLogged ? " · ✅ logged this month" : " · ⏳ pending"}
                     </p>
                   </div>
-                  <p style={{margin:0, fontSize:15, fontWeight:700, color:C.ink, fontFamily:"Georgia,serif", flexShrink:0}}>
+                  <p style={{margin:0, fontSize:14, fontWeight:700, color:C.ink, fontFamily:"Georgia,serif", flexShrink:0}}>
                     {fmt(r.amount)}
                   </p>
+                  <div style={{display:"flex", gap:6, flexShrink:0}}>
+                    <button onClick={()=>openEdit(r)} style={{padding:"4px 8px", borderRadius:7, border:`1px solid ${C.border}`, background:C.bg, cursor:"pointer", fontFamily:"inherit", fontSize:11, color:C.muted}}>Edit</button>
+                    <button onClick={()=>{onToggle(r.id); showToast(r.active?"Paused ✓":"Resumed ✓");}}
+                      style={{padding:"4px 8px", borderRadius:7, border:`1px solid ${C.border}`, background:r.active?"#FFF7ED":"#F0FDF4", cursor:"pointer", fontFamily:"inherit", fontSize:11, color:r.active?C.amber:C.green}}>
+                      {r.active?"Pause":"Resume"}
+                    </button>
+                  </div>
                 </div>
-                <div style={{display:"flex", gap:6, marginTop:9, paddingTop:9, borderTop:`1px solid ${C.bg}`}}>
-                  <button onClick={()=>onToggle(r.id)} style={{flex:1, padding:"5px 0", borderRadius:7, fontSize:11, fontWeight:600, cursor:"pointer", fontFamily:"inherit", border:`1px solid ${C.border}`, background:r.active?"#FFFBEB":"#F0FDF4", color:r.active?C.amber:C.green}}>
-                    {r.active ? "⏸ Pause" : "▶ Resume"}
-                  </button>
-                  <button onClick={()=>openEdit(r)} style={{flex:1, padding:"5px 0", borderRadius:7, fontSize:11, fontWeight:600, cursor:"pointer", fontFamily:"inherit", border:`1px solid ${C.border}`, background:"#fff", color:C.ink}}>
-                    ✏ Edit
-                  </button>
-                  <button onClick={()=>{ if(window.confirm(`Delete "${r.label}"?`)) onDelete(r.id); }} style={{flex:1, padding:"5px 0", borderRadius:7, fontSize:11, fontWeight:600, cursor:"pointer", fontFamily:"inherit", border:"1px solid #FECACA", background:"#FFF1F2", color:C.red}}>
-                    🗑 Delete
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Monthly total summary */}
+      {(incomeSources.length > 0 || fixedExpenses.length > 0 || loans.length > 0 || recurringExpenses.length > 0) && (
+        <div style={{marginTop:16, padding:"12px 14px", borderRadius:12,
+          background:"#F0FDF4", border:"1px solid #86EFAC"}}>
+          <div style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+            <p style={{margin:0, fontSize:12, fontWeight:700, color:C.green}}>
+              Total Monthly Commitments
+            </p>
+            <p style={{margin:0, fontSize:15, fontWeight:800, color:C.green, fontFamily:"Georgia,serif"}}>
+              {fmt(monthlyFixed + monthlyLoans + monthlyRecurring)}
+            </p>
+          </div>
+          <p style={{margin:"4px 0 0", fontSize:10, color:"#166534"}}>
+            Fixed {fmt(monthlyFixed)} + EMIs {fmt(monthlyLoans)} + Recurring {fmt(monthlyRecurring)}
+          </p>
         </div>
       )}
     </div>
   );
 }
-
 // ─── DASHBOARD ────────────────────────────────────────────────────────────
 function DashboardScreen(props) {
   const {
@@ -1595,6 +1728,11 @@ function DashboardScreen(props) {
             onDelete={deleteRecurring}
             onToggle={toggleRecurring}
             showToast={showToast}
+            incomeSources={incomeSources||[]}
+            fixedExpenses={fixedExpenses||[]}
+            loans={loans||[]}
+            onUpdateIncomeSource={updateIncomeSource}
+            onUpdateFixedExpense={updateFixedExpense}
           />
         )}
 
