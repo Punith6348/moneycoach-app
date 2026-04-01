@@ -59,8 +59,8 @@ export function calcMonthlyReserve(payment) {
 export function calcTotalReserve(payments) {
   return payments.reduce((s, p) => s + calcMonthlyReserve(p), 0);
 }
-export function calcRemainingBudget(income, fixed, savings, reserve) {
-  return income - fixed - savings - reserve;
+export function calcRemainingBudget(income, fixed, savings, reserve, loanEmi = 0) {
+  return income - fixed - savings - reserve - loanEmi;
 }
 export function calcDailyLimit(remaining) {
   const now   = new Date();
@@ -443,19 +443,17 @@ export function useAppData(firebaseUser = null) {
   const totalFixed    = calcTotalFixed(data.fixedExpenses);
   const totalSavings  = calcTotalSavings(data.savingsPlans);
   const totalReserve  = calcTotalReserve(data.futurePayments);
+  const totalLoanEmi  = (data.loans||[]).reduce((s,l) => s + (l.emi||0), 0);
 
   // ── Current month expenses only ──────────────────────────────────────────
   const curMonthKey    = currentMonthKey();
-  const thisMonthExp   = (data.allExpenses[curMonthKey] || []); // ALL expenses this month
+  const thisMonthExp   = (data.allExpenses[curMonthKey] || []);
   const thisMonthSpent = thisMonthExp.reduce((s, e) => s + (e.amount || 0), 0);
 
-  // ── Recurring auto-logged this month (fixed costs already in plan) ────────
-  // These are already counted in totalFixed via plan — don't double-count
-  const budgetForMonth = calcRemainingBudget(totalIncome, totalFixed, totalSavings, totalReserve);
+  // ── Budget = Income − Fixed − Savings − Reserve − Loan EMIs ─────────────
+  const budgetForMonth = calcRemainingBudget(totalIncome, totalFixed, totalSavings, totalReserve, totalLoanEmi);
 
-  // ── TRUE remaining = this month's budget minus variable daily spending ────
-  // budgetForMonth already accounts for fixed, savings, reserve
-  // thisMonthSpent = only manual daily expenses this month
+  // ── TRUE remaining = budget minus this month's daily expenses ────────────
   const remaining  = budgetForMonth - thisMonthSpent;
   const dailyLimit = calcDailyLimit(remaining);
 
@@ -532,7 +530,7 @@ export function useAppData(firebaseUser = null) {
     categoryBudgets: data.categoryBudgets || {},
     recurringExpenses: data.recurringExpenses || [],
     allExpenses:data.allExpenses, checkIns:data.checkIns,
-    totalIncome, totalFixed, totalSavings, totalReserve,
+    totalIncome, totalFixed, totalSavings, totalReserve, totalLoanEmi,
     remaining, dailyLimit,
     thisMonthSpent, budgetForMonth,
     lastMonthKey, lastMonthSpent, lastMonthSaved, lastMonthBudget,
