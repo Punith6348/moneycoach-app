@@ -444,10 +444,9 @@ export function useAppData(firebaseUser = null) {
   const totalSavings  = calcTotalSavings(data.savingsPlans);
   const totalReserve  = calcTotalReserve(data.futurePayments);
 
-  // ── Current month expenses only (no carry-forward) ───────────────────────
+  // ── Current month expenses only ──────────────────────────────────────────
   const curMonthKey    = currentMonthKey();
-  const thisMonthExp   = (data.allExpenses[curMonthKey] || [])
-    .filter(e => !e.auto); // exclude auto-logged recurring from balance calc
+  const thisMonthExp   = (data.allExpenses[curMonthKey] || []); // ALL expenses this month
   const thisMonthSpent = thisMonthExp.reduce((s, e) => s + (e.amount || 0), 0);
 
   // ── Recurring auto-logged this month (fixed costs already in plan) ────────
@@ -465,7 +464,7 @@ export function useAppData(firebaseUser = null) {
   lastMonthDate.setDate(1);
   lastMonthDate.setMonth(lastMonthDate.getMonth() - 1);
   const lastMonthKey   = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth()+1).padStart(2,"0")}`;
-  const lastMonthExp   = (data.allExpenses[lastMonthKey] || []).filter(e => !e.auto);
+  const lastMonthExp   = (data.allExpenses[lastMonthKey] || []); // ALL last month expenses
   const lastMonthSpent = lastMonthExp.reduce((s, e) => s + (e.amount || 0), 0);
   const lastMonthBudget = budgetForMonth; // same plan
   const lastMonthSaved  = lastMonthBudget - lastMonthSpent;
