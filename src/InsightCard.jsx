@@ -165,7 +165,7 @@ export default function InsightCard({
   monthlyIncome = 0, expenses = [], prevMonthExpenses = [],
   totalFixed = 0, totalSavings = 0, totalReserve = 0,
   loans = [], allExpenses = {}, selectedMonth, onMonthChange,
-  showDetails = true,
+  showDetails = true, smartSuggestions = [], onNavigate,
 }) {
   const totalLoanEmi = useMemo(
     () => loans.reduce((s, l) => s + calcLoanTotals(l).emi, 0),
@@ -354,6 +354,33 @@ export default function InsightCard({
             Actionable Insights
           </p>
           {insights.map((ins, i) => <Pill key={i} text={ins.text} type={ins.type} />)}
+        </div>
+      )}
+
+      {/* ── D. SMART SUGGESTIONS ───────────────────────────────────────────── */}
+      {smartSuggestions.length > 0 && (
+        <div style={{ marginBottom:20 }}>
+          <p style={{ margin:"0 0 10px", fontSize:10, fontWeight:700, color:C.muted,
+                      textTransform:"uppercase", letterSpacing:"1px" }}>
+            💡 Smart Suggestions
+          </p>
+          {smartSuggestions.map((s,i) => (
+            <div key={i} onClick={()=>onNavigate&&onNavigate(s.tab)}
+              style={{
+                display:"flex", alignItems:"center", gap:12,
+                padding:"12px 14px", borderRadius:12, marginBottom:8,
+                background:"#fff", border:`1px solid ${C.border}`,
+                cursor:onNavigate?"pointer":"default",
+                boxShadow:"0 1px 3px rgba(0,0,0,0.05)",
+              }}>
+              <span style={{ fontSize:24, flexShrink:0 }}>{s.icon}</span>
+              <div style={{ flex:1, minWidth:0 }}>
+                <p style={{ margin:0, fontSize:13, fontWeight:700, color:C.ink }}>{s.title}</p>
+                <p style={{ margin:"2px 0 0", fontSize:11, color:C.muted, lineHeight:1.4 }}>{s.desc}</p>
+              </div>
+              {onNavigate && <span style={{ fontSize:16, color:"#D1D5DB", flexShrink:0 }}>›</span>}
+            </div>
+          ))}
         </div>
       )}
     </div>

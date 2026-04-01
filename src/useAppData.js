@@ -189,21 +189,62 @@ export const getActiveMonthKeys = (allExpenses) => {
   return Array.from(new Set([cur,...withData])).sort((a,b)=>b.localeCompare(a));
 };
 
+// ── Month carry-forward: run once when month changes ─────────────────────────
+// Income sources, fixed expenses, loans carry forward automatically
+// Daily expenses do NOT carry forward (stored per month key)
+function checkAndCarryForward(data) {
+  const curKey = currentMonthKey();
+  const lastCarryKey = data.lastCarryForwardMonth || "";
+
+  // Already did carry-forward this month — skip
+  if (lastCarryKey === curKey) return data;
+
+  // First time ever — just mark current month, no carry needed
+  if (!lastCarryKey) return { ...data, lastCarryForwardMonth: curKey };
+
+  // New month detected — carry forward plan items
+  // Income sources, fixed expenses, loans, savings plans all persist automatically
+  // (they are stored in data directly, not per month)
+  // Only need to auto-log recurring expenses for the new month
+  const now   = new Date();
+  const today = now.getDate();
+  const mk    = curKey;
+  const recs  = data.recurringExpenses || [];
+  const existing = data.allExpenses[mk] || [];
+  const toAdd = [];
+
+  recs.forEach(r => {
+    if (!r.active) return;
+    if (today < r.dayOfMonth) return;
+    const alreadyLogged = existing.some(e => e.recurringId === r.id);
+    if (alreadyLogged) return;
+    toAdd.push({
+      id: Date.now() + Math.random(),
+      amount:      r.amount,
+      label:       r.category,
+      note:        r.note || r.label,
+      date:        new Date(now.getFullYear(), now.getMonth(), r.dayOfMonth, 9, 0, 0).toISOString(),
+      recurringId: r.id,
+      auto:        true,
+    });
+  });
+
+  return {
+    ...data,
+    lastCarryForwardMonth: curKey,
+    allExpenses: toAdd.length > 0
+      ? { ...data.allExpenses, [mk]: [...existing, ...toAdd] }
+      : data.allExpenses,
+  };
+}
+
 // ── HOOK ──────────────────────────────────────────────────────────────────
 export function useAppData(firebaseUser = null) {
   const [data, setData] = useState(() => {
-    // Only load localStorage if UID matches current user
-    // If no user yet, start empty — will load from Firestore after login
     const storedUid = localStorage.getItem("moneyCoachUID");
     const saved = load();
-
-    // If no stored UID or no saved data, start fresh
     if (!storedUid || !saved) return {...DEFAULT_STATE};
-
-    // Only restore if same user (UID stored at login time)
-    // Note: firebaseUser may be null here during initial render
-    // The useEffect below will handle proper loading after auth resolves
-    return {
+    const restored = {
       ...DEFAULT_STATE, ...saved,
       loans:             Array.isArray(saved.loans)             ? saved.loans             : [],
       incomeSources:     Array.isArray(saved.incomeSources)     ? saved.incomeSources     : [],
@@ -216,6 +257,8 @@ export function useAppData(firebaseUser = null) {
       recurringExpenses: Array.isArray(saved.recurringExpenses) ? saved.recurringExpenses : [],
       assets:            Array.isArray(saved.assets)            ? saved.assets            : [],
     };
+    // Check month carry-forward on every app load
+    return checkAndCarryForward(restored);
   });
 
   // ── Load from Firestore when user logs in ────────────────────────────────

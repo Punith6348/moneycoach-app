@@ -1423,7 +1423,6 @@ function DashboardScreen(props) {
                       thisMonthSpent={thisMonthSpent} budgetForMonth={budgetForMonth}
                       lastMonthKey={lastMonthKey} lastMonthSpent={lastMonthSpent}
                       lastMonthSaved={lastMonthSaved} lastMonthBudget={lastMonthBudget}
-                      smartSuggestions={smartSuggestions}
                       incomeSources={incomeSources} fixedExpenses={fixedExpenses}
                       savingsPlans={savingsPlans} futurePayments={futurePayments}
                       currentExpenses={currentExpenses}
@@ -1664,6 +1663,8 @@ function DashboardScreen(props) {
               selectedMonth={selectedMonth}
               onMonthChange={setSelectedMonth}
               showDetails={true}
+              smartSuggestions={smartSuggestions}
+              onNavigate={(targetTab) => setTab(targetTab)}
             />
           );
         })()}
