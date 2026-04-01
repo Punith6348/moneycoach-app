@@ -457,11 +457,11 @@ export default function BudgetDashboard({
       {/* ══ 2. SUMMARY CARDS ══ */}
       <div className="mc-summary-row">
         {[
-          // navTo: {tab, section} for editable cards — null for computed/derived cards
-          { label:"Total Income",   value:fmt(totalIncome),                                   color:C.green,  icon:"💰", sub:null,                                          navTo:{tab:"plan",  section:"plan-income"} },
-          { label:"Fixed Expenses", value:fmt(totalFixed),                                    color:C.red,    icon:"🏠", sub:totalIncome>0?`${allocPct(totalFixed)}% of income`:null,  navTo:{tab:"plan",  section:"plan-fixed"}  },
-          { label:"Savings & Inv.", value:fmt(totalSavings),                                  color:C.blue,   icon:"📈", sub:totalIncome>0?`${allocPct(totalSavings)}% of income`:null, navTo:{tab:"plan",  section:"plan-savings"} },
-          { label:"Loan EMI",       value:loans.length>0?`${fmt(totalLoanEmi)}/mo`:"₹0",     color:C.purple, icon:"🏦", sub:loans.length>0&&totalIncome>0?`${allocPct(totalLoanEmi)}% of income`:null, navTo:{tab:"loans", section:null} },
+          { label:"Income",         value:fmt(totalIncome),                               color:C.green,  icon:"💰", sub:"Monthly earnings",                                       navTo:{tab:"plan",  section:"plan-income"} },
+          { label:"Fixed Bills",    value:fmt(totalFixed),                                color:C.red,    icon:"🏠", sub:totalIncome>0?`${allocPct(totalFixed)}% of income`:null,  navTo:{tab:"plan",  section:"plan-fixed"}  },
+          { label:"Savings & Inv.", value:fmt(totalSavings),                              color:C.blue,   icon:"📈", sub:totalIncome>0?`${allocPct(totalSavings)}% of income`:null,navTo:{tab:"plan",  section:"plan-savings"} },
+          { label:"Future Reserve", value:fmt(Math.round(totalReserve)),                  color:C.amber,  icon:"🎯", sub:"For upcoming payments",                                  navTo:{tab:"plan",  section:"plan-savings"} },
+          { label:"Loan EMI",       value:loans.length>0?`${fmt(totalLoanEmi)}/mo`:"₹0", color:C.purple, icon:"🏦", sub:loans.length>0&&totalIncome>0?`${allocPct(totalLoanEmi)}% of income`:null, navTo:{tab:"loans", section:null} },
         ].map(t => {
           const clickable = !!t.navTo && !!onNavigate;
           const hovered   = hoveredCard === t.label;
