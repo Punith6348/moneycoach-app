@@ -118,9 +118,9 @@ const APP_CSS = `
   }
 
   /* ── Grid helpers ── */
-  .mc-plan-top  { display:grid; grid-template-columns:1fr; gap:0; }
+  .mc-plan-top  { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
   .mc-plan-full { width:100%; }
-  @media(min-width:768px){ .mc-plan-top { grid-template-columns:1fr 1fr; gap:12px; } }
+  @media(max-width:600px){ .mc-plan-top { grid-template-columns:1fr; gap:0; } }
 
   .mc-expense-row { display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px solid #F8FAFC; gap:8px; }
   .mc-expense-row:last-child { border-bottom:none; }
@@ -1578,78 +1578,77 @@ function DashboardScreen(props) {
         {/* ══ PLAN ══ */}
         {tab==="plan"&&(
           <>
-            <p style={{fontSize:12,color:C.muted,marginBottom:14,lineHeight:1.6}}>
-              Define your income, fixed bills, savings, and future payments. These drive your daily spending limit.
-            </p>
-            {/* Top row: Income (left) + Savings (right) — 2-col on desktop */}
+            {/* 2-col grid: Left = Income + Fixed, Right = Savings + Future */}
             <div className="mc-plan-top">
               <div>
                 <IncomeSources sources={incomeSources} totalIncome={totalIncome}
                   onAdd={src=>{if(!src.amount||src.amount<=0){showToast("⚠ Enter a valid amount");return;}addIncomeSource(src);showToast("Income source saved ✓");}}
                   onUpdate={(id,upd)=>{updateIncomeSource(id,upd);showToast("Income updated ✓");}}
                   onDelete={deleteIncomeSource}/>
+                <FixedExpensesSection items={fixedExpenses} totalFixed={totalFixed}
+                  onAdd={item=>{addFixedExpense(item);showToast("Fixed expense saved ✓");}}
+                  onUpdate={(id,upd)=>{updateFixedExpense(id,upd);showToast("Fixed expense updated ✓");}}
+                  onDelete={deleteFixedExpense}/>
               </div>
               <div>
                 <SavingsSection plans={savingsPlans} totalSavings={totalSavings}
                   onAdd={p=>{addSavingsPlan(p);showToast("Savings plan saved ✓");}}
                   onUpdate={(id,upd)=>{updateSavingsPlan(id,upd);showToast("Savings updated ✓");}}
                   onDelete={deleteSavingsPlan}/>
+                <FuturePaymentsSection payments={futurePayments} totalReserve={totalReserve}
+                  onAdd={p=>{addFuturePayment(p);showToast("Future payment saved ✓");}}
+                  onUpdate={(id,upd)=>{updateFuturePayment(id,upd);showToast("Future payment updated ✓");}}
+                  onDelete={deleteFuturePayment}/>
               </div>
-            </div>
-            {/* Full-width below: Fixed Expenses + Future Payments */}
-            <div className="mc-plan-full">
-              <FixedExpensesSection items={fixedExpenses} totalFixed={totalFixed}
-                onAdd={item=>{addFixedExpense(item);showToast("Fixed expense saved ✓");}}
-                onUpdate={(id,upd)=>{updateFixedExpense(id,upd);showToast("Fixed expense updated ✓");}}
-                onDelete={deleteFixedExpense}/>
-              <FuturePaymentsSection payments={futurePayments} totalReserve={totalReserve}
-                onAdd={p=>{addFuturePayment(p);showToast("Future payment saved ✓");}}
-                onUpdate={(id,upd)=>{updateFuturePayment(id,upd);showToast("Future payment updated ✓");}}
-                onDelete={deleteFuturePayment}/>
             </div>
 
             {/* ── Budget Summary Row ── */}
-            {totalIncome > 0 && (
-              <div style={{
-                background:"linear-gradient(135deg,#1E293B,#334155)",
-                borderRadius:14, padding:"14px 16px", marginTop:4,
-              }}>
-                <p style={{margin:"0 0 10px",fontSize:9,color:"#94A3B8",
-                           textTransform:"uppercase",letterSpacing:"1px",fontWeight:700}}>
-                  Monthly Budget Flow
-                </p>
-                <div style={{display:"flex",alignItems:"center",flexWrap:"wrap",gap:4}}>
-                  {[
-                    {label:"Income",  value:fmt(totalIncome),  color:"#6EE7B7"},
-                    {label:"Fixed",   value:fmt(totalFixed),   color:"#FCA5A5", prefix:"−"},
-                    {label:"Savings", value:fmt(totalSavings), color:"#93C5FD", prefix:"−"},
-                    {label:"Reserve", value:fmt(totalReserve), color:"#FCD34D", prefix:"−", hide:totalReserve===0},
-                    {label:"Daily Budget", value:dailyLimit>0?`${fmt(dailyLimit)}/day`:"₹0", color:"#fff", isResult:true},
-                  ].filter(t=>!t.hide).map((t,i,arr)=>(
-                    <div key={t.label} style={{display:"flex",alignItems:"center",gap:4}}>
-                      <div style={{
-                        padding:"6px 10px", borderRadius:8,
-                        background: t.isResult ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.06)",
-                        border:`1px solid ${t.isResult?"rgba(255,255,255,0.2)":"rgba(255,255,255,0.08)"}`,
-                      }}>
-                        <p style={{margin:0,fontSize:8,color:"#94A3B8",textTransform:"uppercase",letterSpacing:"0.6px"}}>{t.label}</p>
-                        <p style={{margin:"2px 0 0",fontSize:13,fontWeight:700,color:t.color,fontFamily:"Georgia,serif"}}>
-                          {t.prefix}{t.value}
-                        </p>
-                      </div>
-                      {i < arr.length-1 && (
-                        <span style={{fontSize:12,color:"#475569",fontWeight:700}}>→</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                {remaining < 0 && (
-                  <p style={{margin:"8px 0 0",fontSize:11,color:"#FCA5A5"}}>
-                    ⚠ Commitments exceed income by {fmt(Math.abs(remaining))} — review your fixed expenses or savings.
+            {totalIncome > 0 && (() => {
+              const loanEmi = loans.reduce((s,l)=>s+(l.emi||0),0);
+              const items = [
+                {label:"Income",   value:fmt(totalIncome),           color:"#6EE7B7"},
+                {label:"Fixed",    value:fmt(totalFixed),            color:"#FCA5A5", prefix:"−"},
+                {label:"Savings",  value:fmt(totalSavings),          color:"#93C5FD", prefix:"−"},
+                {label:"EMI",      value:fmt(loanEmi),               color:"#C4B5FD", prefix:"−", hide:loanEmi===0},
+                {label:"Reserve",  value:fmt(Math.round(totalReserve)), color:"#FCD34D", prefix:"−", hide:totalReserve===0},
+                {label:"Left/day", value:dailyLimit>0?`${fmt(dailyLimit)}/day`:"₹0", color:"#fff", isResult:true},
+              ].filter(t=>!t.hide);
+              return (
+                <div style={{
+                  background:"linear-gradient(135deg,#1E293B,#334155)",
+                  borderRadius:14, padding:"14px 16px", marginTop:4,
+                }}>
+                  <p style={{margin:"0 0 10px",fontSize:9,color:"#94A3B8",
+                             textTransform:"uppercase",letterSpacing:"1px",fontWeight:700}}>
+                    Monthly Budget Flow
                   </p>
-                )}
-              </div>
-            )}
+                  <div style={{display:"flex",alignItems:"center",flexWrap:"wrap",gap:4}}>
+                    {items.map((t,i,arr)=>(
+                      <div key={t.label} style={{display:"flex",alignItems:"center",gap:4}}>
+                        <div style={{
+                          padding:"6px 10px", borderRadius:8,
+                          background: t.isResult?"rgba(255,255,255,0.12)":"rgba(255,255,255,0.06)",
+                          border:`1px solid ${t.isResult?"rgba(255,255,255,0.2)":"rgba(255,255,255,0.08)"}`,
+                        }}>
+                          <p style={{margin:0,fontSize:8,color:"#94A3B8",textTransform:"uppercase",letterSpacing:"0.6px"}}>{t.label}</p>
+                          <p style={{margin:"2px 0 0",fontSize:13,fontWeight:700,color:t.color,fontFamily:"Georgia,serif"}}>
+                            {t.prefix}{t.value}
+                          </p>
+                        </div>
+                        {i < arr.length-1 && (
+                          <span style={{fontSize:12,color:"#475569",fontWeight:700}}>→</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {remaining < 0 && (
+                    <p style={{margin:"8px 0 0",fontSize:11,color:"#FCA5A5"}}>
+                      ⚠ Commitments exceed income by {fmt(Math.abs(remaining))} — review your plan.
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
           </>
         )}
 
