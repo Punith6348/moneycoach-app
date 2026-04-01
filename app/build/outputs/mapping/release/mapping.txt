@@ -3,8 +3,8 @@
 # min_api: 21
 # common_typos_disable
 # {"id":"com.android.tools.r8.mapping","version":"2.2"}
-# pg_map_id: d106e0e
-# pg_map_hash: SHA-256 d106e0ecd091cc2a65e814308b46084ea04bd4c04807b8f53cfd4e430786b845
+# pg_map_id: e0ddc8f
+# pg_map_hash: SHA-256 e0ddc8f5164fbf6fa8edf596422d971213f882c5d5c197980ea2d150cab2d9dc
 android.support.customtabs.ICustomTabsCallback -> a.a:
 # {"id":"sourceFile","fileName":"ICustomTabsCallback.java"}
     java.lang.String DESCRIPTOR -> a
@@ -22708,8 +22708,8 @@ app.vercel.moneycoach_app.twa.LauncherActivity -> app.vercel.moneycoach_app.twa.
     1:5:android.net.Uri getLaunchingUrl():48:48 -> i
     1:3:void onCreate(android.os.Bundle):33:33 -> onCreate
     4:10:void onCreate(android.os.Bundle):38:38 -> onCreate
-    11:15:void onCreate(android.os.Bundle):39:39 -> onCreate
-    16:19:void onCreate(android.os.Bundle):41:41 -> onCreate
+    11:14:void onCreate(android.os.Bundle):39:39 -> onCreate
+    15:18:void onCreate(android.os.Bundle):41:41 -> onCreate
 com.google.androidbrowserhelper.R$drawable -> I.a:
     int ic_site_settings -> a
 com.google.androidbrowserhelper.R$string -> I.b:

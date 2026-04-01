@@ -39,7 +39,7 @@
     <string name="hostName" translatable="false">moneycoach-app.vercel.app</string>
     <string name="launchUrl" translatable="false">https://moneycoach-app.vercel.app/</string>
     <string name="launcherName" translatable="false">Money Coach</string>
-    <string name="orientation" translatable="false">portrait-primary</string>
+    <string name="orientation" translatable="false">default</string>
     <string name="providerAuthority" translatable="false">app.vercel.moneycoach_app.twa.fileprovider</string>
     <string name="webManifestUrl" translatable="false">https://moneycoach-app.vercel.app/manifest.json</string>
 </resources>

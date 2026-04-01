@@ -192,19 +192,27 @@ export const getActiveMonthKeys = (allExpenses) => {
 // ── HOOK ──────────────────────────────────────────────────────────────────
 export function useAppData(firebaseUser = null) {
   const [data, setData] = useState(() => {
+    // Only load localStorage if UID matches current user
+    // If no user yet, start empty — will load from Firestore after login
+    const storedUid = localStorage.getItem("moneyCoachUID");
     const saved = load();
-    if (!saved) return {...DEFAULT_STATE};
+
+    // If no stored UID or no saved data, start fresh
+    if (!storedUid || !saved) return {...DEFAULT_STATE};
+
+    // Only restore if same user (UID stored at login time)
+    // Note: firebaseUser may be null here during initial render
+    // The useEffect below will handle proper loading after auth resolves
     return {
-      ...DEFAULT_STATE,
-      ...saved,
-      loans:          Array.isArray(saved.loans)          ? saved.loans          : [],
-      incomeSources:  Array.isArray(saved.incomeSources)  ? saved.incomeSources  : [],
-      fixedExpenses:  Array.isArray(saved.fixedExpenses)  ? saved.fixedExpenses  : [],
-      savingsPlans:   Array.isArray(saved.savingsPlans)   ? saved.savingsPlans   : [],
-      futurePayments: Array.isArray(saved.futurePayments) ? saved.futurePayments : [],
-      checkIns:       Array.isArray(saved.checkIns)       ? saved.checkIns       : [],
-      allExpenses:    (saved.allExpenses && typeof saved.allExpenses==="object") ? saved.allExpenses : {},
-      categoryBudgets:(saved.categoryBudgets && typeof saved.categoryBudgets==="object") ? saved.categoryBudgets : {},
+      ...DEFAULT_STATE, ...saved,
+      loans:             Array.isArray(saved.loans)             ? saved.loans             : [],
+      incomeSources:     Array.isArray(saved.incomeSources)     ? saved.incomeSources     : [],
+      fixedExpenses:     Array.isArray(saved.fixedExpenses)     ? saved.fixedExpenses     : [],
+      savingsPlans:      Array.isArray(saved.savingsPlans)      ? saved.savingsPlans      : [],
+      futurePayments:    Array.isArray(saved.futurePayments)    ? saved.futurePayments    : [],
+      checkIns:          Array.isArray(saved.checkIns)          ? saved.checkIns          : [],
+      allExpenses:       (saved.allExpenses && typeof saved.allExpenses==="object")       ? saved.allExpenses       : {},
+      categoryBudgets:   (saved.categoryBudgets && typeof saved.categoryBudgets==="object") ? saved.categoryBudgets : {},
       recurringExpenses: Array.isArray(saved.recurringExpenses) ? saved.recurringExpenses : [],
       assets:            Array.isArray(saved.assets)            ? saved.assets            : [],
     };
@@ -214,7 +222,26 @@ export function useAppData(firebaseUser = null) {
   useEffect(() => {
     if (!firebaseUser) return;
     (async () => {
-      await migrateLocalToFirestore(firebaseUser.uid);
+      // Check if localStorage belongs to a different user
+      const storedUid = localStorage.getItem("moneyCoachUID");
+
+      if (storedUid && storedUid !== firebaseUser.uid) {
+        // Different user — clear old user's local data completely
+        localStorage.removeItem("moneyCoachData_v3");
+        localStorage.removeItem("moneyCoachUID");
+        // Reset state to default
+        setData({...DEFAULT_STATE});
+      }
+
+      // Save current user's UID to localStorage
+      localStorage.setItem("moneyCoachUID", firebaseUser.uid);
+
+      // Only migrate if this is the SAME user (same UID in storage)
+      if (!storedUid || storedUid === firebaseUser.uid) {
+        await migrateLocalToFirestore(firebaseUser.uid);
+      }
+
+      // Load this user's cloud data
       const cloudData = await loadFromFirestore(firebaseUser.uid);
       if (cloudData) {
         const merged = {
@@ -232,6 +259,11 @@ export function useAppData(firebaseUser = null) {
         };
         setData(merged);
         persist(merged);
+      } else {
+        // New user with no cloud data — start fresh with onboarding
+        const freshState = {...DEFAULT_STATE};
+        setData(freshState);
+        persist(freshState);
       }
     })();
   }, [firebaseUser?.uid]);
@@ -363,8 +395,81 @@ export function useAppData(firebaseUser = null) {
   const totalFixed    = calcTotalFixed(data.fixedExpenses);
   const totalSavings  = calcTotalSavings(data.savingsPlans);
   const totalReserve  = calcTotalReserve(data.futurePayments);
-  const remaining     = calcRemainingBudget(totalIncome, totalFixed, totalSavings, totalReserve);
-  const dailyLimit    = calcDailyLimit(remaining);
+
+  // ── This month's actual spending ──────────────────────────────────────────
+  const curMonthKey     = currentMonthKey();
+  const thisMonthExp    = (data.allExpenses[curMonthKey] || []);
+  const thisMonthSpent  = thisMonthExp.reduce((s, e) => s + (e.amount || 0), 0);
+
+  // ── Last month summary ────────────────────────────────────────────────────
+  const lastMonthDate   = new Date();
+  lastMonthDate.setDate(1);
+  lastMonthDate.setMonth(lastMonthDate.getMonth() - 1);
+  const lastMonthKey    = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth()+1).padStart(2,"0")}`;
+  const lastMonthExp    = (data.allExpenses[lastMonthKey] || []);
+  const lastMonthSpent  = lastMonthExp.reduce((s, e) => s + (e.amount || 0), 0);
+  const lastMonthBudget = calcRemainingBudget(totalIncome, totalFixed, totalSavings, totalReserve);
+  const lastMonthSaved  = lastMonthBudget - lastMonthSpent; // positive = saved, negative = overspent
+
+  // ── TRUE remaining this month (budget minus what's already spent) ─────────
+  const budgetForMonth  = calcRemainingBudget(totalIncome, totalFixed, totalSavings, totalReserve);
+  const remaining       = budgetForMonth - thisMonthSpent;
+  const dailyLimit      = calcDailyLimit(remaining);
+
+  // ── Smart suggestions based on remaining balance ──────────────────────────
+  const smartSuggestions = (() => {
+    const suggestions = [];
+    const loanTotals  = calcLoanTotals(data.loans || []);
+
+    if (remaining > 0) {
+      // Has money left — suggest good uses
+      if ((data.loans||[]).length > 0) {
+        const highestLoan = (data.loans||[]).reduce((max, l) =>
+          (calcLoanTotals([l]).outstanding > calcLoanTotals([max]).outstanding ? l : max),
+          data.loans[0]
+        );
+        suggestions.push({
+          type: "loan",
+          icon: "🏦",
+          title: "Close Loan Faster",
+          desc: `Pay ₹${Math.min(remaining, Math.round(calcLoanTotals([highestLoan]).outstanding)).toLocaleString("en-IN")} extra on ${highestLoan.name} to save interest`,
+          action: "View Loans",
+          tab: "loans",
+        });
+      }
+      if (remaining > 5000) {
+        suggestions.push({
+          type: "savings",
+          icon: "💰",
+          title: "Add to Savings",
+          desc: `You have ₹${remaining.toLocaleString("en-IN")} left — consider adding to your savings plan`,
+          action: "View Plans",
+          tab: "plan",
+        });
+      }
+      if (remaining > 2000 && (data.savingsPlans||[]).length === 0) {
+        suggestions.push({
+          type: "plan",
+          icon: "🎯",
+          title: "Start a Savings Goal",
+          desc: "No savings plan yet — start one with your leftover budget",
+          action: "Add Plan",
+          tab: "plan",
+        });
+      }
+    } else {
+      // Overspent — warn
+      suggestions.push({
+        type: "warning",
+        icon: "⚠️",
+        title: "Over Budget",
+        desc: `You've spent ₹${Math.abs(remaining).toLocaleString("en-IN")} more than planned this month`,
+        action: "View Expenses",
+        tab: "expenses",
+      });
+    }
+    return suggestions;
+  })();
 
   return {
     screen:data.screen, name:data.name,
@@ -374,7 +479,11 @@ export function useAppData(firebaseUser = null) {
     categoryBudgets: data.categoryBudgets || {},
     recurringExpenses: data.recurringExpenses || [],
     allExpenses:data.allExpenses, checkIns:data.checkIns,
-    totalIncome, totalFixed, totalSavings, totalReserve, remaining, dailyLimit,
+    totalIncome, totalFixed, totalSavings, totalReserve,
+    remaining, dailyLimit,
+    thisMonthSpent, budgetForMonth,
+    lastMonthKey, lastMonthSpent, lastMonthSaved, lastMonthBudget,
+    smartSuggestions,
     completeOnboarding,
     addIncomeSource, updateIncomeSource, deleteIncomeSource,
     addFixedExpense, updateFixedExpense, deleteFixedExpense,

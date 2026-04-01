@@ -17,11 +17,11 @@
   "maskableIconUrl": "https://moneycoach-app.vercel.app/icon-512.png",
   "splashScreenFadeOutDuration": 300,
   "signingKey": {
-    "path": "/Users/puneeth/moneycoach-app/android.keystore",
-    "alias": "android"
+    "path": "/Users/puneeth/Desktop/Money Coach - Google Play package/signing.keystore",
+    "alias": "my-key-alias"
   },
-  "appVersionName": "1",
-  "appVersionCode": 1,
+  "appVersionName": "7",
+  "appVersionCode": 7,
   "shortcuts": [],
   "generatorApp": "bubblewrap-cli",
   "webManifestUrl": "https://moneycoach-app.vercel.app/manifest.json",
@@ -35,7 +35,7 @@
   "isMetaQuest": false,
   "fullScopeUrl": "https://moneycoach-app.vercel.app/",
   "minSdkVersion": 21,
-  "orientation": "portrait-primary",
+  "orientation": "default",
   "fingerprints": [],
   "additionalTrustedOrigins": [],
   "retainedBundles": [],
@@ -46,5 +46,5 @@
     "standalone",
     "minimal-ui"
   ],
-  "appVersion": "1"
+  "appVersion": "7"
 }

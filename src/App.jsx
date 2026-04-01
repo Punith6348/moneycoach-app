@@ -1084,6 +1084,9 @@ function RecurringTab({ recurringExpenses, allExpenses, onAdd, onUpdate, onDelet
 function DashboardScreen(props) {
   const {
     name, totalIncome, totalFixed, totalSavings, totalReserve, remaining, dailyLimit,
+    thisMonthSpent, budgetForMonth,
+    lastMonthKey, lastMonthSpent, lastMonthSaved, lastMonthBudget,
+    smartSuggestions,
     incomeSources, fixedExpenses, savingsPlans, futurePayments,
     loans,
     categoryBudgets, setCategoryBudget,
@@ -1417,6 +1420,10 @@ function DashboardScreen(props) {
                       totalIncome={totalIncome} totalFixed={totalFixed}
                       totalSavings={totalSavings} totalReserve={totalReserve}
                       remaining={remaining} dailyLimit={dailyLimit}
+                      thisMonthSpent={thisMonthSpent} budgetForMonth={budgetForMonth}
+                      lastMonthKey={lastMonthKey} lastMonthSpent={lastMonthSpent}
+                      lastMonthSaved={lastMonthSaved} lastMonthBudget={lastMonthBudget}
+                      smartSuggestions={smartSuggestions}
                       incomeSources={incomeSources} fixedExpenses={fixedExpenses}
                       savingsPlans={savingsPlans} futurePayments={futurePayments}
                       currentExpenses={currentExpenses}

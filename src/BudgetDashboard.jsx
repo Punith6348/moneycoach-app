@@ -66,6 +66,9 @@ const CAT_ICONS = {
 export default function BudgetDashboard({
   totalIncome, totalFixed, totalSavings, totalReserve,
   remaining, dailyLimit,
+  thisMonthSpent=0, budgetForMonth=0,
+  lastMonthSpent=0, lastMonthSaved=0, lastMonthBudget=0, lastMonthKey="",
+  smartSuggestions=[],
   incomeSources, fixedExpenses, savingsPlans, futurePayments,
   currentExpenses, loans = [],
   categoryBudgets = {},
@@ -449,6 +452,76 @@ export default function BudgetDashboard({
           </div>
         );
       })()}
+
+      {/* ══ LAST MONTH SUMMARY ══ */}
+      {lastMonthKey && lastMonthBudget > 0 && (() => {
+        const lmLabel = new Date(lastMonthKey+"-15").toLocaleDateString("en-IN",{month:"long",year:"numeric"});
+        const saved   = lastMonthSaved >= 0;
+        return (
+          <div style={{ marginBottom:14, padding:"14px 16px", borderRadius:14,
+            background: saved ? "#F0FDF4" : "#FFF1F2",
+            border:`1px solid ${saved?"#86EFAC":"#FECACA"}`,
+          }}>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8 }}>
+              <p style={{ margin:0, fontSize:12, fontWeight:700, color:saved?"#166534":"#991B1B" }}>
+                {saved ? "✅" : "⚠️"} {lmLabel} Summary
+              </p>
+              <p style={{ margin:0, fontSize:11, color:"#6B7280" }}>Last month</p>
+            </div>
+            <div style={{ display:"flex", gap:16 }}>
+              <div>
+                <p style={{ margin:0, fontSize:10, color:"#6B7280" }}>Budget</p>
+                <p style={{ margin:0, fontSize:14, fontWeight:700, color:C.ink }}>{fmt(lastMonthBudget)}</p>
+              </div>
+              <div>
+                <p style={{ margin:0, fontSize:10, color:"#6B7280" }}>Spent</p>
+                <p style={{ margin:0, fontSize:14, fontWeight:700, color:C.red }}>{fmt(lastMonthSpent)}</p>
+              </div>
+              <div>
+                <p style={{ margin:0, fontSize:10, color:"#6B7280" }}>{saved?"Saved":"Over"}</p>
+                <p style={{ margin:0, fontSize:14, fontWeight:700, color:saved?C.green:C.red }}>
+                  {saved?"+":"-"}{fmt(Math.abs(lastMonthSaved))}
+                </p>
+              </div>
+            </div>
+            {saved && lastMonthSaved > 1000 && (
+              <p style={{ margin:"8px 0 0", fontSize:11, color:"#166534", lineHeight:1.5 }}>
+                💡 You saved {fmt(lastMonthSaved)} last month! Consider adding it to savings or paying off a loan.
+              </p>
+            )}
+            {!saved && (
+              <p style={{ margin:"8px 0 0", fontSize:11, color:"#991B1B", lineHeight:1.5 }}>
+                💡 You overspent by {fmt(Math.abs(lastMonthSaved))} last month. Review your expenses to stay on track.
+              </p>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* ══ SMART SUGGESTIONS ══ */}
+      {smartSuggestions.length > 0 && (
+        <div style={{ marginBottom:14 }}>
+          <p style={{ margin:"0 0 8px", fontSize:11, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.8px" }}>
+            💡 Suggestions
+          </p>
+          {smartSuggestions.map((s,i) => (
+            <div key={i} onClick={()=>onNavigate&&onNavigate(s.tab)} style={{
+              padding:"12px 14px", borderRadius:12, marginBottom:8,
+              background:"#fff", border:`1px solid ${C.border}`,
+              cursor:onNavigate?"pointer":"default",
+              display:"flex", alignItems:"center", gap:12,
+              boxShadow:"0 1px 3px rgba(0,0,0,0.05)",
+            }}>
+              <span style={{ fontSize:24, flexShrink:0 }}>{s.icon}</span>
+              <div style={{ flex:1, minWidth:0 }}>
+                <p style={{ margin:0, fontSize:13, fontWeight:700, color:C.ink }}>{s.title}</p>
+                <p style={{ margin:"2px 0 0", fontSize:11, color:"#6B7280", lineHeight:1.4 }}>{s.desc}</p>
+              </div>
+              {onNavigate && <span style={{ fontSize:16, color:"#D1D5DB", flexShrink:0 }}>›</span>}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ══ 2. SUMMARY CARDS ══ */}
       <div className="mc-summary-row">
