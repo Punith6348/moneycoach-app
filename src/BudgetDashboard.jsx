@@ -67,7 +67,6 @@ export default function BudgetDashboard({
   totalIncome, totalFixed, totalSavings, totalReserve,
   remaining, dailyLimit,
   thisMonthSpent=0, budgetForMonth=0,
-  lastMonthSpent=0, lastMonthSaved=0, lastMonthBudget=0, lastMonthKey="",
   incomeSources, fixedExpenses, savingsPlans, futurePayments,
   currentExpenses, loans = [],
   categoryBudgets = {},
@@ -450,82 +449,6 @@ export default function BudgetDashboard({
                   </div>
                 );
               })()}
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* ══ LAST MONTH SUMMARY ══ */}
-      {lastMonthKey && lastMonthBudget > 0 && (() => {
-        const lmLabel = new Date(lastMonthKey+"-15").toLocaleDateString("en-IN",{month:"long",year:"numeric"});
-        const saved   = lastMonthSaved >= 0;
-        const pctSpent = lastMonthBudget > 0 ? Math.min(Math.round((lastMonthSpent/lastMonthBudget)*100),100) : 0;
-        const pctSaved = lastMonthBudget > 0 ? Math.max(0,100-pctSpent) : 0;
-        return (
-          <div style={{ marginBottom:14, padding:"14px 16px", borderRadius:14,
-            background:"#fff", border:`1px solid ${C.border}`,
-            boxShadow:"0 1px 4px rgba(0,0,0,0.05)",
-          }}>
-            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
-              <p style={{ margin:0, fontSize:13, fontWeight:700, color:C.ink }}>
-                📅 {lmLabel}
-              </p>
-              <p style={{ margin:0, fontSize:11, padding:"2px 8px", borderRadius:99,
-                background: saved?"#F0FDF4":"#FFF1F2",
-                color: saved?C.green:C.red, fontWeight:700,
-              }}>
-                {saved ? `Saved ${fmt(lastMonthSaved)}` : `Over ${fmt(Math.abs(lastMonthSaved))}`}
-              </p>
-            </div>
-
-            {/* Income − Spent = Remaining chart */}
-            <div style={{ marginBottom:12 }}>
-              <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
-                <p style={{ margin:0, fontSize:10, color:C.muted }}>Income</p>
-                <p style={{ margin:0, fontSize:11, fontWeight:700, color:C.green }}>{fmt(lastMonthBudget)}</p>
-              </div>
-              {/* Full bar = income */}
-              <div style={{ height:8, borderRadius:99, background:"#F1F5F9", overflow:"hidden", marginBottom:8 }}>
-                <div style={{ display:"flex", height:"100%", borderRadius:99, overflow:"hidden" }}>
-                  <div style={{ width:`${pctSpent}%`, background:saved?C.amber:C.red, transition:"width 0.5s" }}/>
-                  <div style={{ width:`${pctSaved}%`, background:C.green, transition:"width 0.5s" }}/>
-                </div>
-              </div>
-              <div style={{ display:"flex", gap:16 }}>
-                <div style={{ display:"flex", alignItems:"center", gap:5 }}>
-                  <div style={{ width:8, height:8, borderRadius:99, background:saved?C.amber:C.red }}/>
-                  <p style={{ margin:0, fontSize:10, color:C.muted }}>Spent</p>
-                  <p style={{ margin:0, fontSize:11, fontWeight:700, color:C.ink }}>{fmt(lastMonthSpent)}</p>
-                </div>
-                <div style={{ display:"flex", alignItems:"center", gap:5 }}>
-                  <div style={{ width:8, height:8, borderRadius:99, background:C.green }}/>
-                  <p style={{ margin:0, fontSize:10, color:C.muted }}>Remaining</p>
-                  <p style={{ margin:0, fontSize:11, fontWeight:700, color:saved?C.green:C.red }}>
-                    {saved ? fmt(lastMonthSaved) : `−${fmt(Math.abs(lastMonthSaved))}`}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Formula row: Income − Spent = Remaining */}
-            <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:8,
-              padding:"8px", background:C.bg, borderRadius:10 }}>
-              <div style={{ textAlign:"center" }}>
-                <p style={{ margin:0, fontSize:9, color:C.muted }}>INCOME</p>
-                <p style={{ margin:0, fontSize:13, fontWeight:700, color:C.green }}>{fmt(lastMonthBudget)}</p>
-              </div>
-              <p style={{ margin:0, fontSize:16, color:C.muted, fontWeight:300 }}>−</p>
-              <div style={{ textAlign:"center" }}>
-                <p style={{ margin:0, fontSize:9, color:C.muted }}>SPENT</p>
-                <p style={{ margin:0, fontSize:13, fontWeight:700, color:C.red }}>{fmt(lastMonthSpent)}</p>
-              </div>
-              <p style={{ margin:0, fontSize:16, color:C.muted, fontWeight:300 }}>=</p>
-              <div style={{ textAlign:"center" }}>
-                <p style={{ margin:0, fontSize:9, color:C.muted }}>REMAINING</p>
-                <p style={{ margin:0, fontSize:13, fontWeight:700, color:saved?C.green:C.red }}>
-                  {saved ? fmt(lastMonthSaved) : `−${fmt(Math.abs(lastMonthSaved))}`}
-                </p>
-              </div>
             </div>
           </div>
         );

@@ -190,36 +190,37 @@ export const getActiveMonthKeys = (allExpenses) => {
 };
 
 // ── Month carry-forward: run once when month changes ─────────────────────────
-// Income sources, fixed expenses, loans carry forward automatically
-// Daily expenses do NOT carry forward (stored per month key)
+// Rules:
+// ✅ Income Sources, Fixed Expenses, Loans → stored in data directly, persist always
+// ✅ Recurring expenses → auto-log on new month (no duplication)
+// ❌ Daily expenses → stored per monthKey, never carry forward
+// ❌ No balance carry-forward — each month starts fresh
 function checkAndCarryForward(data) {
   const curKey = currentMonthKey();
   const lastCarryKey = data.lastCarryForwardMonth || "";
 
-  // Already did carry-forward this month — skip
+  // Already processed this month — skip
   if (lastCarryKey === curKey) return data;
 
-  // First time ever — just mark current month, no carry needed
+  // First time setup — just mark month, no carry needed
   if (!lastCarryKey) return { ...data, lastCarryForwardMonth: curKey };
 
-  // New month detected — carry forward plan items
-  // Income sources, fixed expenses, loans, savings plans all persist automatically
-  // (they are stored in data directly, not per month)
-  // Only need to auto-log recurring expenses for the new month
+  // ── New month detected ────────────────────────────────────────────────────
   const now   = new Date();
   const today = now.getDate();
   const mk    = curKey;
   const recs  = data.recurringExpenses || [];
   const existing = data.allExpenses[mk] || [];
-  const toAdd = [];
 
+  // Auto-log recurring items for new month (no duplicates)
+  const toAdd = [];
   recs.forEach(r => {
     if (!r.active) return;
     if (today < r.dayOfMonth) return;
-    const alreadyLogged = existing.some(e => e.recurringId === r.id);
-    if (alreadyLogged) return;
+    // Check not already logged this month
+    if (existing.some(e => e.recurringId === r.id)) return;
     toAdd.push({
-      id: Date.now() + Math.random(),
+      id:          Date.now() + Math.random(),
       amount:      r.amount,
       label:       r.category,
       note:        r.note || r.label,
@@ -228,6 +229,10 @@ function checkAndCarryForward(data) {
       auto:        true,
     });
   });
+
+  // Income sources, fixed expenses, loans persist in data automatically
+  // No special carry needed — they are not month-scoped
+  // Daily expenses stay in their own monthKey — no carry
 
   return {
     ...data,
@@ -439,25 +444,31 @@ export function useAppData(firebaseUser = null) {
   const totalSavings  = calcTotalSavings(data.savingsPlans);
   const totalReserve  = calcTotalReserve(data.futurePayments);
 
-  // ── This month's actual spending ──────────────────────────────────────────
-  const curMonthKey     = currentMonthKey();
-  const thisMonthExp    = (data.allExpenses[curMonthKey] || []);
-  const thisMonthSpent  = thisMonthExp.reduce((s, e) => s + (e.amount || 0), 0);
+  // ── Current month expenses only (no carry-forward) ───────────────────────
+  const curMonthKey    = currentMonthKey();
+  const thisMonthExp   = (data.allExpenses[curMonthKey] || [])
+    .filter(e => !e.auto); // exclude auto-logged recurring from balance calc
+  const thisMonthSpent = thisMonthExp.reduce((s, e) => s + (e.amount || 0), 0);
 
-  // ── Last month summary ────────────────────────────────────────────────────
-  const lastMonthDate   = new Date();
+  // ── Recurring auto-logged this month (fixed costs already in plan) ────────
+  // These are already counted in totalFixed via plan — don't double-count
+  const budgetForMonth = calcRemainingBudget(totalIncome, totalFixed, totalSavings, totalReserve);
+
+  // ── TRUE remaining = this month's budget minus variable daily spending ────
+  // budgetForMonth already accounts for fixed, savings, reserve
+  // thisMonthSpent = only manual daily expenses this month
+  const remaining  = budgetForMonth - thisMonthSpent;
+  const dailyLimit = calcDailyLimit(remaining);
+
+  // ── Last month data — for Charts tab only ────────────────────────────────
+  const lastMonthDate  = new Date();
   lastMonthDate.setDate(1);
   lastMonthDate.setMonth(lastMonthDate.getMonth() - 1);
-  const lastMonthKey    = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth()+1).padStart(2,"0")}`;
-  const lastMonthExp    = (data.allExpenses[lastMonthKey] || []);
-  const lastMonthSpent  = lastMonthExp.reduce((s, e) => s + (e.amount || 0), 0);
-  const lastMonthBudget = calcRemainingBudget(totalIncome, totalFixed, totalSavings, totalReserve);
-  const lastMonthSaved  = lastMonthBudget - lastMonthSpent; // positive = saved, negative = overspent
-
-  // ── TRUE remaining this month (budget minus what's already spent) ─────────
-  const budgetForMonth  = calcRemainingBudget(totalIncome, totalFixed, totalSavings, totalReserve);
-  const remaining       = budgetForMonth - thisMonthSpent;
-  const dailyLimit      = calcDailyLimit(remaining);
+  const lastMonthKey   = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth()+1).padStart(2,"0")}`;
+  const lastMonthExp   = (data.allExpenses[lastMonthKey] || []).filter(e => !e.auto);
+  const lastMonthSpent = lastMonthExp.reduce((s, e) => s + (e.amount || 0), 0);
+  const lastMonthBudget = budgetForMonth; // same plan
+  const lastMonthSaved  = lastMonthBudget - lastMonthSpent;
 
   // ── Smart suggestions based on remaining balance ──────────────────────────
   const smartSuggestions = (() => {
