@@ -1746,21 +1746,30 @@ function DashboardScreen(props) {
 
         {/* ══ CHARTS ══ */}
         {tab==="charts"&&(()=>{
-          const totalSpent    = expenses.reduce((s,e)=>s+e.amount,0);
-          const txCount       = expenses.length;
-          const daysWithSpend = new Set(expenses.map(e=>e.date.split("T")[0])).size;
+          const curKey        = currentMonthKey();
+          const isCurrentMon  = selectedMonth === curKey;
+          const isCompleted   = selectedMonth < curKey; // only past months are "completed"
+
+          // Selected month data only
+          const selExp        = allExpenses[selectedMonth] || [];
+          const totalSpent    = selExp.reduce((s,e)=>s+e.amount,0);
+          const txCount       = selExp.length;
+          const daysWithSpend = new Set(selExp.map(e=>e.date.split("T")[0])).size;
           const avgDaily      = daysWithSpend>0?Math.round(totalSpent/daysWithSpend):0;
 
-          // Build month summaries for all months that have data
-          const allMonthKeys = Object.keys(allExpenses)
-            .filter(k => (allExpenses[k]||[]).filter(e=>!e.auto).length > 0)
-            .sort((a,b) => b.localeCompare(a));
+          // Summary for selected month — only if completed
+          const mSaved  = budgetForMonth - totalSpent;
+          const saved   = mSaved >= 0;
+          const pctSpent = budgetForMonth>0 ? Math.min(Math.round((totalSpent/budgetForMonth)*100),100) : 0;
+          const pctLeft  = Math.max(0, 100-pctSpent);
+          const mLabel   = new Date(selectedMonth+"-15").toLocaleDateString("en-IN",{month:"long",year:"numeric"});
 
           return (
             <>
               <MonthBar/>
-              {/* Stats strip */}
-              {totalSpent > 0 && (
+
+              {/* Stats strip — selected month only */}
+              {totalSpent > 0 ? (
                 <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:12}}>
                   {[
                     {label:"Total Spent",   value:fmt(totalSpent), color:"#DC2626"},
@@ -1777,71 +1786,81 @@ function DashboardScreen(props) {
                     </div>
                   ))}
                 </div>
+              ) : (
+                <div style={{background:"#fff",borderRadius:12,border:`1px solid ${C.border}`,
+                  padding:"20px",textAlign:"center",marginBottom:12}}>
+                  <p style={{fontSize:24,margin:"0 0 6px"}}>📊</p>
+                  <p style={{fontSize:13,color:C.muted,margin:0}}>
+                    No expenses logged for {mLabel}
+                  </p>
+                </div>
               )}
+
+              {/* Charts — use selected month expenses */}
               <TrendChart allExpenses={allExpenses} monthlyIncome={totalIncome}/>
               <CategoryHistoryChart allExpenses={allExpenses}/>
-              <SpendingChart expenses={expenses} monthlyIncome={totalIncome}/>
+              <SpendingChart expenses={selExp} monthlyIncome={totalIncome}/>
 
-              {/* ── MONTHLY SUMMARIES — at bottom of Charts ── */}
-              {allMonthKeys.length > 0 && (
+              {/* ── Month Summary — ONLY for completed months ── */}
+              {isCompleted && totalSpent > 0 && (
                 <div style={{marginTop:8}}>
                   <p style={{margin:"0 0 10px",fontSize:11,fontWeight:700,color:C.muted,
-                    textTransform:"uppercase",letterSpacing:"0.8px"}}>Monthly History</p>
-                  {allMonthKeys.map(mk => {
-                    const mLabel   = new Date(mk+"-15").toLocaleDateString("en-IN",{month:"long",year:"numeric"});
-                    const mExp     = (allExpenses[mk]||[]).filter(e=>!e.auto);
-                    const mSpent   = mExp.reduce((s,e)=>s+e.amount,0);
-                    const mBudget  = budgetForMonth; // same plan each month
-                    const mSaved   = mBudget - mSpent;
-                    const saved    = mSaved >= 0;
-                    const pctSpent = mBudget > 0 ? Math.min(Math.round((mSpent/mBudget)*100),100) : 0;
-                    const pctLeft  = Math.max(0, 100 - pctSpent);
-                    return (
-                      <div key={mk} style={{
-                        background:"#fff", borderRadius:14, padding:"14px 16px",
-                        marginBottom:10, border:`1px solid ${C.border}`,
-                        boxShadow:"0 1px 3px rgba(0,0,0,0.04)",
-                      }}>
-                        {/* Header */}
-                        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-                          <p style={{margin:0,fontSize:13,fontWeight:700,color:C.ink}}>📅 {mLabel}</p>
-                          <span style={{fontSize:11,padding:"2px 8px",borderRadius:99,fontWeight:700,
-                            background:saved?"#F0FDF4":"#FFF1F2",
-                            color:saved?C.green:C.red}}>
-                            {saved ? `Saved ${fmt(mSaved)}` : `Over ${fmt(Math.abs(mSaved))}`}
-                          </span>
-                        </div>
-                        {/* Bar: Income = Spent + Remaining */}
-                        <div style={{height:8,borderRadius:99,background:"#F1F5F9",overflow:"hidden",marginBottom:8}}>
-                          <div style={{display:"flex",height:"100%"}}>
-                            <div style={{width:`${pctSpent}%`,background:saved?C.amber:C.red,borderRadius:"99px 0 0 99px",transition:"width 0.5s"}}/>
-                            <div style={{width:`${pctLeft}%`,background:C.green,borderRadius:"0 99px 99px 0",transition:"width 0.5s"}}/>
-                          </div>
-                        </div>
-                        {/* Formula: Income − Spent = Remaining */}
-                        <div style={{display:"flex",alignItems:"center",justifyContent:"space-around",
-                          padding:"8px",background:C.bg,borderRadius:10}}>
-                          <div style={{textAlign:"center"}}>
-                            <p style={{margin:0,fontSize:9,color:C.muted}}>INCOME</p>
-                            <p style={{margin:0,fontSize:13,fontWeight:700,color:C.green,fontFamily:"Georgia,serif"}}>{fmt(mBudget)}</p>
-                          </div>
-                          <p style={{margin:0,fontSize:18,color:C.muted,fontWeight:300}}>−</p>
-                          <div style={{textAlign:"center"}}>
-                            <p style={{margin:0,fontSize:9,color:C.muted}}>SPENT</p>
-                            <p style={{margin:0,fontSize:13,fontWeight:700,color:C.red,fontFamily:"Georgia,serif"}}>{fmt(mSpent)}</p>
-                          </div>
-                          <p style={{margin:0,fontSize:18,color:C.muted,fontWeight:300}}>=</p>
-                          <div style={{textAlign:"center"}}>
-                            <p style={{margin:0,fontSize:9,color:C.muted}}>REMAINING</p>
-                            <p style={{margin:0,fontSize:13,fontWeight:700,fontFamily:"Georgia,serif",
-                              color:saved?C.green:C.red}}>
-                              {saved ? fmt(mSaved) : `−${fmt(Math.abs(mSaved))}`}
-                            </p>
-                          </div>
-                        </div>
+                    textTransform:"uppercase",letterSpacing:"0.8px"}}>
+                    📅 {mLabel} Summary
+                  </p>
+                  <div style={{
+                    background:"#fff", borderRadius:14, padding:"14px 16px",
+                    border:`1px solid ${C.border}`,
+                    boxShadow:"0 1px 3px rgba(0,0,0,0.04)",
+                  }}>
+                    {/* Badge */}
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+                      <p style={{margin:0,fontSize:13,fontWeight:700,color:C.ink}}>{mLabel}</p>
+                      <span style={{fontSize:11,padding:"2px 8px",borderRadius:99,fontWeight:700,
+                        background:saved?"#F0FDF4":"#FFF1F2",
+                        color:saved?C.green:C.red}}>
+                        {saved ? `Saved ${fmt(mSaved)}` : `Over ${fmt(Math.abs(mSaved))}`}
+                      </span>
+                    </div>
+                    {/* Progress bar */}
+                    <div style={{height:8,borderRadius:99,background:"#F1F5F9",overflow:"hidden",marginBottom:8}}>
+                      <div style={{display:"flex",height:"100%"}}>
+                        <div style={{width:`${pctSpent}%`,background:saved?C.amber:C.red,borderRadius:"99px 0 0 99px",transition:"width 0.5s"}}/>
+                        <div style={{width:`${pctLeft}%`,background:C.green,borderRadius:"0 99px 99px 0",transition:"width 0.5s"}}/>
                       </div>
-                    );
-                  })}
+                    </div>
+                    {/* Formula: Income − Spent = Remaining */}
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-around",
+                      padding:"8px",background:C.bg,borderRadius:10}}>
+                      <div style={{textAlign:"center"}}>
+                        <p style={{margin:0,fontSize:9,color:C.muted}}>INCOME</p>
+                        <p style={{margin:0,fontSize:13,fontWeight:700,color:C.green,fontFamily:"Georgia,serif"}}>{fmt(budgetForMonth)}</p>
+                      </div>
+                      <p style={{margin:0,fontSize:18,color:C.muted,fontWeight:300}}>−</p>
+                      <div style={{textAlign:"center"}}>
+                        <p style={{margin:0,fontSize:9,color:C.muted}}>SPENT</p>
+                        <p style={{margin:0,fontSize:13,fontWeight:700,color:C.red,fontFamily:"Georgia,serif"}}>{fmt(totalSpent)}</p>
+                      </div>
+                      <p style={{margin:0,fontSize:18,color:C.muted,fontWeight:300}}>=</p>
+                      <div style={{textAlign:"center"}}>
+                        <p style={{margin:0,fontSize:9,color:C.muted}}>REMAINING</p>
+                        <p style={{margin:0,fontSize:13,fontWeight:700,fontFamily:"Georgia,serif",
+                          color:saved?C.green:C.red}}>
+                          {saved ? fmt(mSaved) : `−${fmt(Math.abs(mSaved))}`}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Current month — no summary shown */}
+              {isCurrentMon && (
+                <div style={{marginTop:8,padding:"10px 14px",borderRadius:10,
+                  background:"#EFF6FF",border:"1px solid #BFDBFE"}}>
+                  <p style={{margin:0,fontSize:12,color:"#1D4ED8"}}>
+                    📊 Month in progress — summary will appear once April ends
+                  </p>
                 </div>
               )}
             </>
