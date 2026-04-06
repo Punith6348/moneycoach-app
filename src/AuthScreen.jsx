@@ -130,20 +130,27 @@ function PhoneScreen({ onBack, onSent, loading, setLoading, error, setError, rec
     if (phone.length !== 10) { setError("Enter a valid 10-digit number"); return; }
     setError(""); setLoading(true);
     try {
-      // Clear any existing recaptcha
+      // Always clear old verifier first
       if (window.recaptchaVerifier) {
         try { window.recaptchaVerifier.clear(); } catch(e) {}
         window.recaptchaVerifier = null;
       }
-      // Create fresh RecaptchaVerifier on the persistent div
-      window.recaptchaVerifier = new RecaptchaVerifier(auth, "recaptcha-container", {
-        size: "invisible",
-        callback: () => {},
-        "expired-callback": () => {
-          window.recaptchaVerifier = null;
-        }
-      });
-      await window.recaptchaVerifier.render();
+
+      // Re-create the container div fresh (fixes mobile DOM issues)
+      const oldDiv = document.getElementById("recaptcha-container");
+      if (oldDiv) {
+        const newDiv = document.createElement("div");
+        newDiv.id = "recaptcha-container";
+        oldDiv.parentNode.replaceChild(newDiv, oldDiv);
+      }
+
+      // Create RecaptchaVerifier — invisible mode
+      window.recaptchaVerifier = new RecaptchaVerifier(
+        auth,
+        "recaptcha-container",
+        { size: "invisible" }
+      );
+
       const result = await signInWithPhoneNumber(auth, `+91${phone}`, window.recaptchaVerifier);
       onSent(result, phone);
     } catch(e) {
@@ -152,8 +159,10 @@ function PhoneScreen({ onBack, onSent, loading, setLoading, error, setError, rec
         setError("Too many attempts. Please wait a few minutes and try again.");
       } else if (e.code === "auth/invalid-phone-number") {
         setError("Invalid phone number. Check and try again.");
+      } else if (e.code === "auth/captcha-check-failed" || e.code === "auth/recaptcha-not-enabled") {
+        setError("Security check failed. Please refresh and try again.");
       } else {
-        setError("Failed to send OTP. Please try again.");
+        setError(`Failed to send OTP (${e.code}). Try again.`);
       }
       if (window.recaptchaVerifier) {
         try { window.recaptchaVerifier.clear(); } catch(e) {}
@@ -288,8 +297,8 @@ export default function AuthScreen({ onGuest }) {
 
   return (
     <>
-      {/* Recaptcha container — always mounted, never inside conditionals */}
-      <div id="recaptcha-container" style={{ position:"fixed", bottom:0, left:0, zIndex:99999 }}/>
+      {/* Recaptcha container — always in DOM, never removed */}
+      <div id="recaptcha-container" style={{ position:"fixed", bottom:10, left:10, zIndex:99999, opacity:0.01 }}/>
 
       {screen==="welcome" && (
         <WelcomeScreen
