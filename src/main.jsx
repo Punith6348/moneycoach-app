@@ -44,22 +44,32 @@ function Root() {
   const [guestMode, setGuestMode] = useState(false);
 
   useEffect(() => {
-    // First check for redirect result (Google login returning)
+    let unsub = null;
+
+    // FIRST: Handle Google redirect result
+    // This must complete before setting up auth listener
     getRedirectResult(auth)
       .then(result => {
         if (result?.user) {
-          console.log("Redirect login success:", result.user.email);
+          console.log("✅ Google redirect success:", result.user.email);
         }
       })
-      .catch(err => console.warn("Redirect error:", err));
+      .catch(err => {
+        // Ignore no-auth-event errors (normal on first load)
+        if (err.code !== "auth/no-auth-event") {
+          console.warn("Redirect error:", err.code);
+        }
+      })
+      .finally(() => {
+        // THEN: Listen for auth state changes
+        unsub = onAuthStateChanged(auth, async u => {
+          console.log("Auth state:", u?.email || u?.phoneNumber || "null");
+          if (u) await registerUserProfile(u);
+          setUser(u ?? null);
+        });
+      });
 
-    // Listen for auth state
-    const unsub = onAuthStateChanged(auth, async u => {
-      console.log("Auth state:", u?.email || u?.phoneNumber || "null");
-      if (u) await registerUserProfile(u);
-      setUser(u ?? null);
-    });
-    return unsub;
+    return () => { if (unsub) unsub(); };
   }, []);
 
   if (user === undefined && !guestMode) return <LoadingScreen/>;
