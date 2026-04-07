@@ -1,7 +1,7 @@
 // ─── main.jsx ────────────────────────────────────────────────────────────────
 import { StrictMode, useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
-import { onAuthStateChanged, signOut, getRedirectResult } from "firebase/auth";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "./firebase";
 import { registerUserProfile } from "./useFirestoreSync";
 import App from "./App.jsx";
@@ -34,70 +34,34 @@ function LoadingScreen() {
           onError={e=>{ const p=e.target.parentNode; p.style.cssText="background:linear-gradient(135deg,#1E40AF,#06B6D4);display:flex;align-items:center;justify-content:center;width:72px;height:72px;border-radius:18px"; e.target.remove(); p.innerHTML='<span style="font-size:32px;color:#fff;font-family:Georgia,serif;font-weight:700">₹</span>'; }}
         />
       </div>
-      <p style={{ color:"#64748B", fontSize:13, margin:0, fontFamily:"sans-serif" }}>Signing you in...</p>
+      <p style={{ color:"#64748B", fontSize:13, margin:0, fontFamily:"sans-serif" }}>Loading...</p>
     </div>
   );
 }
 
 function Root() {
-  // undefined = still checking auth
-  // null = checked, not logged in
-  // object = logged in user
-  const [user,        setUser]        = useState(undefined);
-  const [guestMode,   setGuestMode]   = useState(false);
-  const [redirectDone, setRedirectDone] = useState(false);
+  const [user,      setUser]      = useState(undefined); // undefined=checking
+  const [guestMode, setGuestMode] = useState(false);
 
   useEffect(() => {
-    console.log("🔍 Checking redirect result...");
-    // Step 1 — Handle redirect result first (user returning from Google)
-    getRedirectResult(auth)
-      .then(async result => {
-        console.log("🔍 Redirect result:", result);
-        if (result?.user) {
-          console.log("✅ Google redirect success:", result.user.email);
-          await registerUserProfile(result.user);
-          setUser(result.user);
-        } else {
-          console.log("🔍 No redirect result — normal page load");
-        }
-      })
-      .catch(err => {
-        console.log("🔍 Redirect error code:", err.code, err.message);
-        if (err.code !== "auth/no-auth-event") {
-          console.warn("Redirect result error:", err.code);
-        }
-      })
-      .finally(() => {
-        console.log("🔍 Redirect check complete");
-        setRedirectDone(true);
-      });
-  }, []);
-
-  useEffect(() => {
-    if (!redirectDone) return;
-    console.log("🔍 Starting auth state listener...");
-
+    // Simple auth state listener — popup handles login directly
+    // No redirect result needed since we use signInWithPopup
     const unsub = onAuthStateChanged(auth, async u => {
-      console.log("🔍 Auth state changed:", u?.email || u?.phoneNumber || "NULL");
+      console.log("Auth state:", u?.email || "null");
       if (u) {
         await registerUserProfile(u);
         setUser(u);
       } else {
-        setUser(prev => {
-          console.log("🔍 Setting user - prev:", prev?.email, "new: null");
-          if (prev && prev.uid) return prev;
-          return null;
-        });
+        setUser(null);
       }
     });
-
     return () => unsub();
-  }, [redirectDone]);
+  }, []);
 
-  // Show loading while checking auth state
+  // Still checking
   if (user === undefined && !guestMode) return <LoadingScreen/>;
 
-  // Show auth screen if not logged in
+  // Not logged in
   if (!user && !guestMode) {
     return (
       <div className="auth-root">
@@ -106,7 +70,7 @@ function Root() {
     );
   }
 
-  // Show main app
+  // Logged in or guest
   return (
     <App
       firebaseUser={user || null}
