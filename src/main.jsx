@@ -1,7 +1,7 @@
 // ─── main.jsx ────────────────────────────────────────────────────────────────
 import { StrictMode, useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import { onAuthStateChanged, signOut, setPersistence, browserLocalPersistence } from "firebase/auth";
 import { auth } from "./firebase";
 import { registerUserProfile } from "./useFirestoreSync";
 import App from "./App.jsx";
@@ -44,18 +44,34 @@ function Root() {
   const [guestMode, setGuestMode] = useState(false);
 
   useEffect(() => {
-    // Simple auth state listener — popup handles login directly
-    // No redirect result needed since we use signInWithPopup
-    const unsub = onAuthStateChanged(auth, async u => {
-      console.log("Auth state:", u?.email || "null");
-      if (u) {
-        await registerUserProfile(u);
-        setUser(u);
-      } else {
-        setUser(null);
-      }
-    });
-    return () => unsub();
+    // Set persistence to LOCAL — session survives page refresh and app restart
+    // This is the key fix — without this Firebase defaults to SESSION persistence
+    // which clears on every page reload
+    setPersistence(auth, browserLocalPersistence)
+      .then(() => {
+        // After setting persistence, listen for auth state
+        const unsub = onAuthStateChanged(auth, async u => {
+          if (u) {
+            await registerUserProfile(u);
+            setUser(u);
+          } else {
+            setUser(null);
+          }
+        });
+        // Store unsub for cleanup
+        window._authUnsub = unsub;
+      })
+      .catch(err => {
+        console.warn("Persistence error:", err);
+        // Fall back to normal auth listener
+        const unsub = onAuthStateChanged(auth, async u => {
+          if (u) { await registerUserProfile(u); setUser(u); }
+          else setUser(null);
+        });
+        window._authUnsub = unsub;
+      });
+
+    return () => { if (window._authUnsub) window._authUnsub(); };
   }, []);
 
   // Still checking
