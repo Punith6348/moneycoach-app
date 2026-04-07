@@ -34,46 +34,68 @@ function LoadingScreen() {
           onError={e=>{ const p=e.target.parentNode; p.style.cssText="background:linear-gradient(135deg,#1E40AF,#06B6D4);display:flex;align-items:center;justify-content:center;width:72px;height:72px;border-radius:18px"; e.target.remove(); p.innerHTML='<span style="font-size:32px;color:#fff;font-family:Georgia,serif;font-weight:700">₹</span>'; }}
         />
       </div>
-      <p style={{ color:"#64748B", fontSize:13, margin:0, fontFamily:"sans-serif" }}>Loading...</p>
+      <p style={{ color:"#64748B", fontSize:13, margin:0, fontFamily:"sans-serif" }}>Signing you in...</p>
     </div>
   );
 }
 
 function Root() {
-  const [user,      setUser]      = useState(undefined);
-  const [guestMode, setGuestMode] = useState(false);
+  // undefined = still checking auth
+  // null = checked, not logged in
+  // object = logged in user
+  const [user,        setUser]        = useState(undefined);
+  const [guestMode,   setGuestMode]   = useState(false);
+  const [redirectDone, setRedirectDone] = useState(false);
 
   useEffect(() => {
-    let unsub = null;
-
-    // FIRST: Handle Google redirect result
-    // This must complete before setting up auth listener
+    // Step 1 — Handle redirect result first (user returning from Google)
     getRedirectResult(auth)
-      .then(result => {
+      .then(async result => {
         if (result?.user) {
+          // User just signed in via redirect — register profile and set user
           console.log("✅ Google redirect success:", result.user.email);
+          await registerUserProfile(result.user);
+          setUser(result.user);
         }
       })
       .catch(err => {
-        // Ignore no-auth-event errors (normal on first load)
         if (err.code !== "auth/no-auth-event") {
-          console.warn("Redirect error:", err.code);
+          console.warn("Redirect result error:", err.code);
         }
       })
       .finally(() => {
-        // THEN: Listen for auth state changes
-        unsub = onAuthStateChanged(auth, async u => {
-          console.log("Auth state:", u?.email || u?.phoneNumber || "null");
-          if (u) await registerUserProfile(u);
-          setUser(u ?? null);
-        });
+        // Mark redirect check as done — now safe to use auth state
+        setRedirectDone(true);
       });
-
-    return () => { if (unsub) unsub(); };
   }, []);
 
+  useEffect(() => {
+    // Step 2 — Only start auth listener AFTER redirect result is handled
+    // This prevents race condition where null fires before redirect resolves
+    if (!redirectDone) return;
+
+    const unsub = onAuthStateChanged(auth, async u => {
+      console.log("Auth state:", u?.email || u?.phoneNumber || "null");
+      if (u) {
+        await registerUserProfile(u);
+        setUser(u);
+      } else {
+        // Only set null if we haven't already set a user from redirect
+        setUser(prev => {
+          // Keep existing user if we already set one from redirect
+          if (prev && prev.uid) return prev;
+          return null;
+        });
+      }
+    });
+
+    return () => unsub();
+  }, [redirectDone]);
+
+  // Show loading while checking auth state
   if (user === undefined && !guestMode) return <LoadingScreen/>;
 
+  // Show auth screen if not logged in
   if (!user && !guestMode) {
     return (
       <div className="auth-root">
@@ -82,12 +104,12 @@ function Root() {
     );
   }
 
+  // Show main app
   return (
     <App
       firebaseUser={user || null}
       isGuest={guestMode}
       onSignOut={async () => {
-        // Clear local data before signing out
         localStorage.removeItem("moneyCoachData_v3");
         localStorage.removeItem("moneyCoachUID");
         if (user) await signOut(auth);
