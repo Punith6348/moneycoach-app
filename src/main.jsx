@@ -48,41 +48,43 @@ function Root() {
   const [redirectDone, setRedirectDone] = useState(false);
 
   useEffect(() => {
+    console.log("🔍 Checking redirect result...");
     // Step 1 — Handle redirect result first (user returning from Google)
     getRedirectResult(auth)
       .then(async result => {
+        console.log("🔍 Redirect result:", result);
         if (result?.user) {
-          // User just signed in via redirect — register profile and set user
           console.log("✅ Google redirect success:", result.user.email);
           await registerUserProfile(result.user);
           setUser(result.user);
+        } else {
+          console.log("🔍 No redirect result — normal page load");
         }
       })
       .catch(err => {
+        console.log("🔍 Redirect error code:", err.code, err.message);
         if (err.code !== "auth/no-auth-event") {
           console.warn("Redirect result error:", err.code);
         }
       })
       .finally(() => {
-        // Mark redirect check as done — now safe to use auth state
+        console.log("🔍 Redirect check complete");
         setRedirectDone(true);
       });
   }, []);
 
   useEffect(() => {
-    // Step 2 — Only start auth listener AFTER redirect result is handled
-    // This prevents race condition where null fires before redirect resolves
     if (!redirectDone) return;
+    console.log("🔍 Starting auth state listener...");
 
     const unsub = onAuthStateChanged(auth, async u => {
-      console.log("Auth state:", u?.email || u?.phoneNumber || "null");
+      console.log("🔍 Auth state changed:", u?.email || u?.phoneNumber || "NULL");
       if (u) {
         await registerUserProfile(u);
         setUser(u);
       } else {
-        // Only set null if we haven't already set a user from redirect
         setUser(prev => {
-          // Keep existing user if we already set one from redirect
+          console.log("🔍 Setting user - prev:", prev?.email, "new: null");
           if (prev && prev.uid) return prev;
           return null;
         });
