@@ -1,0 +1,10 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.turingsxyz.moneycoach",
+    "sha256_cert_fingerprints": [
+      "31:34:7F:E7:0A:38:15:64:2B:18:A0:D9:B3:D2:B4:90:D9:52:50:BF:E6:D9:47:96:7B:64:71:67:CE:68:B6:7C"
+    ]
+  }
+}]
