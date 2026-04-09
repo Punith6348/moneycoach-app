@@ -14,6 +14,7 @@ const DEFAULT_STATE = {
   savingsPlans:     [],
   futurePayments:   [],
   loans:            [],  // [{id, name, principal, rate, tenureMonths, emi, startDate}]
+  creditCards:      [],  // [{id, name, bank, limit, outstanding, minDue, dueDate, apr, rewardRate, bestFor}]
   categoryBudgets:  {},  // { "Food": 3000, "Travel": 1500, ... }
   recurringExpenses:[],  // [{id, label, category, amount, dayOfMonth, note, active}]
   assets:           [],  // [{id, label, type, value, note}]  type: savings|fd|stocks|gold|property|other
@@ -252,6 +253,7 @@ export function useAppData(firebaseUser = null) {
     const restored = {
       ...DEFAULT_STATE, ...saved,
       loans:             Array.isArray(saved.loans)             ? saved.loans             : [],
+      creditCards:       Array.isArray(saved.creditCards)       ? saved.creditCards       : [],
       incomeSources:     Array.isArray(saved.incomeSources)     ? saved.incomeSources     : [],
       fixedExpenses:     Array.isArray(saved.fixedExpenses)     ? saved.fixedExpenses     : [],
       savingsPlans:      Array.isArray(saved.savingsPlans)      ? saved.savingsPlans      : [],
@@ -384,6 +386,10 @@ export function useAppData(firebaseUser = null) {
   const addLoan    = (l)      => commit(prev=>({...prev, loans:[...(prev.loans||[]), {...l, id:Date.now()}]}));
   const updateLoan = (id,upd) => commit(prev=>({...prev, loans:(prev.loans||[]).map(x=>x.id===id?{...x,...upd}:x)}));
   const deleteLoan = (id)     => commit(prev=>({...prev, loans:(prev.loans||[]).filter(x=>x.id!==id)}));
+
+  const addCreditCard    = (c)      => commit(prev=>({...prev, creditCards:[...(prev.creditCards||[]), {...c, id:Date.now()}]}));
+  const updateCreditCard = (id,upd) => commit(prev=>({...prev, creditCards:(prev.creditCards||[]).map(x=>x.id===id?{...x,...upd}:x)}));
+  const deleteCreditCard = (id)     => commit(prev=>({...prev, creditCards:(prev.creditCards||[]).filter(x=>x.id!==id)}));
 
   // Category budgets  — value of 0 or undefined means "no budget set"
   const setCategoryBudget = (category, amount) => commit(prev => {
@@ -527,6 +533,7 @@ export function useAppData(firebaseUser = null) {
     incomeSources:data.incomeSources, fixedExpenses:data.fixedExpenses,
     savingsPlans:data.savingsPlans, futurePayments:data.futurePayments,
     loans: data.loans || [],
+    creditCards: data.creditCards || [],
     categoryBudgets: data.categoryBudgets || {},
     recurringExpenses: data.recurringExpenses || [],
     allExpenses:data.allExpenses, checkIns:data.checkIns,
@@ -542,6 +549,7 @@ export function useAppData(firebaseUser = null) {
     addFuturePayment, updateFuturePayment, deleteFuturePayment,
     addExpense, editExpense, deleteExpense, addCheckIn, resetAll,
     addLoan, updateLoan, deleteLoan,
+    addCreditCard, updateCreditCard, deleteCreditCard,
     setCategoryBudget,
     updateName,
     addRecurring, updateRecurring, deleteRecurring, toggleRecurring, autoLogRecurring,
