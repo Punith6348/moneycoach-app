@@ -23,7 +23,7 @@ const groupByDate = (expenses) => {
   const today = new Date().toISOString().split("T")[0];
   const yest = new Date(); yest.setDate(yest.getDate()-1);
   const yestStr = yest.toISOString().split("T")[0];
-  [...expenses].reverse().forEach(e => {
+  [...expenses].filter(e=>e.date).reverse().forEach(e => {
     const d = e.date.split("T")[0];
     const l = d===today?"Today":d===yestStr?"Yesterday":new Date(d).toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"short"});
     if(!groups[l]){ groups[l]=[]; order.push(l); }
@@ -537,7 +537,7 @@ function DateFilter({ expenses, onFiltered, monthKey }) {
   const yestStr = yest.toISOString().split("T")[0];
 
   // Smart default on mount
-  const initMode = expenses.some(e=>e.date.startsWith(today)) ? "today" : "custom";
+  const initMode = expenses.some(e=>e.date?.startsWith(today)) ? "today" : "custom";
   const initDate = initMode==="today" ? today :
     ([...new Set(expenses.map(e=>e.date.split("T")[0]))].sort((a,b)=>b.localeCompare(a))[0] || today);
 
@@ -569,9 +569,9 @@ function DateFilter({ expenses, onFiltered, monthKey }) {
     new Date(selDate+"T12:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short"});
 
   useEffect(()=>{
-    if      (mode==="today")     onFiltered(expenses.filter(e=>e.date.startsWith(today)));
-    else if (mode==="yesterday") onFiltered(expenses.filter(e=>e.date.startsWith(yestStr)));
-    else                         onFiltered(expenses.filter(e=>e.date.startsWith(selDate)));
+    if      (mode==="today")     onFiltered(expenses.filter(e=>e.date?.startsWith(today)));
+    else if (mode==="yesterday") onFiltered(expenses.filter(e=>e.date?.startsWith(yestStr)));
+    else                         onFiltered(expenses.filter(e=>e.date?.startsWith(selDate)));
   }, [mode, selDate, expenses]);
 
   useEffect(()=>{
@@ -676,7 +676,7 @@ function DateFilter({ expenses, onFiltered, monthKey }) {
 // ─── FILTERED EXPENSE LIST ────────────────────────────────────────────────────
 function FilteredExpenseList({ expenses, monthKey, onEdit, onDelete, isCurrentMonth }) {
   const [filtered, setFiltered] = useState(expenses);
-  useEffect(() => { setFiltered(expenses.filter(e=>e.date.startsWith(new Date().toISOString().split("T")[0]))); }, [expenses]);
+  useEffect(() => { setFiltered(expenses.filter(e=>e.date?.startsWith(new Date().toISOString().split("T")[0]))); }, [expenses]);
   return (
     <>
       <DateFilter expenses={expenses} onFiltered={(f) => setFiltered(f)} monthKey={monthKey}/>
@@ -694,7 +694,7 @@ function LogExpenseForm({onAdd, disabled, currentExpenses=[], dailyLimit=0}) {
   const [saved,setSaved]=useState(false);
 
   const todayStr   = new Date().toISOString().split("T")[0];
-  const todaySpent = currentExpenses.filter(e=>e.date.startsWith(todayStr)).reduce((s,e)=>s+e.amount,0);
+  const todaySpent = currentExpenses.filter(e=>e.date?.startsWith(todayStr)).reduce((s,e)=>s+e.amount,0);
   const limitLeft  = dailyLimit>0?dailyLimit-todaySpent:null;
   const overLimit  = limitLeft!==null&&limitLeft<0;
 

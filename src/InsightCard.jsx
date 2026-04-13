@@ -197,7 +197,7 @@ export default function InsightCard({
 
   // ── Snapshot values ───────────────────────────────────────────────────────
   const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth()+1, 0).getDate();
-  const noSpendDays = daysInMonth - new Set(expenses.map(e => e.date.split("T")[0])).size;
+  const noSpendDays = daysInMonth - new Set(expenses.filter(e=>e.date).map(e => e.date.split("T")[0])).size;
 
   // ── Rule-based insights (priority-ordered, max 3) ─────────────────────────
   const fixedBurden = pct(totalFixed + totalLoanEmi, monthlyIncome);
