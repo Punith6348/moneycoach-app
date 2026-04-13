@@ -18,6 +18,22 @@ const getGreeting = (name) => {
   const t = h<12?"Good morning":h<17?"Good afternoon":"Good evening";
   return name ? `${t}, ${name}` : t;
 };
+
+// Smart insight for greeting
+const getSmartInsight = (remaining, totalIncome, thisMonthSpent, dailyLimit, streak) => {
+  if (totalIncome === 0) return null;
+  const pctSpent = totalIncome > 0 ? Math.round((thisMonthSpent/totalIncome)*100) : 0;
+  const now = new Date();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+  const daysPassed = now.getDate();
+  const dayPct = Math.round((daysPassed/daysInMonth)*100);
+
+  if (remaining < 0) return { text:`Over budget by ₹${Math.abs(remaining).toLocaleString("en-IN")} this month`, color:"#DC2626" };
+  if (pctSpent > dayPct + 15) return { text:`Spending ahead of pace — ₹${dailyLimit.toLocaleString("en-IN")}/day limit`, color:"#D97706" };
+  if (streak >= 3) return { text:`🔥 ${streak}-day logging streak! Keep it up`, color:"#EA580C" };
+  if (pctSpent <= dayPct - 15) return { text:`On track to save ₹${remaining.toLocaleString("en-IN")} this month 🎯`, color:"#16A34A" };
+  return { text:`₹${dailyLimit.toLocaleString("en-IN")}/day available to spend`, color:"#6B7280" };
+};
 const groupByDate = (expenses) => {
   const groups = {}; const order = [];
   const today = new Date().toISOString().split("T")[0];
@@ -261,76 +277,253 @@ function SetupChecklist({ totalIncome, fixedExpenses, savingsPlans, onNavigate }
 
 // ─── ONBOARDING — multi-step ──────────────────────────────────────────────
 function OnboardingScreen({onComplete}) {
-  const [step,setStep]    = useState(1); // 1=name, 2=income sources
-  const [name,setName]    = useState("");
-  const [sources,setSources] = useState([{id:1,label:"Salary",amount:""}]);
-
-  const addSource    = ()    => setSources(p=>[...p,{id:Date.now(),label:"Salary",amount:""}]);
-  const removeSource = (id)  => setSources(p=>p.filter(s=>s.id!==id));
-  const updateSource = (id,k,v) => setSources(p=>p.map(s=>s.id===id?{...s,[k]:v}:s));
+  const [step,    setStep]    = useState(1);
+  const [name,    setName]    = useState("");
+  const [sources, setSources] = useState([{id:1,label:"Salary",amount:""}]);
+  const [bills,   setBills]   = useState([{id:1,label:"Rent",amount:""}]);
 
   const INCOME_LABELS = ["Salary","Freelance","Rental Income","Business Income","Other Income"];
+  const BILL_LABELS   = ["Rent","Electricity","Internet","Mobile","Insurance","School Fees","Other Fixed"];
+
+  const addSource    = () => setSources(p=>[...p,{id:Date.now(),label:"Salary",amount:""}]);
+  const removeSource = (id) => setSources(p=>p.filter(s=>s.id!==id));
+  const updateSource = (id,k,v) => setSources(p=>p.map(s=>s.id===id?{...s,[k]:v}:s));
+
+  const addBill    = () => setBills(p=>[...p,{id:Date.now(),label:"Rent",amount:""}]);
+  const removeBill = (id) => setBills(p=>p.filter(b=>b.id!==id));
+  const updateBill = (id,k,v) => setBills(p=>p.map(b=>b.id===id?{...b,[k]:v}:b));
+
+  const totalIncome = sources.reduce((s,x)=>s+(parseFloat(x.amount)||0),0);
+  const totalBills  = bills.reduce((s,x)=>s+(parseFloat(x.amount)||0),0);
 
   const go = () => {
-    const valid = sources.filter(s=>parseFloat(s.amount)>0);
-    if(valid.length===0) return;
-    onComplete({name:name.trim(), incomeSources:valid.map(s=>({...s,amount:parseFloat(s.amount)||0}))});
+    const validSources = sources.filter(s=>parseFloat(s.amount)>0);
+    if(validSources.length===0) return;
+    onComplete({
+      name: name.trim(),
+      incomeSources: validSources.map(s=>({...s, amount:parseFloat(s.amount)||0})),
+      fixedExpenses: bills.filter(b=>parseFloat(b.amount)>0).map(b=>({...b, amount:parseFloat(b.amount)||0})),
+    });
   };
 
-  const totalPreview = sources.reduce((s,x)=>s+(parseFloat(x.amount)||0),0);
+  const inp = { width:"100%", padding:"10px 12px", borderRadius:10,
+    border:`1.5px solid ${C.border}`, fontFamily:"inherit",
+    fontSize:14, outline:"none", boxSizing:"border-box", background:"#fff" };
+
+  const STEPS = ["👋 Welcome", "💰 Income", "🏠 Fixed Bills"];
 
   return (
-    <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
-      <div style={{width:"100%",maxWidth:480}}>
-        <div style={{textAlign:"center",marginBottom:28}}>
-          <div style={{fontSize:52,marginBottom:10}}>💰</div>
-          <h1 style={{fontSize:28,fontWeight:700,color:C.ink,fontFamily:"Georgia,serif",letterSpacing:-1,margin:0}}>Money Coach</h1>
-          <p style={{marginTop:8,color:C.muted,fontSize:14,lineHeight:1.7}}>Smart daily spending. Real financial planning.</p>
+    <div style={{ minHeight:"100vh", background:"linear-gradient(160deg,#0F172A,#1E293B)",
+      display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
+      <div style={{ width:"100%", maxWidth:440 }}>
+
+        {/* Logo */}
+        <div style={{ textAlign:"center", marginBottom:24 }}>
+          <div style={{ fontSize:48, marginBottom:8 }}>💰</div>
+          <h1 style={{ fontSize:26, fontWeight:800, color:"#F1F5F9",
+            fontFamily:"Georgia,serif", margin:0 }}>Money Coach</h1>
+          <p style={{ margin:"6px 0 0", fontSize:13, color:"#64748B" }}>
+            Smart daily spending. Real financial planning.
+          </p>
         </div>
 
-        <div style={{background:"#fff",borderRadius:16,border:`1px solid ${C.border}`,padding:24}}>
-          {step===1 && (<>
-            <p style={{fontSize:16,fontWeight:700,color:C.ink,marginBottom:16}}>👋 Let's get started</p>
-            <Label>Your Name (optional)</Label>
-            <input type="text" value={name} onChange={e=>setName(e.target.value)} placeholder="Your Name"
-              style={{width:"100%",padding:"10px 12px",borderRadius:8,border:`1.5px solid ${C.border}`,fontFamily:"inherit",fontSize:14,background:C.bg,outline:"none",marginTop:6,marginBottom:20,boxSizing:"border-box"}} />
-            <button onClick={()=>setStep(2)} style={{width:"100%",padding:13,borderRadius:12,background:C.ink,color:"#fff",border:"none",fontSize:15,fontFamily:"inherit",fontWeight:700,cursor:"pointer"}}>Next → Add Income Sources</button>
-          </>)}
-
-          {step===2 && (<>
-            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
-              <button onClick={()=>setStep(1)} style={{background:"none",border:"none",cursor:"pointer",fontSize:18,color:C.muted}}>←</button>
-              <p style={{fontSize:16,fontWeight:700,color:C.ink,margin:0}}>💰 Your Income Sources</p>
+        {/* Step indicators */}
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"center",
+          gap:8, marginBottom:20 }}>
+          {STEPS.map((s,i)=>(
+            <div key={i} style={{ display:"flex", alignItems:"center", gap:8 }}>
+              <div style={{ display:"flex", alignItems:"center", gap:5 }}>
+                <div style={{ width:24, height:24, borderRadius:"50%",
+                  background: step===i+1?"#2563EB":step>i+1?"#16A34A":"#334155",
+                  display:"flex", alignItems:"center", justifyContent:"center",
+                  fontSize:11, fontWeight:700, color:"#fff",
+                  border: step===i+1?"2px solid #60A5FA":"2px solid transparent" }}>
+                  {step>i+1?"✓":i+1}
+                </div>
+                <span style={{ fontSize:11, color:step===i+1?"#E2E8F0":"#475569", fontWeight:step===i+1?700:400 }}>
+                  {s}
+                </span>
+              </div>
+              {i<STEPS.length-1 && <div style={{ width:20, height:1, background:"#334155" }}/>}
             </div>
-            <p style={{fontSize:13,color:C.muted,marginBottom:14,lineHeight:1.6}}>Add all monthly income. You can edit these anytime from the Plan tab.</p>
-            {sources.map((s,i)=>(
-              <div key={s.id} style={{display:"grid",gridTemplateColumns:"1fr 1fr auto",gap:8,marginBottom:10,alignItems:"end"}}>
-                <div>
-                  {i===0&&<Label>Source</Label>}
-                  <select value={s.label} onChange={e=>updateSource(s.id,"label",e.target.value)}
-                    style={{width:"100%",padding:"9px 10px",borderRadius:8,border:`1.5px solid ${C.border}`,fontFamily:"inherit",fontSize:13,background:"#fff",outline:"none",marginTop:i===0?4:0}}>
-                    {INCOME_LABELS.map(l=><option key={l} value={l}>{l}</option>)}
-                  </select>
-                </div>
-                <div>
-                  {i===0&&<Label>Monthly Amount (₹)</Label>}
-                  <input type="number" value={s.amount} onChange={e=>updateSource(s.id,"amount",e.target.value)} placeholder="e.g. 50000"
-                    style={{width:"100%",padding:"9px 10px",borderRadius:8,border:`1.5px solid ${C.border}`,fontFamily:"Georgia,serif",fontSize:14,background:"#fff",outline:"none",marginTop:i===0?4:0,boxSizing:"border-box"}} />
-                </div>
-                <button onClick={()=>removeSource(s.id)} style={{padding:"9px 10px",borderRadius:8,border:`1px solid ${C.border}`,background:"#fff",color:C.muted,cursor:"pointer",fontSize:14,alignSelf:"end"}}>✕</button>
-              </div>
-            ))}
-            <button onClick={addSource} style={{width:"100%",padding:"9px",borderRadius:10,border:`1.5px dashed ${C.border}`,background:"transparent",color:C.muted,fontSize:13,fontFamily:"inherit",cursor:"pointer",fontWeight:600,marginBottom:16}}>+ Add Another Source</button>
-            {totalPreview>0&&(
-              <div style={{background:"#F0FDF4",borderRadius:10,padding:"10px 14px",marginBottom:16,display:"flex",justifyContent:"space-between",alignItems:"center",border:"1px solid #86EFAC"}}>
-                <span style={{fontSize:13,color:C.green,fontWeight:600}}>Total Monthly Income</span>
-                <span style={{fontSize:18,fontWeight:700,color:C.green,fontFamily:"Georgia,serif"}}>{fmt(totalPreview)}</span>
-              </div>
-            )}
-            <button onClick={go} style={{width:"100%",padding:13,borderRadius:12,background:C.ink,color:"#fff",border:"none",fontSize:15,fontFamily:"inherit",fontWeight:700,cursor:"pointer"}}>Start Tracking →</button>
-          </>)}
+          ))}
         </div>
-        <p style={{textAlign:"center",marginTop:12,fontSize:12,color:C.muted}}>All data stays on your device.</p>
+
+        {/* Card */}
+        <div style={{ background:"#fff", borderRadius:20, padding:"24px 20px",
+          boxShadow:"0 20px 60px rgba(0,0,0,0.4)" }}>
+
+          {/* Step 1 — Name */}
+          {step===1 && (
+            <>
+              <p style={{ fontSize:17, fontWeight:700, color:C.ink, margin:"0 0 6px" }}>
+                👋 Welcome! What's your name?
+              </p>
+              <p style={{ fontSize:13, color:C.muted, margin:"0 0 16px", lineHeight:1.5 }}>
+                We'll personalise your dashboard with your name
+              </p>
+              <input value={name} onChange={e=>setName(e.target.value)}
+                onKeyDown={e=>e.key==="Enter"&&setStep(2)}
+                placeholder="Your name (e.g. Puneeth)"
+                style={{...inp, marginBottom:16, fontSize:16}}
+                autoFocus
+              />
+              <button onClick={()=>setStep(2)} style={{ width:"100%", padding:13,
+                borderRadius:12, background:C.ink, color:"#fff", border:"none",
+                fontSize:15, fontFamily:"inherit", fontWeight:700, cursor:"pointer" }}>
+                Next → Add Income
+              </button>
+              <p style={{ textAlign:"center", fontSize:11, color:C.muted, margin:"10px 0 0" }}>
+                Name is optional — you can skip
+              </p>
+            </>
+          )}
+
+          {/* Step 2 — Income */}
+          {step===2 && (
+            <>
+              <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:6 }}>
+                <button onClick={()=>setStep(1)} style={{ background:"none", border:"none",
+                  cursor:"pointer", fontSize:18, color:C.muted, padding:0 }}>←</button>
+                <p style={{ fontSize:17, fontWeight:700, color:C.ink, margin:0 }}>
+                  💰 Your Monthly Income
+                </p>
+              </div>
+              <p style={{ fontSize:13, color:C.muted, margin:"0 0 16px", lineHeight:1.5 }}>
+                Add all income sources. This sets your monthly budget.
+              </p>
+              {sources.map((s,i)=>(
+                <div key={s.id} style={{ display:"grid", gridTemplateColumns:"1fr 1fr auto",
+                  gap:8, marginBottom:10, alignItems:"end" }}>
+                  <div>
+                    {i===0&&<p style={{ margin:"0 0 4px", fontSize:11, fontWeight:700,
+                      color:C.muted, textTransform:"uppercase" }}>Source</p>}
+                    <select value={s.label} onChange={e=>updateSource(s.id,"label",e.target.value)}
+                      style={inp}>
+                      {INCOME_LABELS.map(l=><option key={l} value={l}>{l}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    {i===0&&<p style={{ margin:"0 0 4px", fontSize:11, fontWeight:700,
+                      color:C.muted, textTransform:"uppercase" }}>Amount (₹)</p>}
+                    <input type="number" value={s.amount}
+                      onChange={e=>updateSource(s.id,"amount",e.target.value)}
+                      placeholder="e.g. 50000"
+                      style={{...inp, fontFamily:"Georgia,serif"}}/>
+                  </div>
+                  {sources.length>1 && (
+                    <button onClick={()=>removeSource(s.id)} style={{ padding:"10px",
+                      borderRadius:8, border:`1px solid ${C.border}`, background:"#fff",
+                      color:C.muted, cursor:"pointer", fontSize:14, alignSelf:"flex-end" }}>✕</button>
+                  )}
+                </div>
+              ))}
+              <button onClick={addSource} style={{ width:"100%", padding:"8px",
+                borderRadius:10, border:`1.5px dashed ${C.border}`, background:"transparent",
+                color:C.muted, fontSize:12, fontFamily:"inherit", cursor:"pointer",
+                fontWeight:600, marginBottom:12 }}>
+                + Add Another Source
+              </button>
+              {totalIncome > 0 && (
+                <div style={{ background:"#F0FDF4", borderRadius:10, padding:"10px 14px",
+                  marginBottom:14, display:"flex", justifyContent:"space-between",
+                  alignItems:"center", border:"1px solid #86EFAC" }}>
+                  <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Total Income</span>
+                  <span style={{ fontSize:18, fontWeight:700, color:C.green,
+                    fontFamily:"Georgia,serif" }}>{fmt(totalIncome)}</span>
+                </div>
+              )}
+              <button onClick={()=>setStep(3)} disabled={totalIncome===0}
+                style={{ width:"100%", padding:13, borderRadius:12,
+                  background:totalIncome>0?C.ink:"#E5E7EB",
+                  color:totalIncome>0?"#fff":C.muted,
+                  border:"none", fontSize:15, fontFamily:"inherit",
+                  fontWeight:700, cursor:totalIncome>0?"pointer":"default" }}>
+                Next → Add Fixed Bills
+              </button>
+            </>
+          )}
+
+          {/* Step 3 — Fixed Bills */}
+          {step===3 && (
+            <>
+              <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:6 }}>
+                <button onClick={()=>setStep(2)} style={{ background:"none", border:"none",
+                  cursor:"pointer", fontSize:18, color:C.muted, padding:0 }}>←</button>
+                <p style={{ fontSize:17, fontWeight:700, color:C.ink, margin:0 }}>
+                  🏠 Fixed Monthly Bills
+                </p>
+              </div>
+              <p style={{ fontSize:13, color:C.muted, margin:"0 0 16px", lineHeight:1.5 }}>
+                Add rent, bills, EMIs. These are auto-deducted from your budget.
+              </p>
+              {bills.map((b,i)=>(
+                <div key={b.id} style={{ display:"grid", gridTemplateColumns:"1fr 1fr auto",
+                  gap:8, marginBottom:10, alignItems:"end" }}>
+                  <div>
+                    {i===0&&<p style={{ margin:"0 0 4px", fontSize:11, fontWeight:700,
+                      color:C.muted, textTransform:"uppercase" }}>Bill</p>}
+                    <select value={b.label} onChange={e=>updateBill(b.id,"label",e.target.value)}
+                      style={inp}>
+                      {BILL_LABELS.map(l=><option key={l} value={l}>{l}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    {i===0&&<p style={{ margin:"0 0 4px", fontSize:11, fontWeight:700,
+                      color:C.muted, textTransform:"uppercase" }}>Amount (₹)</p>}
+                    <input type="number" value={b.amount}
+                      onChange={e=>updateBill(b.id,"amount",e.target.value)}
+                      placeholder="e.g. 15000"
+                      style={{...inp, fontFamily:"Georgia,serif"}}/>
+                  </div>
+                  {bills.length>1 && (
+                    <button onClick={()=>removeBill(b.id)} style={{ padding:"10px",
+                      borderRadius:8, border:`1px solid ${C.border}`, background:"#fff",
+                      color:C.muted, cursor:"pointer", fontSize:14, alignSelf:"flex-end" }}>✕</button>
+                  )}
+                </div>
+              ))}
+              <button onClick={addBill} style={{ width:"100%", padding:"8px",
+                borderRadius:10, border:`1.5px dashed ${C.border}`, background:"transparent",
+                color:C.muted, fontSize:12, fontFamily:"inherit", cursor:"pointer",
+                fontWeight:600, marginBottom:12 }}>
+                + Add Another Bill
+              </button>
+              {totalBills > 0 && totalIncome > 0 && (
+                <div style={{ background:totalBills>totalIncome*0.6?"#FFF1F2":"#F0FDF4",
+                  borderRadius:10, padding:"10px 14px", marginBottom:14,
+                  border:`1px solid ${totalBills>totalIncome*0.6?"#FECACA":"#86EFAC"}` }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+                    <span style={{ fontSize:12, color:C.muted }}>Fixed Bills</span>
+                    <span style={{ fontSize:14, fontWeight:700, color:C.red,
+                      fontFamily:"Georgia,serif" }}>{fmt(totalBills)}</span>
+                  </div>
+                  <div style={{ display:"flex", justifyContent:"space-between" }}>
+                    <span style={{ fontSize:12, color:C.muted }}>Left for spending</span>
+                    <span style={{ fontSize:14, fontWeight:700,
+                      color:totalIncome-totalBills>0?C.green:C.red,
+                      fontFamily:"Georgia,serif" }}>{fmt(totalIncome-totalBills)}</span>
+                  </div>
+                </div>
+              )}
+              <button onClick={go} style={{ width:"100%", padding:14, borderRadius:12,
+                background:"linear-gradient(135deg,#2563EB,#1D4ED8)",
+                color:"#fff", border:"none", fontSize:15, fontFamily:"inherit",
+                fontWeight:800, cursor:"pointer",
+                boxShadow:"0 4px 16px rgba(37,99,235,0.4)" }}>
+                🚀 Start Tracking!
+              </button>
+              <button onClick={go} style={{ width:"100%", padding:"10px", borderRadius:12,
+                background:"transparent", color:C.muted, border:"none",
+                fontSize:13, fontFamily:"inherit", cursor:"pointer", marginTop:6 }}>
+                Skip and add later →
+              </button>
+            </>
+          )}
+        </div>
+        <p style={{ textAlign:"center", marginTop:12, fontSize:11, color:"#334155" }}>
+          All data stays on your device · Free forever
+        </p>
       </div>
     </div>
   );
@@ -1291,6 +1484,7 @@ function DashboardScreen(props) {
   const [isMobile,     setIsMobile]     = useState(() => window.innerWidth <= 640);
   const [showSettings, setShowSettings] = useState(false);
   const [darkMode,     setDarkMode]     = useState(() => initDarkMode());
+  const [salaryDismissed, setSalaryDismissed] = useState(false);
 
   const toggleDark = (on) => { applyDarkMode(on); setDarkMode(on); };
 
@@ -1541,6 +1735,14 @@ function DashboardScreen(props) {
                 <p style={{margin:0,fontSize:14,fontWeight:700,color:"#111827",fontFamily:"Georgia,serif",lineHeight:1.15}}>
                   {getGreeting(name)} 👋
                 </p>
+                {(() => {
+                  const insight = getSmartInsight(remaining, totalIncome, thisMonthSpent, dailyLimit, streak);
+                  return insight ? (
+                    <p style={{margin:"2px 0 0",fontSize:10,color:insight.color,fontWeight:600,lineHeight:1.3}}>
+                      {insight.text}
+                    </p>
+                  ) : null;
+                })()}
               </div>
               <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
                 {streak > 0 && (
@@ -1602,9 +1804,52 @@ function DashboardScreen(props) {
               {/* ══ BUDGET DASHBOARD ══ */}
                 {tab==="budget"&&(
                   <>
-                    <p style={{fontSize:11,color:C.muted,marginBottom:10,lineHeight:1.5}}>
-                      Financial overview · {new Date().toLocaleDateString("en-IN",{month:"long",year:"numeric"})}
-                    </p>
+                    {/* ── SALARY DAY MODE ── */}
+                    {(() => {
+                      const today = new Date().getDate();
+                      const isSalaryDay = today === 1 || today <= 5 || today >= 28;
+                      if (!isSalaryDay || salaryDismissed || totalIncome === 0) return null;
+                      const lastMonthDate = new Date();
+                      lastMonthDate.setDate(1);
+                      lastMonthDate.setMonth(lastMonthDate.getMonth()-1);
+                      const lastMonthKey = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth()+1).padStart(2,"0")}`;
+                      const lastMonthSpent = (allExpenses[lastMonthKey]||[]).reduce((s,e)=>s+(e.amount||0),0);
+                      const lastMonthSaved = budgetForMonth - lastMonthSpent;
+                      return (
+                        <div style={{ marginBottom:12, borderRadius:14, overflow:"hidden",
+                          background:"linear-gradient(135deg,#1E3A5F,#1E293B)",
+                          border:"1px solid rgba(37,99,235,0.3)" }}>
+                          <div style={{ padding:"14px 16px" }}>
+                            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+                              <div>
+                                <p style={{ margin:0, fontSize:13, fontWeight:800, color:"#60A5FA" }}>🎉 New Month — Fresh Budget!</p>
+                                <p style={{ margin:"2px 0 0", fontSize:11, color:"#64748B" }}>Your monthly reset is ready</p>
+                              </div>
+                              <button onClick={()=>setSalaryDismissed(true)} style={{ background:"none", border:"none", color:"#475569", cursor:"pointer", fontSize:18, padding:0, lineHeight:1 }}>✕</button>
+                            </div>
+                            {lastMonthSpent > 0 && (
+                              <div style={{ display:"flex", gap:8, marginTop:10 }}>
+                                {[
+                                  { label:"Last Month Spent", value:fmt(lastMonthSpent), color:"#F87171" },
+                                  { label:lastMonthSaved>=0?"Saved":"Overspent", value:fmt(Math.abs(lastMonthSaved)), color:lastMonthSaved>=0?"#86EFAC":"#F87171" },
+                                  { label:"This Month Budget", value:fmt(budgetForMonth), color:"#6EE7B7" },
+                                ].map(s=>(
+                                  <div key={s.label} style={{ flex:1, background:"rgba(255,255,255,0.05)", borderRadius:8, padding:"8px 6px", textAlign:"center" }}>
+                                    <p style={{ margin:0, fontSize:9, color:"#64748B", textTransform:"uppercase" }}>{s.label}</p>
+                                    <p style={{ margin:"2px 0 0", fontSize:13, fontWeight:700, color:s.color, fontFamily:"Georgia,serif" }}>{s.value}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            <div style={{ display:"flex", gap:8, marginTop:10 }}>
+                              <button onClick={()=>setTab("plan")} style={{ flex:1, padding:"8px", borderRadius:8, border:"1px solid rgba(37,99,235,0.3)", background:"rgba(37,99,235,0.1)", color:"#60A5FA", fontFamily:"inherit", fontSize:12, fontWeight:700, cursor:"pointer" }}>📋 Review Plan</button>
+                              <button onClick={()=>{ setSalaryDismissed(true); setTab("home"); }} style={{ flex:1, padding:"8px", borderRadius:8, border:"none", background:"#2563EB", color:"#fff", fontFamily:"inherit", fontSize:12, fontWeight:700, cursor:"pointer" }}>💸 Start Logging</button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                     <SetupChecklist
                       totalIncome={totalIncome}
                       fixedExpenses={fixedExpenses}
@@ -1784,12 +2029,24 @@ function DashboardScreen(props) {
 
         {/* ══ LOANS ══ */}
         {tab==="loans"&&(
-          <LoansTab
-            loans={loans}
-            onAdd={addLoan}
-            onUpdate={updateLoan}
-            onDelete={deleteLoan}
-          />
+          <>
+            {loans.length === 0 && (
+              <div style={{ background:"#EFF6FF", border:"1px solid #BFDBFE", borderRadius:14,
+                padding:"28px 20px", textAlign:"center", marginBottom:14 }}>
+                <p style={{ fontSize:36, margin:"0 0 8px" }}>🏦</p>
+                <p style={{ fontSize:15, fontWeight:700, color:C.ink, margin:"0 0 6px" }}>No loans added yet</p>
+                <p style={{ fontSize:12, color:C.muted, margin:"0 0 16px", lineHeight:1.6 }}>
+                  Track your home loan, car loan or personal loan — see exact EMI, outstanding balance and interest saved by prepaying
+                </p>
+              </div>
+            )}
+            <LoansTab
+              loans={loans}
+              onAdd={addLoan}
+              onUpdate={updateLoan}
+              onDelete={deleteLoan}
+            />
+          </>
         )}
 
         {/* ══ CREDIT CARDS ══ */}
@@ -1986,6 +2243,30 @@ function DashboardScreen(props) {
               </div>{/* /slideIn */}
             </div>{/* /mc-content */}
           </div>{/* /mc-scroll */}
+
+          {/* ════════ FLOATING QUICK-ADD BUTTON ════════ */}
+          {isMobile && tab !== "home" && tab !== "plan" && (
+            <button
+              onClick={() => setTab("home")}
+              style={{
+                position:"fixed",
+                right:16,
+                bottom:`calc(${NAV_HEIGHT}px + env(safe-area-inset-bottom, 0px) + 12px)`,
+                zIndex:9990,
+                width:52, height:52,
+                borderRadius:16,
+                background:"linear-gradient(135deg,#1E293B,#334155)",
+                border:"1px solid rgba(255,255,255,0.1)",
+                boxShadow:"0 4px 20px rgba(0,0,0,0.3)",
+                color:"#fff", fontSize:22,
+                cursor:"pointer",
+                display:"flex", alignItems:"center", justifyContent:"center",
+              }}
+              title="Log Expense"
+            >
+              💸
+            </button>
+          )}
 
           {/* ════════ MOBILE BOTTOM NAV ════════ */}
           {isMobile && (

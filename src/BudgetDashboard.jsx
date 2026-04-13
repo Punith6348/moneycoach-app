@@ -78,7 +78,7 @@ export default function BudgetDashboard({
   const daysLeft   = Math.max(1, lastDay - now.getDate() + 1);
   const monthSpent = currentExpenses.reduce((s,e) => s+e.amount, 0);
   const todaySpent = currentExpenses
-    .filter(e => e.date.startsWith(now.toISOString().split("T")[0]))
+    .filter(e => e.date?.startsWith(now.toISOString().split("T")[0]))
     .reduce((s,e) => s+e.amount, 0);
 
   // Loan aggregates
@@ -208,7 +208,7 @@ export default function BudgetDashboard({
     }
 
     // 10. Zero-spend days milestone
-    const daysWithSpend = new Set(currentExpenses.map(e=>e.date.split("T")[0])).size;
+    const daysWithSpend = new Set(currentExpenses.filter(e=>e.date).map(e=>e.date.split("T")[0])).size;
     const noSpend = daysPassed - daysWithSpend;
     if (noSpend >= 5 && daysPassed >= 10) {
       list.push({

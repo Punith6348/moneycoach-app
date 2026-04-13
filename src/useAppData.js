@@ -333,8 +333,14 @@ export function useAppData(firebaseUser = null) {
   };
 
   // Onboarding
-  const completeOnboarding = ({name, incomeSources}) => {
-    commit(prev => ({...prev, screen:"dashboard", name:name||"", incomeSources}));
+  const completeOnboarding = ({name, incomeSources, fixedExpenses=[]}) => {
+    commit(prev => ({
+      ...prev,
+      screen:"dashboard",
+      name:name||"",
+      incomeSources: incomeSources.map((s,i) => ({...s, id:Date.now()+i})),
+      fixedExpenses: fixedExpenses.map((b,i) => ({...b, id:Date.now()+100+i})),
+    }));
   };
 
   // Income sources
