@@ -1348,6 +1348,89 @@ function DashboardScreen(props) {
           firebaseUser={firebaseUser}
           isGuest={isGuest}
           onSignOut={onSignOut}
+          onLoadTestData={() => {
+            // ── Seed realistic test data ──────────────────────────────────
+            const now   = new Date();
+            const curKey = currentMonthKey();
+            const prevKey = `${now.getFullYear()}-${String(now.getMonth()).padStart(2,"0")}`;
+            const prevPrevKey = `${now.getFullYear()}-${String(now.getMonth()-1 < 1 ? 12 : now.getMonth()-1).padStart(2,"0")}`;
+
+            // Income
+            [
+              {label:"Salary", amount:85000, note:"Turings XYZ"},
+              {label:"Freelance", amount:12000, note:"Side project"},
+            ].forEach(s => addIncomeSource(s));
+
+            // Fixed expenses
+            [
+              {label:"Rent",        amount:18000, note:"1BHK Whitefield"},
+              {label:"Electricity", amount:2200,  note:"BESCOM"},
+              {label:"Internet",    amount:999,   note:"Airtel 1Gbps"},
+              {label:"Mobile",      amount:599,   note:"Jio postpaid"},
+              {label:"Insurance",   amount:3500,  note:"LIC premium"},
+            ].forEach(f => addFixedExpense(f));
+
+            // Savings
+            [
+              {label:"Mutual Fund SIP", amount:10000, note:"Parag Parikh Flexi Cap"},
+              {label:"Emergency Fund",  amount:5000,  note:"Liquid fund"},
+            ].forEach(s => addSavingsPlan(s));
+
+            // Loans
+            addLoan({
+              name:"Home Loan", principal:3500000, rate:8.5,
+              tenureMonths:240, startDate:"2022-04-01",
+            });
+            addLoan({
+              name:"Car Loan", principal:600000, rate:9.2,
+              tenureMonths:60, startDate:"2023-01-01",
+            });
+
+            // Current month expenses
+            const days   = now.getDate();
+            const expCats = [
+              {label:"Food",          amounts:[450,780,320,550,890,420,670,380,720,490]},
+              {label:"Travel",        amounts:[280,450,180,320,560]},
+              {label:"Grocery",       amounts:[2400,1800,3200]},
+              {label:"Coffee",        amounts:[180,220,160,240]},
+              {label:"Entertainment", amounts:[1200,850]},
+              {label:"Medical",       amounts:[650]},
+            ];
+            expCats.forEach(cat => {
+              cat.amounts.forEach((amt, i) => {
+                const d = Math.min(i+1, days);
+                const date = new Date(now.getFullYear(), now.getMonth(), d, 10, 0, 0);
+                addExpense(curKey, {
+                  amount:amt, label:cat.label,
+                  note:`${cat.label} expense`, date:date.toISOString(),
+                });
+              });
+            });
+
+            // Previous month expenses
+            const prevExpCats = [
+              {label:"Food",          amounts:[520,680,390,610,840,480,590,410,720,350,680,430]},
+              {label:"Travel",        amounts:[320,490,210,380,640,270]},
+              {label:"Grocery",       amounts:[2800,1600,2900,1400]},
+              {label:"Coffee",        amounts:[160,200,180,220,190]},
+              {label:"Entertainment", amounts:[1500,2200,900]},
+              {label:"Medical",       amounts:[1200,480]},
+            ];
+            prevExpCats.forEach(cat => {
+              cat.amounts.forEach((amt, i) => {
+                const d = i+1;
+                const prevDate = new Date(now.getFullYear(), now.getMonth()-1, d, 10, 0, 0);
+                addExpense(prevKey, {
+                  amount:amt, label:cat.label,
+                  note:`${cat.label} expense`, date:prevDate.toISOString(),
+                });
+              });
+            });
+
+            // Update name
+            updateName("Ravi");
+            showToast("✅ Test data loaded! Explore all tabs.");
+          }}
         />
       )}
 

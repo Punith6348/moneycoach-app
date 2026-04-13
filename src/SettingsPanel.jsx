@@ -10,6 +10,7 @@ export default function SettingsPanel({
   name, onClose, onResetAll, onNameChange,
   darkMode=false, onToggleDark,
   firebaseUser=null, isGuest=false, onSignOut=null,
+  onLoadTestData=null,
 }) {
   const [resetArmed,  setResetArmed]  = useState(false);
   const [editingName, setEditingName] = useState(false);
@@ -108,6 +109,17 @@ export default function SettingsPanel({
               <div style={{ position:"absolute", top:3, left:darkMode?25:3, width:20, height:20, borderRadius:99, background:"#fff", transition:"left 0.2s", boxShadow:"0 1px 3px rgba(0,0,0,0.2)" }}/>
             </button>
           </div>
+
+          {/* ── Load Test Data ── */}
+          {onLoadTestData && (
+            <Row
+              icon="🧪"
+              label="Load Test Data"
+              sublabel="Fill app with realistic dummy data for testing"
+              highlight
+              onTap={()=>{ onLoadTestData(); onClose(); }}
+            />
+          )}
 
           {/* ── Reset ── */}
           <Row
