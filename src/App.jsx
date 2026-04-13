@@ -1,5 +1,5 @@
 // ─── App.jsx — Full financial planning integration ─────────────────────
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, Component } from "react";
 import InsightCard      from "./InsightCard";
 import SpendingChart, { TrendChart, CategoryHistoryChart } from "./SpendingChart";
 import { useStreak }    from "./useStreak";
@@ -11,6 +11,47 @@ import CreditCardsTab   from "./CreditCardsTab";
 import CategoryBudgets, { BudgetAlertWidget } from "./CategoryBudgets";
 import SettingsPanel    from "./SettingsPanel";
 import { calcLoanTotals } from "./useAppData";
+
+// ─── Error Boundary ───────────────────────────────────────────────────────────
+class ErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { hasError:false, error:null }; }
+  static getDerivedStateFromError(e) { return { hasError:true, error:e }; }
+  componentDidCatch(e, info) { console.error("App crash:", e, info); }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ minHeight:"100vh", background:"#0F172A", display:"flex",
+          alignItems:"center", justifyContent:"center", padding:24,
+          fontFamily:"-apple-system,sans-serif" }}>
+          <div style={{ textAlign:"center", maxWidth:320 }}>
+            <p style={{ fontSize:40, margin:"0 0 12px" }}>⚠️</p>
+            <p style={{ fontSize:16, fontWeight:700, color:"#F1F5F9", margin:"0 0 8px" }}>
+              Something went wrong
+            </p>
+            <p style={{ fontSize:13, color:"#64748B", margin:"0 0 20px", lineHeight:1.5 }}>
+              {this.state.error?.message || "Unexpected error"}
+            </p>
+            <button onClick={()=>{localStorage.removeItem("moneyCoachData_v3");window.location.reload();}}
+              style={{ padding:"12px 24px", borderRadius:10, border:"none",
+                background:"#2563EB", color:"#fff", fontFamily:"inherit",
+                fontSize:14, fontWeight:700, cursor:"pointer",
+                display:"block", width:"100%", marginBottom:8 }}>
+              🔄 Clear Data & Reload
+            </button>
+            <button onClick={()=>this.setState({hasError:false,error:null})}
+              style={{ padding:"10px 24px", borderRadius:10,
+                border:"1px solid #334155", background:"transparent",
+                color:"#64748B", fontFamily:"inherit",
+                fontSize:13, cursor:"pointer", width:"100%" }}>
+              Try Again
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const fmt = (n) => `₹${Math.abs(Math.round(n)).toLocaleString("en-IN")}`;
 const getGreeting = (name) => {
@@ -1736,12 +1777,14 @@ function DashboardScreen(props) {
                   {getGreeting(name)} 👋
                 </p>
                 {(() => {
-                  const insight = getSmartInsight(remaining, totalIncome, thisMonthSpent, dailyLimit, streak);
-                  return insight ? (
-                    <p style={{margin:"2px 0 0",fontSize:10,color:insight.color,fontWeight:600,lineHeight:1.3}}>
-                      {insight.text}
-                    </p>
-                  ) : null;
+                  try {
+                    const insight = getSmartInsight(remaining||0, totalIncome||0, thisMonthSpent||0, dailyLimit||0, streak||0);
+                    return insight ? (
+                      <p style={{margin:"2px 0 0",fontSize:10,color:insight.color,fontWeight:600,lineHeight:1.3}}>
+                        {insight.text}
+                      </p>
+                    ) : null;
+                  } catch(e) { return null; }
                 })()}
               </div>
               <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
@@ -2343,8 +2386,16 @@ function DashboardScreen(props) {
 }
 
 // ─── ROOT ─────────────────────────────────────────────────────────────────
-export default function App({ firebaseUser = null, isGuest = false, onSignOut = null }) {
+function AppInner({ firebaseUser = null, isGuest = false, onSignOut = null }) {
   const appData = useAppData(firebaseUser);
   if(appData.screen==="onboarding") return <OnboardingScreen onComplete={appData.completeOnboarding}/>;
   return <DashboardScreen {...appData} firebaseUser={firebaseUser} isGuest={isGuest} onSignOut={onSignOut}/>;
+}
+
+export default function App(props) {
+  return (
+    <ErrorBoundary>
+      <AppInner {...props}/>
+    </ErrorBoundary>
+  );
 }
