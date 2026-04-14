@@ -36,12 +36,13 @@ export default function EmailPasswordAuth({ onError, onLoading }) {
         return;
       }
 
+      console.log("🔐 Attempting login with:", email);
       const result = await signInWithEmailAndPassword(auth, email, password);
-      console.log("Login success:", result.user.email);
+      console.log("✅ Login success:", result.user.email, "UID:", result.user.uid);
       // onAuthStateChanged in main.jsx handles navigation
       // Do NOT clear loading state here - let onAuthStateChanged navigate
     } catch (e) {
-      console.error("Login error:", e.code, e.message);
+      console.error("❌ Login error:", e.code, e.message);
       const msg =
         e.code === "auth/user-not-found"
           ? "No account found with this email"
@@ -51,7 +52,8 @@ export default function EmailPasswordAuth({ onError, onLoading }) {
               ? "Invalid email address"
               : e.code === "auth/too-many-requests"
                 ? "Too many failed attempts. Try again later."
-                : "Login failed. Please try again.";
+                : e.message || "Login failed. Please try again.";
+      console.log("💬 Error message:", msg);
       setError(msg);
       setLoading(false);
       onLoading?.(false);
@@ -86,8 +88,9 @@ export default function EmailPasswordAuth({ onError, onLoading }) {
       }
 
       // Create account
+      console.log("📝 Creating account with:", email);
       const result = await createUserWithEmailAndPassword(auth, email, password);
-      console.log("Signup success:", result.user.email);
+      console.log("✅ Signup success:", result.user.email, "UID:", result.user.uid);
 
       // Update profile if name provided
       if (name.trim()) {
@@ -99,7 +102,7 @@ export default function EmailPasswordAuth({ onError, onLoading }) {
       // onAuthStateChanged in main.jsx handles navigation
       // Do NOT clear loading state here - let onAuthStateChanged navigate
     } catch (e) {
-      console.error("Signup error:", e.code, e.message);
+      console.error("❌ Signup error:", e.code, e.message);
       const msg =
         e.code === "auth/email-already-in-use"
           ? "This email is already registered"

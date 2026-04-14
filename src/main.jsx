@@ -69,6 +69,7 @@ function Root() {
     setPersistence(auth, browserLocalPersistence)
       .then(() => {
         const unsub = onAuthStateChanged(auth, async u => {
+          console.log("🔔 Auth state changed:", u ? `Signed in as ${u.email}` : "Signed out");
           if (u) {
             // Always check if localStorage belongs to this Google user
             const storedUid = localStorage.getItem("moneyCoachUID");
@@ -84,8 +85,10 @@ function Root() {
 
             setGuestMode(false);
             await registerUserProfile(u);
+            console.log("✅ User set in React state:", u.email);
             setUser(u);
           } else {
+            console.log("❌ User set to null");
             setUser(null);
           }
         });
@@ -94,6 +97,7 @@ function Root() {
       .catch(err => {
         console.warn("Persistence error:", err);
         const unsub = onAuthStateChanged(auth, async u => {
+          console.log("🔔 Auth state changed (fallback):", u ? `Signed in as ${u.email}` : "Signed out");
           if (u) {
             const storedUid = localStorage.getItem("moneyCoachUID");
             if (storedUid !== u.uid) {
@@ -104,8 +108,10 @@ function Root() {
             }
             setGuestMode(false);
             await registerUserProfile(u);
+            console.log("✅ User set in React state (fallback):", u.email);
             setUser(u);
           } else {
+            console.log("❌ User set to null (fallback)");
             setUser(null);
           }
         });
