@@ -1890,7 +1890,7 @@ function DashboardScreen(props) {
           firebaseUser={firebaseUser}
           isGuest={isGuest}
           onSignOut={onSignOut}
-          onLoadTestData={() => {
+          onLoadTestData={isGuest ? () => {
             const now    = new Date();
             const yr     = now.getFullYear();
             const mo     = now.getMonth(); // 0-indexed
@@ -1967,7 +1967,7 @@ function DashboardScreen(props) {
 
             updateName("Ravi");
             showToast("✅ Test data loaded! Explore all tabs.");
-          }}
+          } : null}
         />
       )}
 
