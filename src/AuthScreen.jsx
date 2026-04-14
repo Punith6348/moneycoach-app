@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { auth } from "./firebase";
 import {
   GoogleAuthProvider, signInWithRedirect,
-  OAuthProvider, signInWithCredential,
+  OAuthProvider, signInWithCredential, signInWithPopup,
 } from "firebase/auth";
 import EmailPasswordAuth from "./EmailPasswordAuth";
 
