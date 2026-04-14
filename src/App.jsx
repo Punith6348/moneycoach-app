@@ -1449,16 +1449,78 @@ function RecurringTab({
     );
   };
 
+  // Helper function to render a category section with consistent styling
+  const categorySection = (icon, title, total, totalLabel, items, emptyMessage, isBuiltIn=true) => {
+    const hasItems = items && items.length > 0;
+    const bgColor = {
+      "💰": "#F0FDF4",
+      "🏠": "#FEF3C7",
+      "🏦": "#EDE9FE",
+      "🔁": "#EFF6FF"
+    }[icon] || "#F8FAFC";
+    const borderColor = {
+      "💰": "#86EFAC",
+      "🏠": "#FCD34D",
+      "🏦": "#D8B4FE",
+      "🔁": "#BFDBFE"
+    }[icon] || C.border;
+
+    return (
+      <div style={{marginBottom:16}}>
+        {/* Category header */}
+        <div style={{
+          background:bgColor, border:`1px solid ${borderColor}`,
+          borderRadius:11, padding:"10px 14px", marginBottom:10,
+          display:"flex", justifyContent:"space-between", alignItems:"center"
+        }}>
+          <div style={{display:"flex", alignItems:"center", gap:8}}>
+            <span style={{fontSize:18}}>{icon}</span>
+            <div>
+              <p style={{margin:0, fontSize:12, fontWeight:700, color:C.ink}}>{title}</p>
+              <p style={{margin:"1px 0 0", fontSize:10, color:C.muted}}>
+                {totalLabel}
+              </p>
+            </div>
+          </div>
+          <p style={{margin:0, fontSize:14, fontWeight:800, color:C.ink, fontFamily:"Georgia,serif"}}>
+            {fmt(total)}
+          </p>
+        </div>
+
+        {/* Items or empty state */}
+        {hasItems ? (
+          <div style={{display:"flex", flexDirection:"column", gap:8}}>
+            {items}
+          </div>
+        ) : (
+          <div style={{
+            background:"#fff", border:`1px solid ${C.border}`, borderRadius:11,
+            padding:"16px 14px", textAlign:"center"
+          }}>
+            <p style={{margin:0, fontSize:11, color:C.muted, fontStyle:"italic"}}>
+              {emptyMessage}
+            </p>
+          </div>
+        )}
+        {!isBuiltIn && (
+          <p style={{margin:"6px 0 0", fontSize:9, color:C.muted, fontStyle:"italic"}}>
+            * Edit in the respective tab
+          </p>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div>
       {/* Header */}
-      <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:14}}>
+      <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16}}>
         <div>
           <h2 style={{margin:"0 0 2px", fontSize:17, fontWeight:700, color:C.ink, fontFamily:"Georgia,serif"}}>
             Recurring & Monthly
           </h2>
           <p style={{margin:0, fontSize:11, color:C.muted}}>
-            Auto-carries every month · tap Edit to update amount
+            All auto-carry commitments organized by category
           </p>
         </div>
         {!showForm && (
@@ -1466,73 +1528,76 @@ function RecurringTab({
             padding:"7px 14px", borderRadius:9, border:"none",
             background:C.ink, color:"#fff", fontSize:12, fontWeight:700,
             cursor:"pointer", fontFamily:"inherit", flexShrink:0,
-          }}>+ Add</button>
+          }}>+ Add Recurring</button>
         )}
       </div>
 
       {/* ── INCOME SOURCES ── */}
-      {incomeSources.length > 0 && (
-        <div style={{marginBottom:16}}>
-          <p style={{margin:"0 0 8px", fontSize:11, fontWeight:700, color:C.muted,
-            textTransform:"uppercase", letterSpacing:"0.8px"}}>
-            💰 Income Sources · {fmt(monthlyIncome)}/month
-          </p>
-          {incomeSources.map(src =>
-            cfRow("💰", src.label||src.name||"Income", src.amount,
-              "Monthly income · auto carry-forward",
-              "income", src.id, onUpdateIncomeSource)
-          )}
-        </div>
+      {categorySection(
+        "💰",
+        "Income Sources",
+        monthlyIncome,
+        "Total monthly income",
+        incomeSources.length > 0 ? incomeSources.map(src =>
+          cfRow("💰", src.label||src.name||"Income", src.amount,
+            "Monthly income · auto carry-forward",
+            "income", src.id, onUpdateIncomeSource)
+        ) : null,
+        "No income sources yet",
+        true
       )}
 
       {/* ── FIXED EXPENSES ── */}
-      {fixedExpenses.length > 0 && (
-        <div style={{marginBottom:16}}>
-          <p style={{margin:"0 0 8px", fontSize:11, fontWeight:700, color:C.muted,
-            textTransform:"uppercase", letterSpacing:"0.8px"}}>
-            🏠 Fixed Expenses · {fmt(monthlyFixed)}/month
-          </p>
-          {fixedExpenses.map(exp =>
-            cfRow("🏠", exp.label||exp.name||"Fixed", exp.amount,
-              "Fixed monthly · auto carry-forward",
-              "fixed", exp.id, onUpdateFixedExpense)
-          )}
-        </div>
+      {categorySection(
+        "🏠",
+        "Fixed Expenses",
+        monthlyFixed,
+        "Total fixed monthly expenses",
+        fixedExpenses.length > 0 ? fixedExpenses.map(exp =>
+          cfRow("🏠", exp.label||exp.name||"Fixed", exp.amount,
+            "Fixed monthly · auto carry-forward",
+            "fixed", exp.id, onUpdateFixedExpense)
+        ) : null,
+        "No fixed expenses yet",
+        true
       )}
 
       {/* ── LOANS / EMI ── */}
-      {loans.length > 0 && (
-        <div style={{marginBottom:16}}>
-          <p style={{margin:"0 0 8px", fontSize:11, fontWeight:700, color:C.muted,
-            textTransform:"uppercase", letterSpacing:"0.8px"}}>
-            🏦 Loans & EMIs · {fmt(monthlyLoans)}/month
-          </p>
-          {loans.map(loan =>
-            cfRow("🏦", loan.name||"Loan", loan.manualEmi||loan.emi||0,
-              "EMI · auto carry-forward",
-              "loan", loan.id, null)
-          )}
-          <p style={{margin:"4px 0 0", fontSize:10, color:C.muted}}>
-            * Edit loan EMI in the Loans tab
-          </p>
-        </div>
+      {categorySection(
+        "🏦",
+        "Loans & EMIs",
+        monthlyLoans,
+        "Total monthly EMI payments",
+        loans.length > 0 ? loans.map(loan =>
+          cfRow("🏦", loan.name||"Loan", loan.manualEmi||loan.emi||0,
+            "EMI · auto carry-forward",
+            "loan", loan.id, null)
+        ) : null,
+        "No active loans yet",
+        true
       )}
 
       {/* ── CUSTOM RECURRING EXPENSES ── */}
-      <div style={{marginBottom:8}}>
-        <p style={{margin:"0 0 8px", fontSize:11, fontWeight:700, color:C.muted,
-          textTransform:"uppercase", letterSpacing:"0.8px"}}>
-          🔁 Custom Recurring · {fmt(monthlyRecurring)}/month
-        </p>
-
-        {recurringExpenses.length === 0 && !showForm && (
-          <div style={{background:"#EFF6FF", border:"1px solid #BFDBFE", borderRadius:11, padding:"12px 14px", marginBottom:14, display:"flex", alignItems:"flex-start", gap:10}}>
-            <span style={{fontSize:20, flexShrink:0}}>🔁</span>
-            <p style={{margin:0, fontSize:12, color:C.ink, lineHeight:1.6}}>
-              Add expenses that repeat monthly — Netflix, gym, electricity. They'll be <strong>auto-logged</strong> on the day you set.
-            </p>
+      <div>
+        {/* Category header */}
+        <div style={{
+          background:"#EFF6FF", border:"1px solid #BFDBFE",
+          borderRadius:11, padding:"10px 14px", marginBottom:10,
+          display:"flex", justifyContent:"space-between", alignItems:"center"
+        }}>
+          <div style={{display:"flex", alignItems:"center", gap:8}}>
+            <span style={{fontSize:18}}>🔁</span>
+            <div>
+              <p style={{margin:0, fontSize:12, fontWeight:700, color:C.ink}}>Custom Recurring</p>
+              <p style={{margin:"1px 0 0", fontSize:10, color:C.muted}}>
+                One-time additions
+              </p>
+            </div>
           </div>
-        )}
+          <p style={{margin:0, fontSize:14, fontWeight:800, color:C.ink, fontFamily:"Georgia,serif"}}>
+            {fmt(monthlyRecurring)}
+          </p>
+        </div>
 
         {/* Add / Edit form */}
         {showForm && (
@@ -1576,6 +1641,18 @@ function RecurringTab({
                 {editId !== null ? "Save Changes ✓" : "Add Recurring ✓"}
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Empty state with helpful info */}
+        {recurringExpenses.length === 0 && !showForm && (
+          <div style={{background:"#fff", border:`1px solid ${C.border}`, borderRadius:11, padding:"16px 14px", textAlign:"center", marginBottom:10}}>
+            <p style={{margin:"0 0 8px", fontSize:11, color:C.ink, fontWeight:600}}>
+              No custom recurring expenses yet
+            </p>
+            <p style={{margin:0, fontSize:10, color:C.muted, lineHeight:1.5}}>
+              Add expenses that repeat monthly — Netflix, gym memberships, subscriptions. They'll be auto-logged on the day you set.
+            </p>
           </div>
         )}
 
@@ -1626,15 +1703,38 @@ function RecurringTab({
           background:"#F0FDF4", border:"1px solid #86EFAC"}}>
           <div style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}>
             <p style={{margin:0, fontSize:12, fontWeight:700, color:C.green}}>
-              Total Monthly Commitments
+              💰 Total Monthly Commitments
             </p>
             <p style={{margin:0, fontSize:15, fontWeight:800, color:C.green, fontFamily:"Georgia,serif"}}>
               {fmt(monthlyFixed + monthlyLoans + monthlyRecurring)}
             </p>
           </div>
-          <p style={{margin:"4px 0 0", fontSize:10, color:"#166534"}}>
-            Fixed {fmt(monthlyFixed)} + EMIs {fmt(monthlyLoans)} + Recurring {fmt(monthlyRecurring)}
-          </p>
+          <div style={{display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:8, marginTop:8}}>
+            {monthlyFixed > 0 && (
+              <div style={{background:"rgba(255,255,255,0.5)", borderRadius:8, padding:"6px 10px", textAlign:"center"}}>
+                <p style={{margin:0, fontSize:9, color:C.muted}}>Fixed Bills</p>
+                <p style={{margin:"2px 0 0", fontSize:12, fontWeight:700, color:C.red, fontFamily:"Georgia,serif"}}>{fmt(monthlyFixed)}</p>
+              </div>
+            )}
+            {monthlyLoans > 0 && (
+              <div style={{background:"rgba(255,255,255,0.5)", borderRadius:8, padding:"6px 10px", textAlign:"center"}}>
+                <p style={{margin:0, fontSize:9, color:C.muted}}>EMI Payments</p>
+                <p style={{margin:"2px 0 0", fontSize:12, fontWeight:700, color:C.purple, fontFamily:"Georgia,serif"}}>{fmt(monthlyLoans)}</p>
+              </div>
+            )}
+            {monthlyRecurring > 0 && (
+              <div style={{background:"rgba(255,255,255,0.5)", borderRadius:8, padding:"6px 10px", textAlign:"center"}}>
+                <p style={{margin:0, fontSize:9, color:C.muted}}>Custom Recurring</p>
+                <p style={{margin:"2px 0 0", fontSize:12, fontWeight:700, color:C.blue, fontFamily:"Georgia,serif"}}>{fmt(monthlyRecurring)}</p>
+              </div>
+            )}
+            {monthlyIncome > 0 && (
+              <div style={{background:"rgba(255,255,255,0.5)", borderRadius:8, padding:"6px 10px", textAlign:"center"}}>
+                <p style={{margin:0, fontSize:9, color:C.muted}}>Total Income</p>
+                <p style={{margin:"2px 0 0", fontSize:12, fontWeight:700, color:"#059669", fontFamily:"Georgia,serif"}}>{fmt(monthlyIncome)}</p>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

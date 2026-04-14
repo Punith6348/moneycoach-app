@@ -20,8 +20,8 @@
     "path": "/Users/puneeth/Desktop/Money Coach - Google Play package/signing.keystore",
     "alias": "my-key-alias"
   },
-  "appVersionName": "7",
-  "appVersionCode": 7,
+  "appVersionName": "grep \"versionCode\\|versionName\" ~/moneycoach-app/app/build.gradle",
+  "appVersionCode": 10,
   "shortcuts": [],
   "generatorApp": "bubblewrap-cli",
   "webManifestUrl": "https://moneycoach-app.vercel.app/manifest.json",
@@ -36,7 +36,12 @@
   "fullScopeUrl": "https://moneycoach-app.vercel.app/",
   "minSdkVersion": 21,
   "orientation": "default",
-  "fingerprints": [],
+  "fingerprints": [
+    {
+      "name": "playstore",
+      "value": "4C:1F:7F:91:E1:53:D1:9A:39:78:29:89:AC:4D:C4:3A:B1:76:86:5E"
+    }
+  ],
   "additionalTrustedOrigins": [],
   "retainedBundles": [],
   "protocolHandlers": [],
@@ -46,5 +51,5 @@
     "standalone",
     "minimal-ui"
   ],
-  "appVersion": "7"
+  "appVersion": "grep \"versionCode\\|versionName\" ~/moneycoach-app/app/build.gradle"
 }
