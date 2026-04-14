@@ -316,259 +316,439 @@ function SetupChecklist({ totalIncome, fixedExpenses, savingsPlans, onNavigate }
 }
 
 
-// ─── ONBOARDING — multi-step ──────────────────────────────────────────────
+// ─── ONBOARDING — 5 step setup ───────────────────────────────────────────────
 function OnboardingScreen({onComplete}) {
-  const [step,    setStep]    = useState(1);
-  const [name,    setName]    = useState("");
-  const [sources, setSources] = useState([{id:1,label:"Salary",amount:""}]);
-  const [bills,   setBills]   = useState([{id:1,label:"Rent",amount:""}]);
+  const [step, setStep] = useState(1);
+  const [name, setName] = useState("");
 
-  const INCOME_LABELS = ["Salary","Freelance","Rental Income","Business Income","Other Income"];
-  const BILL_LABELS   = ["Rent","Electricity","Internet","Mobile","Insurance","School Fees","Other Fixed"];
+  // Step 2 — Income
+  const [sources, setSources] = useState([
+    {id:1,  label:"Salary",         amount:"", active:false, icon:"💼"},
+    {id:2,  label:"Freelance",      amount:"", active:false, icon:"💻"},
+    {id:3,  label:"Rental Income",  amount:"", active:false, icon:"🏘"},
+    {id:4,  label:"Business",       amount:"", active:false, icon:"🏪"},
+    {id:5,  label:"Part-time Job",  amount:"", active:false, icon:"⏰"},
+    {id:6,  label:"Pension",        amount:"", active:false, icon:"👴"},
+  ]);
 
-  const addSource    = () => setSources(p=>[...p,{id:Date.now(),label:"Salary",amount:""}]);
-  const removeSource = (id) => setSources(p=>p.filter(s=>s.id!==id));
-  const updateSource = (id,k,v) => setSources(p=>p.map(s=>s.id===id?{...s,[k]:v}:s));
+  // Step 3 — Fixed Bills (common ones pre-listed with toggles)
+  const [bills, setBills] = useState([
+    {id:1,  label:"Rent",           amount:"", active:false, icon:"🏠"},
+    {id:2,  label:"Home Loan EMI",  amount:"", active:false, icon:"🏦"},
+    {id:3,  label:"Car Loan EMI",   amount:"", active:false, icon:"🚗"},
+    {id:4,  label:"Electricity",    amount:"", active:false, icon:"⚡"},
+    {id:5,  label:"Internet",       amount:"", active:false, icon:"📶"},
+    {id:6,  label:"Mobile",         amount:"", active:false, icon:"📱"},
+    {id:7,  label:"Insurance",      amount:"", active:false, icon:"🛡"},
+    {id:8,  label:"School Fees",    amount:"", active:false, icon:"🎓"},
+    {id:9,  label:"Maintenance",    amount:"", active:false, icon:"🔧"},
+    {id:10, label:"Water Bill",     amount:"", active:false, icon:"💧"},
+    {id:11, label:"OTT/Streaming",  amount:"", active:false, icon:"📺"},
+    {id:12, label:"Gym",            amount:"", active:false, icon:"💪"},
+    {id:13, label:"Petrol",         amount:"", active:false, icon:"⛽"},
+    {id:14, label:"House Help",     amount:"", active:false, icon:"🧹"},
+  ]);
 
-  const addBill    = () => setBills(p=>[...p,{id:Date.now(),label:"Rent",amount:""}]);
-  const removeBill = (id) => setBills(p=>p.filter(b=>b.id!==id));
-  const updateBill = (id,k,v) => setBills(p=>p.map(b=>b.id===id?{...b,[k]:v}:b));
+  // Step 4 — Savings
+  const [savings, setSavings] = useState([
+    {id:1, label:"Mutual Fund SIP", amount:"", active:false, icon:"📈"},
+    {id:2, label:"Emergency Fund",  amount:"", active:false, icon:"🛟"},
+    {id:3, label:"Recurring Deposit",amount:"",active:false, icon:"🏦"},
+    {id:4, label:"PPF / NPS",       amount:"", active:false, icon:"🏛"},
+  ]);
 
-  const totalIncome = sources.reduce((s,x)=>s+(parseFloat(x.amount)||0),0);
-  const totalBills  = bills.reduce((s,x)=>s+(parseFloat(x.amount)||0),0);
+  // Step 5 — Loans
+  const [loans, setLoans] = useState([
+    {id:1, label:"Home Loan",     emi:"", active:false, icon:"🏠"},
+    {id:2, label:"Car Loan",      emi:"", active:false, icon:"🚗"},
+    {id:3, label:"Personal Loan", emi:"", active:false, icon:"💳"},
+    {id:4, label:"Education Loan",emi:"", active:false, icon:"🎓"},
+  ]);
+
+  const INCOME_LABELS = ["Salary","Freelance","Rental Income","Business Income","Part-time","Other"];
+  const totalIncome  = sources.filter(s=>s.active).reduce((t,s)=>t+(parseFloat(s.amount)||0),0);
+  const totalBills   = bills.filter(b=>b.active).reduce((t,b)=>t+(parseFloat(b.amount)||0),0);
+  const totalSavings = savings.filter(s=>s.active).reduce((t,s)=>t+(parseFloat(s.amount)||0),0);
+  const totalLoans   = loans.filter(l=>l.active).reduce((t,l)=>t+(parseFloat(l.emi)||0),0);
+  const leftover     = totalIncome - totalBills - totalSavings - totalLoans;
+
+  const STEPS = ["👋 Name","💰 Income","🏠 Bills","📈 Savings","🏦 Loans"];
+
+  const inp = {
+    padding:"9px 12px", borderRadius:9, border:`1.5px solid ${C.border}`,
+    fontFamily:"Georgia,serif", fontSize:14, outline:"none",
+    boxSizing:"border-box", background:"#fff", width:"100%",
+  };
 
   const go = () => {
-    const validSources = sources.filter(s=>parseFloat(s.amount)>0);
-    if(validSources.length===0) return;
     onComplete({
       name: name.trim(),
-      incomeSources: validSources.map(s=>({...s, amount:parseFloat(s.amount)||0})),
-      fixedExpenses: bills.filter(b=>parseFloat(b.amount)>0).map(b=>({...b, amount:parseFloat(b.amount)||0})),
+      incomeSources: sources.filter(s=>s.active&&parseFloat(s.amount)>0)
+        .map(s=>({label:s.label, amount:parseFloat(s.amount)||0})),
+      fixedExpenses: bills.filter(b=>b.active&&parseFloat(b.amount)>0)
+        .map(b=>({label:b.label, amount:parseFloat(b.amount)||0})),
+      savingsPlans: savings.filter(s=>s.active&&parseFloat(s.amount)>0)
+        .map(s=>({label:s.label, amount:parseFloat(s.amount)||0})),
+      loanEmis: loans.filter(l=>l.active&&parseFloat(l.emi)>0)
+        .map(l=>({name:l.label, emi:parseFloat(l.emi)||0})),
     });
   };
 
-  const inp = { width:"100%", padding:"10px 12px", borderRadius:10,
-    border:`1.5px solid ${C.border}`, fontFamily:"inherit",
-    fontSize:14, outline:"none", boxSizing:"border-box", background:"#fff" };
-
-  const STEPS = ["👋 Welcome", "💰 Income", "🏠 Fixed Bills"];
+  // Toggle + amount row for bills/savings/loans
+  const ToggleRow = ({item, icon, label, amtKey, placeholder, onToggle, onAmt}) => (
+    <div style={{ marginBottom:8 }}>
+      <div style={{ display:"flex", alignItems:"center", gap:10,
+        padding:"9px 12px", borderRadius:10,
+        background:item.active?"#EFF6FF":"#F8FAFC",
+        border:`1.5px solid ${item.active?C.blue:C.border}`,
+        cursor:"pointer" }}
+        onClick={onToggle}>
+        <span style={{ fontSize:18, flexShrink:0 }}>{icon}</span>
+        <p style={{ margin:0, fontSize:13, fontWeight:600,
+          color:item.active?C.blue:C.ink, flex:1 }}>{label}</p>
+        <div style={{ width:20, height:20, borderRadius:99, flexShrink:0,
+          background:item.active?C.blue:"#E5E7EB",
+          display:"flex", alignItems:"center", justifyContent:"center" }}>
+          {item.active && <span style={{ color:"#fff", fontSize:12, fontWeight:700 }}>✓</span>}
+        </div>
+      </div>
+      {item.active && (
+        <div style={{ display:"flex", alignItems:"center", gap:8,
+          marginTop:6, paddingLeft:12 }}>
+          <span style={{ fontSize:12, color:C.muted, flexShrink:0 }}>₹</span>
+          <input type="number" value={item[amtKey]}
+            onChange={e=>onAmt(e.target.value)}
+            placeholder={placeholder}
+            autoFocus
+            style={{...inp, flex:1}}
+            onClick={e=>e.stopPropagation()}
+          />
+          <span style={{ fontSize:12, color:C.muted, flexShrink:0 }}>/month</span>
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div style={{ minHeight:"100vh", background:"linear-gradient(160deg,#0F172A,#1E293B)",
-      display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
-      <div style={{ width:"100%", maxWidth:440 }}>
+      overflow:"auto", padding:"20px 16px" }}>
+      <div style={{ width:"100%", maxWidth:440, margin:"0 auto" }}>
 
         {/* Logo */}
-        <div style={{ textAlign:"center", marginBottom:24 }}>
-          <div style={{ fontSize:48, marginBottom:8 }}>💰</div>
-          <h1 style={{ fontSize:26, fontWeight:800, color:"#F1F5F9",
+        <div style={{ textAlign:"center", marginBottom:20 }}>
+          <div style={{ fontSize:44, marginBottom:6 }}>💰</div>
+          <h1 style={{ fontSize:24, fontWeight:800, color:"#F1F5F9",
             fontFamily:"Georgia,serif", margin:0 }}>Money Coach</h1>
-          <p style={{ margin:"6px 0 0", fontSize:13, color:"#64748B" }}>
-            Smart daily spending. Real financial planning.
+          <p style={{ margin:"4px 0 0", fontSize:12, color:"#64748B" }}>
+            Let's set up your financial profile
           </p>
         </div>
 
         {/* Step indicators */}
         <div style={{ display:"flex", alignItems:"center", justifyContent:"center",
-          gap:8, marginBottom:20 }}>
+          gap:4, marginBottom:16, flexWrap:"wrap" }}>
           {STEPS.map((s,i)=>(
-            <div key={i} style={{ display:"flex", alignItems:"center", gap:8 }}>
-              <div style={{ display:"flex", alignItems:"center", gap:5 }}>
-                <div style={{ width:24, height:24, borderRadius:"50%",
-                  background: step===i+1?"#2563EB":step>i+1?"#16A34A":"#334155",
-                  display:"flex", alignItems:"center", justifyContent:"center",
-                  fontSize:11, fontWeight:700, color:"#fff",
-                  border: step===i+1?"2px solid #60A5FA":"2px solid transparent" }}>
-                  {step>i+1?"✓":i+1}
-                </div>
-                <span style={{ fontSize:11, color:step===i+1?"#E2E8F0":"#475569", fontWeight:step===i+1?700:400 }}>
-                  {s}
+            <div key={i} style={{ display:"flex", alignItems:"center", gap:4 }}>
+              <div style={{ display:"flex", alignItems:"center", gap:4,
+                padding:"4px 10px", borderRadius:99,
+                background:step===i+1?"#2563EB":step>i+1?"#16A34A22":"#1E293B",
+                border:`1px solid ${step===i+1?"#60A5FA":step>i+1?"#16A34A":"#334155"}` }}>
+                <span style={{ fontSize:10, color:step>i+1?"#16A34A":step===i+1?"#fff":"#475569",
+                  fontWeight:700 }}>
+                  {step>i+1?"✓":s}
                 </span>
               </div>
-              {i<STEPS.length-1 && <div style={{ width:20, height:1, background:"#334155" }}/>}
+              {i<STEPS.length-1&&<div style={{ width:10, height:1, background:"#334155" }}/>}
             </div>
           ))}
         </div>
 
         {/* Card */}
-        <div style={{ background:"#fff", borderRadius:20, padding:"24px 20px",
-          boxShadow:"0 20px 60px rgba(0,0,0,0.4)" }}>
+        <div style={{ background:"#fff", borderRadius:20, padding:"20px",
+          boxShadow:"0 20px 60px rgba(0,0,0,0.5)" }}>
 
-          {/* Step 1 — Name */}
+          {/* ── Step 1: Name ── */}
           {step===1 && (
             <>
-              <p style={{ fontSize:17, fontWeight:700, color:C.ink, margin:"0 0 6px" }}>
-                👋 Welcome! What's your name?
+              <p style={{ fontSize:17, fontWeight:700, color:C.ink, margin:"0 0 4px" }}>
+                👋 Hi! What's your name?
               </p>
-              <p style={{ fontSize:13, color:C.muted, margin:"0 0 16px", lineHeight:1.5 }}>
-                We'll personalise your dashboard with your name
+              <p style={{ fontSize:13, color:C.muted, margin:"0 0 16px" }}>
+                Personalise your dashboard
               </p>
               <input value={name} onChange={e=>setName(e.target.value)}
                 onKeyDown={e=>e.key==="Enter"&&setStep(2)}
-                placeholder="Your name (e.g. Puneeth)"
-                style={{...inp, marginBottom:16, fontSize:16}}
+                placeholder="e.g. Puneeth"
                 autoFocus
+                style={{...inp, fontFamily:"inherit", fontSize:16, marginBottom:16}}
               />
               <button onClick={()=>setStep(2)} style={{ width:"100%", padding:13,
                 borderRadius:12, background:C.ink, color:"#fff", border:"none",
                 fontSize:15, fontFamily:"inherit", fontWeight:700, cursor:"pointer" }}>
-                Next → Add Income
+                Next → Income
               </button>
-              <p style={{ textAlign:"center", fontSize:11, color:C.muted, margin:"10px 0 0" }}>
-                Name is optional — you can skip
+              <p style={{ textAlign:"center", fontSize:11, color:C.muted, margin:"8px 0 0" }}>
+                Optional — you can skip
               </p>
             </>
           )}
 
-          {/* Step 2 — Income */}
+          {/* ── Step 2: Income ── */}
           {step===2 && (
             <>
-              <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:6 }}>
+              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
                 <button onClick={()=>setStep(1)} style={{ background:"none", border:"none",
                   cursor:"pointer", fontSize:18, color:C.muted, padding:0 }}>←</button>
                 <p style={{ fontSize:17, fontWeight:700, color:C.ink, margin:0 }}>
-                  💰 Your Monthly Income
+                  💰 Monthly Income
                 </p>
               </div>
-              <p style={{ fontSize:13, color:C.muted, margin:"0 0 16px", lineHeight:1.5 }}>
-                Add all income sources. This sets your monthly budget.
+              <p style={{ fontSize:12, color:C.muted, margin:"0 0 14px" }}>
+                Select all that apply and enter amounts
               </p>
-              {sources.map((s,i)=>(
-                <div key={s.id} style={{ display:"grid", gridTemplateColumns:"1fr 1fr auto",
-                  gap:8, marginBottom:10, alignItems:"end" }}>
-                  <div>
-                    {i===0&&<p style={{ margin:"0 0 4px", fontSize:11, fontWeight:700,
-                      color:C.muted, textTransform:"uppercase" }}>Source</p>}
-                    <select value={s.label} onChange={e=>updateSource(s.id,"label",e.target.value)}
-                      style={inp}>
-                      {INCOME_LABELS.map(l=><option key={l} value={l}>{l}</option>)}
-                    </select>
+
+              {sources.map(s=>(
+                <div key={s.id} style={{ marginBottom:8 }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:10,
+                    padding:"9px 12px", borderRadius:10,
+                    background:s.active?"#F0FDF4":"#F8FAFC",
+                    border:`1.5px solid ${s.active?C.green:C.border}`,
+                    cursor:"pointer" }}
+                    onClick={()=>setSources(p=>p.map(x=>x.id===s.id?{...x,active:!x.active}:x))}>
+                    <span style={{ fontSize:18, flexShrink:0 }}>{s.icon||"💰"}</span>
+                    <p style={{ margin:0, fontSize:13, fontWeight:600,
+                      color:s.active?C.green:C.ink, flex:1 }}>{s.label}</p>
+                    <div style={{ width:22, height:22, borderRadius:99, flexShrink:0,
+                      background:s.active?C.green:"#E5E7EB",
+                      display:"flex", alignItems:"center", justifyContent:"center" }}>
+                      {s.active&&<span style={{ color:"#fff", fontSize:12, fontWeight:700 }}>✓</span>}
+                    </div>
                   </div>
-                  <div>
-                    {i===0&&<p style={{ margin:"0 0 4px", fontSize:11, fontWeight:700,
-                      color:C.muted, textTransform:"uppercase" }}>Amount (₹)</p>}
-                    <input type="number" value={s.amount}
-                      onChange={e=>updateSource(s.id,"amount",e.target.value)}
-                      placeholder="e.g. 50000"
-                      style={{...inp, fontFamily:"Georgia,serif"}}/>
-                  </div>
-                  {sources.length>1 && (
-                    <button onClick={()=>removeSource(s.id)} style={{ padding:"10px",
-                      borderRadius:8, border:`1px solid ${C.border}`, background:"#fff",
-                      color:C.muted, cursor:"pointer", fontSize:14, alignSelf:"flex-end" }}>✕</button>
+                  {s.active && (
+                    <div style={{ display:"flex", alignItems:"center", gap:8,
+                      marginTop:6, paddingLeft:12 }}>
+                      <span style={{ fontSize:12, color:C.muted }}>₹</span>
+                      <input type="number" value={s.amount}
+                        onChange={e=>setSources(p=>p.map(x=>x.id===s.id?{...x,amount:e.target.value}:x))}
+                        placeholder="Monthly amount"
+                        autoFocus
+                        style={{...inp, flex:1}}
+                        onClick={e=>e.stopPropagation()}
+                      />
+                      <span style={{ fontSize:12, color:C.muted }}>/month</span>
+                    </div>
                   )}
                 </div>
               ))}
-              <button onClick={addSource} style={{ width:"100%", padding:"8px",
-                borderRadius:10, border:`1.5px dashed ${C.border}`, background:"transparent",
-                color:C.muted, fontSize:12, fontFamily:"inherit", cursor:"pointer",
-                fontWeight:600, marginBottom:12 }}>
-                + Add Another Source
+
+              {/* Add custom source */}
+              <button onClick={()=>setSources(p=>[...p,{id:Date.now(),label:"Other Income",amount:"",active:true}])}
+                style={{ width:"100%", padding:"8px", borderRadius:10,
+                  border:`1.5px dashed ${C.border}`, background:"transparent",
+                  color:C.muted, fontSize:12, fontFamily:"inherit", cursor:"pointer",
+                  fontWeight:600, marginBottom:12 }}>
+                + Add another income source
               </button>
-              {totalIncome > 0 && (
-                <div style={{ background:"#F0FDF4", borderRadius:10, padding:"10px 14px",
-                  marginBottom:14, display:"flex", justifyContent:"space-between",
-                  alignItems:"center", border:"1px solid #86EFAC" }}>
+
+              {totalIncome>0 && (
+                <div style={{ background:"#F0FDF4", borderRadius:10, padding:"10px 12px",
+                  marginBottom:12, display:"flex", justifyContent:"space-between",
+                  border:"1px solid #86EFAC" }}>
                   <span style={{ fontSize:13, color:C.green, fontWeight:600 }}>Total Income</span>
-                  <span style={{ fontSize:18, fontWeight:700, color:C.green,
+                  <span style={{ fontSize:16, fontWeight:700, color:C.green,
                     fontFamily:"Georgia,serif" }}>{fmt(totalIncome)}</span>
                 </div>
               )}
               <button onClick={()=>setStep(3)} disabled={totalIncome===0}
-                style={{ width:"100%", padding:13, borderRadius:12,
+                style={{ width:"100%", padding:13, borderRadius:12, border:"none",
                   background:totalIncome>0?C.ink:"#E5E7EB",
                   color:totalIncome>0?"#fff":C.muted,
-                  border:"none", fontSize:15, fontFamily:"inherit",
-                  fontWeight:700, cursor:totalIncome>0?"pointer":"default" }}>
-                Next → Add Fixed Bills
+                  fontSize:15, fontFamily:"inherit", fontWeight:700,
+                  cursor:totalIncome>0?"pointer":"default" }}>
+                Next → Fixed Bills
               </button>
             </>
           )}
 
-          {/* Step 3 — Fixed Bills */}
+          {/* ── Step 3: Fixed Bills ── */}
           {step===3 && (
             <>
-              <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:6 }}>
+              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
                 <button onClick={()=>setStep(2)} style={{ background:"none", border:"none",
                   cursor:"pointer", fontSize:18, color:C.muted, padding:0 }}>←</button>
                 <p style={{ fontSize:17, fontWeight:700, color:C.ink, margin:0 }}>
                   🏠 Fixed Monthly Bills
                 </p>
               </div>
-              <p style={{ fontSize:13, color:C.muted, margin:"0 0 16px", lineHeight:1.5 }}>
-                Add rent, bills, EMIs. These are auto-deducted from your budget.
+              <p style={{ fontSize:12, color:C.muted, margin:"0 0 14px" }}>
+                Tap to select bills you pay every month
               </p>
-              {bills.map((b,i)=>(
-                <div key={b.id} style={{ display:"grid", gridTemplateColumns:"1fr 1fr auto",
-                  gap:8, marginBottom:10, alignItems:"end" }}>
-                  <div>
-                    {i===0&&<p style={{ margin:"0 0 4px", fontSize:11, fontWeight:700,
-                      color:C.muted, textTransform:"uppercase" }}>Bill</p>}
-                    <select value={b.label} onChange={e=>updateBill(b.id,"label",e.target.value)}
-                      style={inp}>
-                      {BILL_LABELS.map(l=><option key={l} value={l}>{l}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    {i===0&&<p style={{ margin:"0 0 4px", fontSize:11, fontWeight:700,
-                      color:C.muted, textTransform:"uppercase" }}>Amount (₹)</p>}
-                    <input type="number" value={b.amount}
-                      onChange={e=>updateBill(b.id,"amount",e.target.value)}
-                      placeholder="e.g. 15000"
-                      style={{...inp, fontFamily:"Georgia,serif"}}/>
-                  </div>
-                  {bills.length>1 && (
-                    <button onClick={()=>removeBill(b.id)} style={{ padding:"10px",
-                      borderRadius:8, border:`1px solid ${C.border}`, background:"#fff",
-                      color:C.muted, cursor:"pointer", fontSize:14, alignSelf:"flex-end" }}>✕</button>
-                  )}
-                </div>
+
+              {bills.map(b=>(
+                <ToggleRow key={b.id} item={b} icon={b.icon} label={b.label}
+                  amtKey="amount" placeholder="e.g. 15000"
+                  onToggle={()=>setBills(p=>p.map(x=>x.id===b.id?{...x,active:!x.active}:x))}
+                  onAmt={v=>setBills(p=>p.map(x=>x.id===b.id?{...x,amount:v}:x))}
+                />
               ))}
-              <button onClick={addBill} style={{ width:"100%", padding:"8px",
-                borderRadius:10, border:`1.5px dashed ${C.border}`, background:"transparent",
-                color:C.muted, fontSize:12, fontFamily:"inherit", cursor:"pointer",
-                fontWeight:600, marginBottom:12 }}>
-                + Add Another Bill
-              </button>
-              {totalBills > 0 && totalIncome > 0 && (
-                <div style={{ background:totalBills>totalIncome*0.6?"#FFF1F2":"#F0FDF4",
-                  borderRadius:10, padding:"10px 14px", marginBottom:14,
-                  border:`1px solid ${totalBills>totalIncome*0.6?"#FECACA":"#86EFAC"}` }}>
-                  <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
-                    <span style={{ fontSize:12, color:C.muted }}>Fixed Bills</span>
+
+              {totalBills>0 && (
+                <div style={{ background:"#FFF7ED", borderRadius:10, padding:"10px 12px",
+                  marginBottom:12, border:"1px solid #FED7AA" }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", marginBottom:3 }}>
+                    <span style={{ fontSize:12, color:C.muted }}>Total Bills</span>
                     <span style={{ fontSize:14, fontWeight:700, color:C.red,
                       fontFamily:"Georgia,serif" }}>{fmt(totalBills)}</span>
                   </div>
                   <div style={{ display:"flex", justifyContent:"space-between" }}>
-                    <span style={{ fontSize:12, color:C.muted }}>Left for spending</span>
+                    <span style={{ fontSize:12, color:C.muted }}>After Bills</span>
                     <span style={{ fontSize:14, fontWeight:700,
                       color:totalIncome-totalBills>0?C.green:C.red,
                       fontFamily:"Georgia,serif" }}>{fmt(totalIncome-totalBills)}</span>
                   </div>
                 </div>
               )}
-              <button onClick={go} style={{ width:"100%", padding:14, borderRadius:12,
-                background:"linear-gradient(135deg,#2563EB,#1D4ED8)",
+
+              <button onClick={()=>setStep(4)} style={{ width:"100%", padding:13,
+                borderRadius:12, background:C.ink, color:"#fff", border:"none",
+                fontSize:15, fontFamily:"inherit", fontWeight:700, cursor:"pointer",
+                marginBottom:8 }}>
+                Next → Savings
+              </button>
+              <button onClick={()=>setStep(4)} style={{ width:"100%", padding:"10px",
+                borderRadius:12, border:"none", background:"transparent",
+                color:C.muted, fontSize:13, fontFamily:"inherit", cursor:"pointer" }}>
+                Skip →
+              </button>
+            </>
+          )}
+
+          {/* ── Step 4: Savings ── */}
+          {step===4 && (
+            <>
+              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
+                <button onClick={()=>setStep(3)} style={{ background:"none", border:"none",
+                  cursor:"pointer", fontSize:18, color:C.muted, padding:0 }}>←</button>
+                <p style={{ fontSize:17, fontWeight:700, color:C.ink, margin:0 }}>
+                  📈 Savings & Investments
+                </p>
+              </div>
+              <p style={{ fontSize:12, color:C.muted, margin:"0 0 14px" }}>
+                Monthly SIPs, RDs or any savings you do
+              </p>
+
+              {savings.map(s=>(
+                <ToggleRow key={s.id} item={s} icon={s.icon} label={s.label}
+                  amtKey="amount" placeholder="e.g. 5000"
+                  onToggle={()=>setSavings(p=>p.map(x=>x.id===s.id?{...x,active:!x.active}:x))}
+                  onAmt={v=>setSavings(p=>p.map(x=>x.id===s.id?{...x,amount:v}:x))}
+                />
+              ))}
+
+              {totalSavings>0 && (
+                <div style={{ background:"#EFF6FF", borderRadius:10, padding:"10px 12px",
+                  marginBottom:12, border:"1px solid #BFDBFE" }}>
+                  <div style={{ display:"flex", justifyContent:"space-between" }}>
+                    <span style={{ fontSize:12, color:C.muted }}>Monthly Savings</span>
+                    <span style={{ fontSize:14, fontWeight:700, color:C.blue,
+                      fontFamily:"Georgia,serif" }}>{fmt(totalSavings)}</span>
+                  </div>
+                </div>
+              )}
+
+              <button onClick={()=>setStep(5)} style={{ width:"100%", padding:13,
+                borderRadius:12, background:C.ink, color:"#fff", border:"none",
+                fontSize:15, fontFamily:"inherit", fontWeight:700, cursor:"pointer",
+                marginBottom:8 }}>
+                Next → Loans & EMIs
+              </button>
+              <button onClick={()=>setStep(5)} style={{ width:"100%", padding:"10px",
+                borderRadius:12, border:"none", background:"transparent",
+                color:C.muted, fontSize:13, fontFamily:"inherit", cursor:"pointer" }}>
+                Skip →
+              </button>
+            </>
+          )}
+
+          {/* ── Step 5: Loans ── */}
+          {step===5 && (
+            <>
+              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
+                <button onClick={()=>setStep(4)} style={{ background:"none", border:"none",
+                  cursor:"pointer", fontSize:18, color:C.muted, padding:0 }}>←</button>
+                <p style={{ fontSize:17, fontWeight:700, color:C.ink, margin:0 }}>
+                  🏦 Loans & EMIs
+                </p>
+              </div>
+              <p style={{ fontSize:12, color:C.muted, margin:"0 0 14px" }}>
+                Any active loan EMIs you pay monthly
+              </p>
+
+              {loans.map(l=>(
+                <ToggleRow key={l.id} item={l} icon={l.icon} label={l.label}
+                  amtKey="emi" placeholder="Monthly EMI"
+                  onToggle={()=>setLoans(p=>p.map(x=>x.id===l.id?{...x,active:!x.active}:x))}
+                  onAmt={v=>setLoans(p=>p.map(x=>x.id===l.id?{...x,emi:v}:x))}
+                />
+              ))}
+
+              {/* Final budget summary */}
+              {totalIncome>0 && (
+                <div style={{ background:"#F8FAFC", borderRadius:12, padding:"12px 14px",
+                  marginBottom:14, border:`1px solid ${C.border}` }}>
+                  <p style={{ margin:"0 0 8px", fontSize:12, fontWeight:700, color:C.ink }}>
+                    📊 Your Monthly Budget
+                  </p>
+                  {[
+                    {label:"Income",  value:fmt(totalIncome),  color:C.green},
+                    {label:"Bills",   value:`− ${fmt(totalBills)}`,  color:C.red},
+                    {label:"Savings", value:`− ${fmt(totalSavings)}`, color:C.blue},
+                    {label:"Loans",   value:`− ${fmt(totalLoans)}`,  color:C.purple},
+                  ].map(r=>(
+                    <div key={r.label} style={{ display:"flex", justifyContent:"space-between",
+                      marginBottom:4 }}>
+                      <span style={{ fontSize:12, color:C.muted }}>{r.label}</span>
+                      <span style={{ fontSize:12, fontWeight:700, color:r.color,
+                        fontFamily:"Georgia,serif" }}>{r.value}</span>
+                    </div>
+                  ))}
+                  <div style={{ height:1, background:C.border, margin:"8px 0" }}/>
+                  <div style={{ display:"flex", justifyContent:"space-between" }}>
+                    <span style={{ fontSize:13, fontWeight:700, color:C.ink }}>
+                      Available to spend
+                    </span>
+                    <span style={{ fontSize:16, fontWeight:800,
+                      color:leftover>0?C.green:C.red, fontFamily:"Georgia,serif" }}>
+                      {leftover>=0?fmt(leftover):`−${fmt(Math.abs(leftover))}`}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <button onClick={go} style={{ width:"100%", padding:14,
+                borderRadius:12, background:"linear-gradient(135deg,#2563EB,#1D4ED8)",
                 color:"#fff", border:"none", fontSize:15, fontFamily:"inherit",
                 fontWeight:800, cursor:"pointer",
-                boxShadow:"0 4px 16px rgba(37,99,235,0.4)" }}>
+                boxShadow:"0 4px 16px rgba(37,99,235,0.4)", marginBottom:8 }}>
                 🚀 Start Tracking!
               </button>
-              <button onClick={go} style={{ width:"100%", padding:"10px", borderRadius:12,
-                background:"transparent", color:C.muted, border:"none",
-                fontSize:13, fontFamily:"inherit", cursor:"pointer", marginTop:6 }}>
-                Skip and add later →
+              <button onClick={go} style={{ width:"100%", padding:"10px",
+                borderRadius:12, border:"none", background:"transparent",
+                color:C.muted, fontSize:13, fontFamily:"inherit", cursor:"pointer" }}>
+                Skip and finish setup →
               </button>
             </>
           )}
         </div>
+
         <p style={{ textAlign:"center", marginTop:12, fontSize:11, color:"#334155" }}>
-          All data stays on your device · Free forever
+          Free forever · Data synced to your Google account
         </p>
       </div>
     </div>
   );
 }
+
 
 // ─── SUMMARY STRIP ────────────────────────────────────────────────────────
 function SummaryStrip({totalIncome,remaining,expenses,dailyLimit}) {
