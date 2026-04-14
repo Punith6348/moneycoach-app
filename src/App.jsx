@@ -503,8 +503,11 @@ function OnboardingScreen({onComplete}) {
                   💰 Monthly Income
                 </p>
               </div>
-              <p style={{ fontSize:12, color:C.muted, margin:"0 0 14px" }}>
+              <p style={{ fontSize:12, color:C.muted, margin:"0 0 6px" }}>
                 Select all that apply and enter amounts
+              </p>
+              <p style={{ fontSize:10, color:C.red, fontWeight:600, margin:"0 0 14px", textTransform:"uppercase", letterSpacing:"0.5px" }}>
+                ⚠ Required — at least one income source
               </p>
 
               {sources.map(s=>(
@@ -579,8 +582,11 @@ function OnboardingScreen({onComplete}) {
                   🏠 Fixed Monthly Bills
                 </p>
               </div>
-              <p style={{ fontSize:12, color:C.muted, margin:"0 0 14px" }}>
+              <p style={{ fontSize:12, color:C.muted, margin:"0 0 6px" }}>
                 Tap to select bills you pay every month
+              </p>
+              <p style={{ fontSize:10, color:C.blue, fontWeight:600, margin:"0 0 14px", textTransform:"uppercase", letterSpacing:"0.5px" }}>
+                Optional — can update later in settings
               </p>
 
               {bills.map(b=>
@@ -615,8 +621,9 @@ function OnboardingScreen({onComplete}) {
               </button>
               <button onClick={()=>setStep(4)} style={{ width:"100%", padding:"10px",
                 borderRadius:12, border:"none", background:"transparent",
-                color:C.muted, fontSize:13, fontFamily:"inherit", cursor:"pointer" }}>
-                Skip →
+                color:C.muted, fontSize:13, fontFamily:"inherit", cursor:"pointer",
+                fontWeight:600 }}>
+                ⟳ Skip & Add Later
               </button>
             </>
           )}
@@ -631,8 +638,11 @@ function OnboardingScreen({onComplete}) {
                   📈 Savings & Investments
                 </p>
               </div>
-              <p style={{ fontSize:12, color:C.muted, margin:"0 0 14px" }}>
+              <p style={{ fontSize:12, color:C.muted, margin:"0 0 6px" }}>
                 Monthly SIPs, RDs or any savings you do
+              </p>
+              <p style={{ fontSize:10, color:C.blue, fontWeight:600, margin:"0 0 14px", textTransform:"uppercase", letterSpacing:"0.5px" }}>
+                Optional — can update later in settings
               </p>
 
               {savings.map(s=>
@@ -661,8 +671,9 @@ function OnboardingScreen({onComplete}) {
               </button>
               <button onClick={()=>setStep(5)} style={{ width:"100%", padding:"10px",
                 borderRadius:12, border:"none", background:"transparent",
-                color:C.muted, fontSize:13, fontFamily:"inherit", cursor:"pointer" }}>
-                Skip →
+                color:C.muted, fontSize:13, fontFamily:"inherit", cursor:"pointer",
+                fontWeight:600 }}>
+                ⟳ Skip & Add Later
               </button>
             </>
           )}
@@ -677,8 +688,11 @@ function OnboardingScreen({onComplete}) {
                   🏦 Loans & EMIs
                 </p>
               </div>
-              <p style={{ fontSize:12, color:C.muted, margin:"0 0 14px" }}>
+              <p style={{ fontSize:12, color:C.muted, margin:"0 0 6px" }}>
                 Any active loan EMIs you pay monthly
+              </p>
+              <p style={{ fontSize:10, color:C.blue, fontWeight:600, margin:"0 0 14px", textTransform:"uppercase", letterSpacing:"0.5px" }}>
+                Optional — can update later in settings
               </p>
 
               {loans.map(l=>
@@ -730,8 +744,9 @@ function OnboardingScreen({onComplete}) {
               </button>
               <button onClick={go} style={{ width:"100%", padding:"10px",
                 borderRadius:12, border:"none", background:"transparent",
-                color:C.muted, fontSize:13, fontFamily:"inherit", cursor:"pointer" }}>
-                Skip and finish setup →
+                color:C.muted, fontSize:13, fontFamily:"inherit", cursor:"pointer",
+                fontWeight:600 }}>
+                ⟳ Skip & Finish Setup
               </button>
             </>
           )}
