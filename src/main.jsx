@@ -48,16 +48,18 @@ function Root() {
       .then(() => {
         const unsub = onAuthStateChanged(auth, async u => {
           if (u) {
-            // ── User logged in via Google/Apple ──
-            // Clear any guest data that was stored locally
-            // Only clear if the stored UID doesn't match this user
+            // Always check if localStorage belongs to this Google user
             const storedUid = localStorage.getItem("moneyCoachUID");
-            if (!storedUid || storedUid !== u.uid) {
-              // Different user or guest data — clear local storage
+            
+            if (storedUid !== u.uid) {
+              // Different UID or no UID (was guest) — clear ALL local data
+              console.log("🔄 New user detected, clearing local data:", storedUid, "->", u.uid);
               localStorage.removeItem("moneyCoachData_v3");
+              localStorage.removeItem("moneyCoachData_v2");
+              localStorage.removeItem("moneyCoachData");
               localStorage.setItem("moneyCoachUID", u.uid);
             }
-            // Exit guest mode if they were in it
+
             setGuestMode(false);
             await registerUserProfile(u);
             setUser(u);
@@ -72,8 +74,10 @@ function Root() {
         const unsub = onAuthStateChanged(auth, async u => {
           if (u) {
             const storedUid = localStorage.getItem("moneyCoachUID");
-            if (!storedUid || storedUid !== u.uid) {
+            if (storedUid !== u.uid) {
               localStorage.removeItem("moneyCoachData_v3");
+              localStorage.removeItem("moneyCoachData_v2");
+              localStorage.removeItem("moneyCoachData");
               localStorage.setItem("moneyCoachUID", u.uid);
             }
             setGuestMode(false);
