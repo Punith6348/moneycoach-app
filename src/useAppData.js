@@ -282,22 +282,22 @@ export function useAppData(firebaseUser = null) {
   useEffect(() => {
     if (!firebaseUser) return;
     (async () => {
-      // Check if localStorage belongs to a different user
+      // ── Load from Firestore when user logs in ────────────────────────────────
       const storedUid = localStorage.getItem("moneyCoachUID");
 
-      if (storedUid && storedUid !== firebaseUser.uid) {
-        // Different user — clear old user's local data completely
+      // If stored UID doesn't match Google UID — clear local data completely
+      // This handles: guest → Google, different user → Google
+      if (storedUid !== firebaseUser.uid) {
         localStorage.removeItem("moneyCoachData_v3");
-        localStorage.removeItem("moneyCoachUID");
-        // Reset state to default
+        localStorage.removeItem("moneyCoachData_v2");
+        localStorage.removeItem("moneyCoachData");
+        localStorage.setItem("moneyCoachUID", firebaseUser.uid);
         setData({...DEFAULT_STATE});
       }
 
-      // Save current user's UID to localStorage
-      localStorage.setItem("moneyCoachUID", firebaseUser.uid);
-
-      // Only migrate if this is the SAME user (same UID in storage)
-      if (!storedUid || storedUid === firebaseUser.uid) {
+      // Only migrate to Firestore if SAME user was already stored
+      // Never migrate guest/unknown data up to Firestore
+      if (storedUid === firebaseUser.uid) {
         await migrateLocalToFirestore(firebaseUser.uid);
       }
 
