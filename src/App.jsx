@@ -1,5 +1,5 @@
 // ─── App.jsx — Full financial planning integration ─────────────────────
-import { useState, useMemo, useRef, useEffect, Component } from "react";
+import { useState, useMemo, useRef, useEffect, Component, memo } from "react";
 import InsightCard      from "./InsightCard";
 import SpendingChart, { TrendChart, CategoryHistoryChart } from "./SpendingChart";
 import { useStreak }    from "./useStreak";
@@ -394,18 +394,18 @@ function OnboardingScreen({onComplete}) {
     });
   };
 
-  // Toggle + amount row for bills/savings/loans
-  const ToggleRow = ({item, icon, label, amtKey, placeholder, onToggle, onAmt}) => (
-    <div style={{ marginBottom:8 }}>
+  // Inline toggle+input row — NOT a component to avoid remount on state change
+  const toggleRow = (item, amtKey, placeholder, onToggle, onAmt) => (
+    <div key={item.id} style={{ marginBottom:8 }}>
       <div style={{ display:"flex", alignItems:"center", gap:10,
         padding:"9px 12px", borderRadius:10,
         background:item.active?"#EFF6FF":"#F8FAFC",
         border:`1.5px solid ${item.active?C.blue:C.border}`,
         cursor:"pointer" }}
         onClick={onToggle}>
-        <span style={{ fontSize:18, flexShrink:0 }}>{icon}</span>
+        <span style={{ fontSize:18, flexShrink:0 }}>{item.icon}</span>
         <p style={{ margin:0, fontSize:13, fontWeight:600,
-          color:item.active?C.blue:C.ink, flex:1 }}>{label}</p>
+          color:item.active?C.blue:C.ink, flex:1 }}>{item.label}</p>
         <div style={{ width:22, height:22, borderRadius:99, flexShrink:0,
           background:item.active?C.blue:"#E5E7EB",
           display:"flex", alignItems:"center", justifyContent:"center" }}>
@@ -413,8 +413,7 @@ function OnboardingScreen({onComplete}) {
         </div>
       </div>
       {item.active && (
-        <div style={{ display:"flex", alignItems:"center", gap:8,
-          marginTop:6, paddingLeft:12 }}
+        <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:6, paddingLeft:12 }}
           onClick={e=>e.stopPropagation()}>
           <span style={{ fontSize:12, color:C.muted, flexShrink:0 }}>₹</span>
           <input
@@ -584,13 +583,12 @@ function OnboardingScreen({onComplete}) {
                 Tap to select bills you pay every month
               </p>
 
-              {bills.map(b=>(
-                <ToggleRow key={b.id} item={b} icon={b.icon} label={b.label}
-                  amtKey="amount" placeholder="e.g. 15000"
-                  onToggle={()=>setBills(p=>p.map(x=>x.id===b.id?{...x,active:!x.active}:x))}
-                  onAmt={v=>setBills(p=>p.map(x=>x.id===b.id?{...x,amount:v}:x))}
-                />
-              ))}
+              {bills.map(b=>
+                toggleRow(b, "amount", "e.g. 15000",
+                  ()=>setBills(p=>p.map(x=>x.id===b.id?{...x,active:!x.active}:x)),
+                  v=>setBills(p=>p.map(x=>x.id===b.id?{...x,amount:v}:x))
+                )
+              )}
 
               {totalBills>0 && (
                 <div style={{ background:"#FFF7ED", borderRadius:10, padding:"10px 12px",
@@ -637,13 +635,12 @@ function OnboardingScreen({onComplete}) {
                 Monthly SIPs, RDs or any savings you do
               </p>
 
-              {savings.map(s=>(
-                <ToggleRow key={s.id} item={s} icon={s.icon} label={s.label}
-                  amtKey="amount" placeholder="e.g. 5000"
-                  onToggle={()=>setSavings(p=>p.map(x=>x.id===s.id?{...x,active:!x.active}:x))}
-                  onAmt={v=>setSavings(p=>p.map(x=>x.id===s.id?{...x,amount:v}:x))}
-                />
-              ))}
+              {savings.map(s=>
+                toggleRow(s, "amount", "e.g. 5000",
+                  ()=>setSavings(p=>p.map(x=>x.id===s.id?{...x,active:!x.active}:x)),
+                  v=>setSavings(p=>p.map(x=>x.id===s.id?{...x,amount:v}:x))
+                )
+              )}
 
               {totalSavings>0 && (
                 <div style={{ background:"#EFF6FF", borderRadius:10, padding:"10px 12px",
@@ -684,13 +681,12 @@ function OnboardingScreen({onComplete}) {
                 Any active loan EMIs you pay monthly
               </p>
 
-              {loans.map(l=>(
-                <ToggleRow key={l.id} item={l} icon={l.icon} label={l.label}
-                  amtKey="emi" placeholder="Monthly EMI"
-                  onToggle={()=>setLoans(p=>p.map(x=>x.id===l.id?{...x,active:!x.active}:x))}
-                  onAmt={v=>setLoans(p=>p.map(x=>x.id===l.id?{...x,emi:v}:x))}
-                />
-              ))}
+              {loans.map(l=>
+                toggleRow(l, "emi", "Monthly EMI amount",
+                  ()=>setLoans(p=>p.map(x=>x.id===l.id?{...x,active:!x.active}:x)),
+                  v=>setLoans(p=>p.map(x=>x.id===l.id?{...x,emi:v}:x))
+                )
+              )}
 
               {/* Final budget summary */}
               {totalIncome>0 && (
@@ -1100,6 +1096,29 @@ function FilteredExpenseList({ expenses, monthKey, onEdit, onDelete, isCurrentMo
   );
 }
 
+// ─── AMOUNT INPUT — isolated to prevent cursor jumping on parent re-render ────
+function AmountInput({ value, onChange, onEnter, disabled, hasError }) {
+  return (
+    <input
+      type="number"
+      value={value}
+      min="0.01"
+      step="any"
+      onChange={e => onChange(e.target.value)}
+      placeholder="e.g. 250"
+      disabled={disabled}
+      onKeyDown={e => e.key === "Enter" && onEnter()}
+      style={{
+        width:"100%", padding:"10px 12px", borderRadius:8,
+        border:`1.5px solid ${hasError ? "#DC2626" : "#E5E7EB"}`,
+        fontFamily:"Georgia,serif", fontSize:20, background:"#F8FAFC",
+        outline:"none", marginTop:6, marginBottom: hasError ? 4 : 12,
+        boxSizing:"border-box",
+      }}
+    />
+  );
+}
+
 function LogExpenseForm({onAdd, disabled, currentExpenses=[], dailyLimit=0}) {
   const [amount,setAmount]=useState("");
   const [label,setLabel]=useState("Food");
@@ -1134,11 +1153,13 @@ function LogExpenseForm({onAdd, disabled, currentExpenses=[], dailyLimit=0}) {
       <p style={{fontSize:15,fontWeight:700,color:C.ink,margin:"0 0 14px"}}>+ Log Daily Expense</p>
       {disabled&&<div style={{marginBottom:10,padding:"7px 11px",borderRadius:8,background:"#FFFBEB",border:"1px solid #FCD34D",fontSize:12,color:C.amber}}>⚠️ Switch to current month to add expenses.</div>}
       <Label>Amount (₹) *</Label>
-      <input type="number" value={amount} min="0.01" step="any"
-        onChange={e=>{setAmount(e.target.value);if(err)setErr("");}}
-        placeholder="e.g. 250" disabled={disabled}
-        onKeyDown={e=>e.key==="Enter"&&submit()}
-        style={{width:"100%",padding:"10px 12px",borderRadius:8,border:`1.5px solid ${err?C.red:C.border}`,fontFamily:"Georgia,serif",fontSize:20,background:C.bg,outline:"none",marginTop:6,marginBottom:err?4:12,boxSizing:"border-box"}} />
+      <AmountInput
+        value={amount}
+        onChange={v => { setAmount(v); if(err) setErr(""); }}
+        onEnter={submit}
+        disabled={disabled}
+        hasError={!!err}
+      />
       {err&&<p style={{margin:"0 0 10px",fontSize:11,color:C.red,fontWeight:600}}>{err}</p>}
       <Label>Category</Label>
       <p style={{fontSize:11,color:C.muted,margin:"2px 0 6px"}}>For fixed bills like Rent or EMI, use the <strong>Plan tab</strong>.</p>
@@ -1372,11 +1393,11 @@ function RecurringTab({
   const monthlyIncome    = incomeSources.reduce((s,i)=>s+i.amount, 0);
   const monthlyLoans     = loans.reduce((s,l)=>s+(l.emi||0), 0);
 
-  // Carry-forward item row
-  const CFRow = ({ icon, label, amount, sublabel, type, id, onEditAmount }) => {
+  // Inline row render — NOT a sub-component to prevent remount/cursor jump
+  const cfRow = (icon, label, amount, sublabel, type, id, onEditAmount) => {
     const isEditing = editingCF?.type === type && editingCF?.id === id;
     return (
-      <div style={{
+      <div key={`${type}-${id}`} style={{
         display:"flex", alignItems:"center", justifyContent:"space-between",
         padding:"12px 14px", background:"#fff", borderRadius:12,
         border:`1px solid ${C.border}`, marginBottom:8,
@@ -1456,14 +1477,11 @@ function RecurringTab({
             textTransform:"uppercase", letterSpacing:"0.8px"}}>
             💰 Income Sources · {fmt(monthlyIncome)}/month
           </p>
-          {incomeSources.map(src => (
-            <CFRow key={src.id}
-              icon="💰" label={src.label||src.name||"Income"} amount={src.amount}
-              sublabel="Monthly income · auto carry-forward"
-              type="income" id={src.id}
-              onEditAmount={onUpdateIncomeSource}
-            />
-          ))}
+          {incomeSources.map(src =>
+            cfRow("💰", src.label||src.name||"Income", src.amount,
+              "Monthly income · auto carry-forward",
+              "income", src.id, onUpdateIncomeSource)
+          )}
         </div>
       )}
 
@@ -1474,14 +1492,11 @@ function RecurringTab({
             textTransform:"uppercase", letterSpacing:"0.8px"}}>
             🏠 Fixed Expenses · {fmt(monthlyFixed)}/month
           </p>
-          {fixedExpenses.map(exp => (
-            <CFRow key={exp.id}
-              icon="🏠" label={exp.label||exp.name||"Fixed"} amount={exp.amount}
-              sublabel="Fixed monthly · auto carry-forward"
-              type="fixed" id={exp.id}
-              onEditAmount={onUpdateFixedExpense}
-            />
-          ))}
+          {fixedExpenses.map(exp =>
+            cfRow("🏠", exp.label||exp.name||"Fixed", exp.amount,
+              "Fixed monthly · auto carry-forward",
+              "fixed", exp.id, onUpdateFixedExpense)
+          )}
         </div>
       )}
 
@@ -1492,14 +1507,11 @@ function RecurringTab({
             textTransform:"uppercase", letterSpacing:"0.8px"}}>
             🏦 Loans & EMIs · {fmt(monthlyLoans)}/month
           </p>
-          {loans.map(loan => (
-            <CFRow key={loan.id}
-              icon="🏦" label={loan.name||"Loan"} amount={loan.emi||0}
-              sublabel={`EMI · auto carry-forward`}
-              type="loan" id={loan.id}
-              onEditAmount={null} // loans edited in Loans tab
-            />
-          ))}
+          {loans.map(loan =>
+            cfRow("🏦", loan.name||"Loan", loan.manualEmi||loan.emi||0,
+              "EMI · auto carry-forward",
+              "loan", loan.id, null)
+          )}
           <p style={{margin:"4px 0 0", fontSize:10, color:C.muted}}>
             * Edit loan EMI in the Loans tab
           </p>
@@ -1730,7 +1742,7 @@ function DashboardScreen(props) {
   // Auto-log any due recurring expenses once on mount
   useEffect(() => { autoLogRecurring(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const MonthBar=()=><MonthSelector selectedMonth={selectedMonth} onChange={setSelectedMonth} allExpenses={allExpenses}/>;
+  const monthBarJsx = <MonthSelector selectedMonth={selectedMonth} onChange={setSelectedMonth} allExpenses={allExpenses}/>;
 
   // ── Shared inline style tokens ─────────────────────────────────────────
   const NAV_BG      = "#1E293B";
@@ -2231,11 +2243,16 @@ function DashboardScreen(props) {
               </div>
             )}
 
-            <MonthBar/>
+            {monthBarJsx}
             <div style={{display:"grid",gridTemplateColumns:"1fr",gap:14}}>
               <div>
-                <LogExpenseForm onAdd={handleAdd} disabled={!isCurrentMonth}
-                  currentExpenses={currentExpenses} dailyLimit={dailyLimit}/>
+                <LogExpenseForm
+                  key="log-expense-form"
+                  onAdd={handleAdd}
+                  disabled={!isCurrentMonth}
+                  currentExpenses={currentExpenses}
+                  dailyLimit={dailyLimit}
+                />
               </div>
               <FilteredExpenseList
                 expenses={expenses}
@@ -2337,7 +2354,7 @@ function DashboardScreen(props) {
 
           return (
             <>
-              <MonthBar/>
+              {monthBarJsx}
 
               {/* Stats strip — selected month only */}
               {totalSpent > 0 ? (
@@ -2568,8 +2585,17 @@ function DashboardScreen(props) {
 // ─── ROOT ─────────────────────────────────────────────────────────────────
 function AppInner({ firebaseUser = null, isGuest = false, onSignOut = null }) {
   const appData = useAppData(firebaseUser);
-  if(appData.screen==="onboarding") return <OnboardingScreen onComplete={appData.completeOnboarding}/>;
-  return <DashboardScreen {...appData} firebaseUser={firebaseUser} isGuest={isGuest} onSignOut={onSignOut}/>;
+  if (appData.screen === "onboarding") {
+    return <OnboardingScreen onComplete={appData.completeOnboarding}/>;
+  }
+  return (
+    <DashboardScreen
+      {...appData}
+      firebaseUser={firebaseUser}
+      isGuest={isGuest}
+      onSignOut={onSignOut}
+    />
+  );
 }
 
 export default function App(props) {
