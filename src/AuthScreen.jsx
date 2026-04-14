@@ -1,12 +1,13 @@
 // ─── AuthScreen.jsx ───────────────────────────────────────────────────────────
 // iOS (Capacitor): Apple Sign In only (Google popup blocked in WKWebView)
-// Web/Android: Google + Apple + Guest
+// Web/Android: Google + Apple + Email/Password + Guest
 import { useState, useEffect } from "react";
 import { auth } from "./firebase";
 import {
   GoogleAuthProvider, signInWithRedirect,
   OAuthProvider, signInWithCredential,
 } from "firebase/auth";
+import EmailPasswordAuth from "./EmailPasswordAuth";
 
 // Detect native iOS app running in Capacitor
 const isNativeIOS = !!(
@@ -80,6 +81,7 @@ async function signInWithApple() {
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function AuthScreen({ onGuest }) {
   const [screen,  setScreen]  = useState("welcome");
+  const [authTab, setAuthTab] = useState("social"); // "social" or "email"
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState("");
 
@@ -216,54 +218,97 @@ export default function AuthScreen({ onGuest }) {
             </div>
           ) : (
             <>
-              {/* Sign in with Apple — ALWAYS shown first (Apple requirement) */}
-              <button onClick={handleApple} style={{
-                width:"100%", padding:"15px 16px", borderRadius:14,
-                border:"none", background:"#000",
-                display:"flex", alignItems:"center", justifyContent:"center", gap:10,
-                cursor:"pointer", fontFamily:"inherit",
-                fontSize:15, fontWeight:700, color:"#fff",
-                marginBottom:12, boxSizing:"border-box",
-              }}>
-                <AppleIcon/> Sign in with Apple
-              </button>
-
-              {/* Google — only on web/Android, hidden on native iOS */}
-              {!isNativeIOS && (
-                <button onClick={handleGoogle} style={{
-                  width:"100%", padding:"15px 16px", borderRadius:14,
-                  border:"1.5px solid #E5E7EB", background:"#fff",
-                  display:"flex", alignItems:"center", justifyContent:"center", gap:10,
-                  cursor:"pointer", fontFamily:"inherit",
-                  fontSize:15, fontWeight:700, color:"#111827",
-                  marginBottom:12, boxSizing:"border-box",
-                  boxShadow:"0 1px 4px rgba(0,0,0,0.06)",
-                }}>
-                  <GoogleIcon/> Continue with Google
+              {/* Auth Method Tabs */}
+              <div style={{ display:"flex", gap:8, marginBottom:16 }}>
+                <button
+                  onClick={() => setAuthTab("social")}
+                  style={{
+                    flex:1, padding:"10px", borderRadius:10,
+                    border:`1.5px solid ${authTab==="social" ? "#2563EB" : "#E5E7EB"}`,
+                    background: authTab==="social" ? "#EFF6FF" : "#fff",
+                    color: authTab==="social" ? "#2563EB" : "#6B7280",
+                    fontFamily:"inherit", fontSize:12, fontWeight:700,
+                    cursor:"pointer", transition:"all 0.2s",
+                  }}>
+                  Social Login
                 </button>
-              )}
-
-              {/* Divider */}
-              <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
-                <div style={{ flex:1, height:1, background:"#F1F5F9" }}/>
-                <span style={{ fontSize:11, color:"#9CA3AF" }}>or</span>
-                <div style={{ flex:1, height:1, background:"#F1F5F9" }}/>
+                <button
+                  onClick={() => setAuthTab("email")}
+                  style={{
+                    flex:1, padding:"10px", borderRadius:10,
+                    border:`1.5px solid ${authTab==="email" ? "#2563EB" : "#E5E7EB"}`,
+                    background: authTab==="email" ? "#EFF6FF" : "#fff",
+                    color: authTab==="email" ? "#2563EB" : "#6B7280",
+                    fontFamily:"inherit", fontSize:12, fontWeight:700,
+                    cursor:"pointer", transition:"all 0.2s",
+                  }}>
+                  Email/Password
+                </button>
               </div>
 
-              {/* Guest */}
-              <button onClick={onGuest} style={{
-                width:"100%", padding:"14px", borderRadius:14,
-                border:"1.5px solid #F1F5F9", background:"#F8FAFC",
-                cursor:"pointer", fontFamily:"inherit",
-                fontSize:14, fontWeight:600, color:"#6B7280",
-                display:"flex", alignItems:"center", justifyContent:"center", gap:8,
-                boxSizing:"border-box",
-              }}>
-                👤 Continue as Guest
-              </button>
-              <p style={{ textAlign:"center", fontSize:11, color:"#9CA3AF", margin:"8px 0 0" }}>
-                Guest mode — data stays on this device only
-              </p>
+              {/* Social Login Methods */}
+              {authTab === "social" && (
+                <>
+                  {/* Sign in with Apple — ALWAYS shown first (Apple requirement) */}
+                  <button onClick={handleApple} style={{
+                    width:"100%", padding:"15px 16px", borderRadius:14,
+                    border:"none", background:"#000",
+                    display:"flex", alignItems:"center", justifyContent:"center", gap:10,
+                    cursor:"pointer", fontFamily:"inherit",
+                    fontSize:15, fontWeight:700, color:"#fff",
+                    marginBottom:12, boxSizing:"border-box",
+                  }}>
+                    <AppleIcon/> Sign in with Apple
+                  </button>
+
+                  {/* Google — only on web/Android, hidden on native iOS */}
+                  {!isNativeIOS && (
+                    <button onClick={handleGoogle} style={{
+                      width:"100%", padding:"15px 16px", borderRadius:14,
+                      border:"1.5px solid #E5E7EB", background:"#fff",
+                      display:"flex", alignItems:"center", justifyContent:"center", gap:10,
+                      cursor:"pointer", fontFamily:"inherit",
+                      fontSize:15, fontWeight:700, color:"#111827",
+                      marginBottom:12, boxSizing:"border-box",
+                      boxShadow:"0 1px 4px rgba(0,0,0,0.06)",
+                    }}>
+                      <GoogleIcon/> Continue with Google
+                    </button>
+                  )}
+
+                  {/* Divider */}
+                  <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
+                    <div style={{ flex:1, height:1, background:"#F1F5F9" }}/>
+                    <span style={{ fontSize:11, color:"#9CA3AF" }}>or</span>
+                    <div style={{ flex:1, height:1, background:"#F1F5F9" }}/>
+                  </div>
+
+                  {/* Guest */}
+                  <button onClick={onGuest} style={{
+                    width:"100%", padding:"14px", borderRadius:14,
+                    border:"1.5px solid #F1F5F9", background:"#F8FAFC",
+                    cursor:"pointer", fontFamily:"inherit",
+                    fontSize:14, fontWeight:600, color:"#6B7280",
+                    display:"flex", alignItems:"center", justifyContent:"center", gap:8,
+                    boxSizing:"border-box",
+                  }}>
+                    👤 Continue as Guest
+                  </button>
+                  <p style={{ textAlign:"center", fontSize:11, color:"#9CA3AF", margin:"8px 0 0" }}>
+                    Guest mode — data stays on this device only
+                  </p>
+                </>
+              )}
+
+              {/* Email/Password Auth */}
+              {authTab === "email" && (
+                <>
+                  <EmailPasswordAuth
+                    onError={(msg) => setError(msg)}
+                    onLoading={(isLoading) => setLoading(isLoading)}
+                  />
+                </>
+              )}
             </>
           )}
         </div>
