@@ -115,7 +115,8 @@ function outstandingAfter(principal, annualRate, emi, monthsElapsed) {
 }
 
 export function calcLoanTotals(loan) {
-  const emi           = loan.emi || calcEMI(loan.principal, loan.rate, loan.tenureMonths);
+  // Use manualEmi if set (from onboarding), else calculate from principal/rate
+  const emi           = loan.manualEmi || loan.emi || calcEMI(loan.principal, loan.rate, loan.tenureMonths);
   const totalPayable  = emi * loan.tenureMonths;
   const totalInterest = Math.max(0, totalPayable - loan.principal);
 
@@ -351,13 +352,49 @@ export function useAppData(firebaseUser = null) {
   };
 
   // Onboarding
-  const completeOnboarding = ({name, incomeSources, fixedExpenses=[]}) => {
+  const completeOnboarding = ({name, incomeSources=[], fixedExpenses=[], savingsPlans=[], loanEmis=[]}) => {
+    const ts = Date.now();
     commit(prev => ({
       ...prev,
-      screen:"dashboard",
-      name:name||"",
-      incomeSources: incomeSources.map((s,i) => ({...s, id:Date.now()+i})),
-      fixedExpenses: fixedExpenses.map((b,i) => ({...b, id:Date.now()+100+i})),
+      screen:        "dashboard",
+      name:          name||"",
+      // → Shows in Plan tab → Income Sources section
+      incomeSources: incomeSources.map((s,i) => ({
+        ...s,
+        id: ts+i,
+        label: s.label||"Income",
+        amount: parseFloat(s.amount)||0,
+      })),
+      // → Shows in Plan tab → Fixed Expenses + Recurring tab
+      fixedExpenses: fixedExpenses.map((b,i) => ({
+        ...b,
+        id: ts+100+i,
+        label: b.label||"Bill",
+        amount: parseFloat(b.amount)||0,
+        auto: true,
+      })),
+      // → Shows in Plan tab → Savings section
+      savingsPlans: savingsPlans.map((s,i) => ({
+        ...s,
+        id: ts+200+i,
+        label: s.label||"Savings",
+        amount: parseFloat(s.amount)||0,
+      })),
+      // → Shows in Loans tab
+      loans: loanEmis.map((l,i) => {
+        const emi = parseFloat(l.emi)||0;
+        return {
+          id:           ts+300+i,
+          name:         l.name||l.label||"Loan",
+          // Estimate principal from EMI (rough: EMI * 60 months)
+          principal:    emi * 60,
+          rate:         9,
+          tenureMonths: 60,
+          startDate:    new Date().toISOString().split("T")[0],
+          // Store actual EMI so it overrides calculation
+          manualEmi:    emi,
+        };
+      }),
     }));
   };
 

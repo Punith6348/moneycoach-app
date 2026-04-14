@@ -406,7 +406,7 @@ function OnboardingScreen({onComplete}) {
         <span style={{ fontSize:18, flexShrink:0 }}>{icon}</span>
         <p style={{ margin:0, fontSize:13, fontWeight:600,
           color:item.active?C.blue:C.ink, flex:1 }}>{label}</p>
-        <div style={{ width:20, height:20, borderRadius:99, flexShrink:0,
+        <div style={{ width:22, height:22, borderRadius:99, flexShrink:0,
           background:item.active?C.blue:"#E5E7EB",
           display:"flex", alignItems:"center", justifyContent:"center" }}>
           {item.active && <span style={{ color:"#fff", fontSize:12, fontWeight:700 }}>✓</span>}
@@ -414,14 +414,15 @@ function OnboardingScreen({onComplete}) {
       </div>
       {item.active && (
         <div style={{ display:"flex", alignItems:"center", gap:8,
-          marginTop:6, paddingLeft:12 }}>
+          marginTop:6, paddingLeft:12 }}
+          onClick={e=>e.stopPropagation()}>
           <span style={{ fontSize:12, color:C.muted, flexShrink:0 }}>₹</span>
-          <input type="number" value={item[amtKey]}
+          <input
+            type="number"
+            value={item[amtKey]}
             onChange={e=>onAmt(e.target.value)}
             placeholder={placeholder}
-            autoFocus
             style={{...inp, flex:1}}
-            onClick={e=>e.stopPropagation()}
           />
           <span style={{ fontSize:12, color:C.muted, flexShrink:0 }}>/month</span>
         </div>
@@ -531,7 +532,6 @@ function OnboardingScreen({onComplete}) {
                       <input type="number" value={s.amount}
                         onChange={e=>setSources(p=>p.map(x=>x.id===s.id?{...x,amount:e.target.value}:x))}
                         placeholder="Monthly amount"
-                        autoFocus
                         style={{...inp, flex:1}}
                         onClick={e=>e.stopPropagation()}
                       />
