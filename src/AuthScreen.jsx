@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import { auth } from "./firebase";
 import {
-  GoogleAuthProvider, signInWithPopup,
+  GoogleAuthProvider, signInWithRedirect,
   OAuthProvider, signInWithCredential,
 } from "firebase/auth";
 
@@ -105,16 +105,15 @@ export default function AuthScreen({ onGuest }) {
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: "select_account" });
-      await signInWithPopup(auth, provider);
+      // Use redirect instead of popup for better iPad/mobile support
+      // Avoids popup blocker issues and webview restrictions
+      await signInWithRedirect(auth, provider);
+      // Page will reload after redirect completes, getRedirectResult in main.jsx handles it
     } catch(e) {
       console.error("Google error:", e.code);
-      if (
-        e.code !== "auth/popup-closed-by-user" &&
-        e.code !== "auth/cancelled-popup-request"
-      ) {
+      if (e.code !== "auth/redirect-cancelled-by-user") {
         setError("Google sign-in failed. Please try again.");
       }
-    } finally {
       setLoading(false);
     }
   };
