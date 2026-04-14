@@ -395,7 +395,7 @@ export default function BudgetDashboard({
                 const savingsRate = Math.round((totalSavings / totalIncome) * 100);
                 const idealSpent  = Math.round((daysPassed / daysInMonth) * (monthSpent + Math.max(0, remaining)));
                 const paceDiff    = idealSpent > 0 ? (monthSpent - idealSpent) / idealSpent : 0;
-                const daysWithSpend = new Set(currentExpenses.map(e=>e.date.split("T")[0])).size;
+                const daysWithSpend = new Set(currentExpenses.filter(e=>e.date).map(e=>e.date.split("T")[0])).size;
                 const noSpendDays = Math.max(0, daysPassed - daysWithSpend);
                 const budgetedCats = Object.entries(categoryBudgets).filter(([,b])=>b>0);
                 const onTrackCats  = budgetedCats.filter(([cat,b]) => (catSpend[cat]||0) <= b).length;

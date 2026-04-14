@@ -17,14 +17,14 @@ const CAT_ICONS = { Food:"🍽",Travel:"🚗",Coffee:"☕",Grocery:"🛒",Medica
 export function generateInsight(monthlyIncome, expenses) {
   if (!monthlyIncome || monthlyIncome <= 0 || expenses.length === 0) return null;
   const now=new Date(), weekAgo=new Date(now-7*24*60*60*1000);
-  const we=expenses.filter(e=>new Date(e.date)>=weekAgo);
+  const we=expenses.filter(e=>e.date&&new Date(e.date)>=weekAgo);
   const wt=we.reduce((s,e)=>s+e.amount,0), wp=Math.round((wt/monthlyIncome)*100);
   const da=wt/7, dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
   const ps=monthlyIncome-da*dim, sr=(ps/monthlyIncome)*100;
   const bc={}; we.forEach(e=>{bc[e.label]=(bc[e.label]||0)+e.amount;});
   const tc=Object.entries(bc).sort((a,b)=>b[1]-a[1])[0];
   const cd=now.getDate(), dr=dim-cd;
-  const ms=expenses.filter(e=>{const d=new Date(e.date);return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();}).reduce((s,e)=>s+e.amount,0);
+  const ms=expenses.filter(e=>{if(!e.date)return false;const d=new Date(e.date);return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();}).reduce((s,e)=>s+e.amount,0);
   const rb=monthlyIncome-ms, dbl=dr>0?Math.round(rb/dr):0;
   let risk,emoji,headline,advice,tip;
   if(sr>=30){risk="excellent";emoji="🏆";headline=`Spent ${fmt(wt)} this week — ${wp}% of income.`;advice="Saving over 30%.";tip="Route surplus to a SIP or emergency fund.";}

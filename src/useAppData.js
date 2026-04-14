@@ -265,7 +265,17 @@ export function useAppData(firebaseUser = null) {
       assets:            Array.isArray(saved.assets)            ? saved.assets            : [],
     };
     // Check month carry-forward on every app load
-    return checkAndCarryForward(restored);
+    const carried = checkAndCarryForward(restored);
+    // Sanitize: strip any expenses with missing/invalid dates to prevent crashes
+    return {
+      ...carried,
+      allExpenses: Object.fromEntries(
+        Object.entries(carried.allExpenses||{}).map(([k,v])=>[
+          k,
+          (Array.isArray(v)?v:[]).filter(e=>e&&e.date&&typeof e.date==="string"&&e.date.length>0)
+        ])
+      ),
+    };
   });
 
   // ── Load from Firestore when user logs in ────────────────────────────────
@@ -294,6 +304,14 @@ export function useAppData(firebaseUser = null) {
       // Load this user's cloud data
       const cloudData = await loadFromFirestore(firebaseUser.uid);
       if (cloudData) {
+        // Sanitize allExpenses — remove entries with missing dates
+        const rawExp = (cloudData.allExpenses && typeof cloudData.allExpenses==="object") ? cloudData.allExpenses : {};
+        const cleanExp = Object.fromEntries(
+          Object.entries(rawExp).map(([k,v])=>[
+            k,
+            (Array.isArray(v)?v:[]).filter(e=>e&&e.date&&typeof e.date==="string"&&e.date.length>0)
+          ])
+        );
         const merged = {
           ...DEFAULT_STATE, ...cloudData,
           loans:             Array.isArray(cloudData.loans)             ? cloudData.loans             : [],
@@ -302,7 +320,7 @@ export function useAppData(firebaseUser = null) {
           savingsPlans:      Array.isArray(cloudData.savingsPlans)      ? cloudData.savingsPlans      : [],
           futurePayments:    Array.isArray(cloudData.futurePayments)    ? cloudData.futurePayments    : [],
           checkIns:          Array.isArray(cloudData.checkIns)          ? cloudData.checkIns          : [],
-          allExpenses:       (cloudData.allExpenses && typeof cloudData.allExpenses==="object")       ? cloudData.allExpenses       : {},
+          allExpenses:       cleanExp,
           categoryBudgets:   (cloudData.categoryBudgets && typeof cloudData.categoryBudgets==="object") ? cloudData.categoryBudgets : {},
           recurringExpenses: Array.isArray(cloudData.recurringExpenses) ? cloudData.recurringExpenses : [],
           assets:            Array.isArray(cloudData.assets)            ? cloudData.assets            : [],

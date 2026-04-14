@@ -612,12 +612,12 @@ function EditModal({expense,monthKey,onSave,onClose}) {
   const [amount,setAmount]=useState(String(expense.amount));
   const [label,setLabel]=useState(expense.label);
   const [note,setNote]=useState(expense.note||"");
-  const existingDate=expense.date.split("T")[0];
+  const existingDate=(expense.date||new Date().toISOString()).split("T")[0];
   const [date,setDate]=useState(existingDate);
   const save=()=>{
     const v=parseFloat(amount);
     if(!v||v<=0) return;
-    const origTime=expense.date.includes("T")?expense.date.split("T")[1]:"00:00:00.000Z";
+    const origTime=(expense.date||new Date().toISOString()).includes("T")?(expense.date||new Date().toISOString()).split("T")[1]:"00:00:00.000Z";
     const newDate=`${date}T${origTime}`;
     onSave(monthKey,expense.id,{amount:v,label,note:note.trim(),date:newDate});
     onClose();
