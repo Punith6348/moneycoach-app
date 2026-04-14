@@ -44,29 +44,44 @@ function Root() {
   const [guestMode, setGuestMode] = useState(false);
 
   useEffect(() => {
-    // Set persistence to LOCAL — session survives page refresh and app restart
-    // This is the key fix — without this Firebase defaults to SESSION persistence
-    // which clears on every page reload
     setPersistence(auth, browserLocalPersistence)
       .then(() => {
-        // After setting persistence, listen for auth state
         const unsub = onAuthStateChanged(auth, async u => {
           if (u) {
+            // ── User logged in via Google/Apple ──
+            // Clear any guest data that was stored locally
+            // Only clear if the stored UID doesn't match this user
+            const storedUid = localStorage.getItem("moneyCoachUID");
+            if (!storedUid || storedUid !== u.uid) {
+              // Different user or guest data — clear local storage
+              localStorage.removeItem("moneyCoachData_v3");
+              localStorage.setItem("moneyCoachUID", u.uid);
+            }
+            // Exit guest mode if they were in it
+            setGuestMode(false);
             await registerUserProfile(u);
             setUser(u);
           } else {
             setUser(null);
           }
         });
-        // Store unsub for cleanup
         window._authUnsub = unsub;
       })
       .catch(err => {
         console.warn("Persistence error:", err);
-        // Fall back to normal auth listener
         const unsub = onAuthStateChanged(auth, async u => {
-          if (u) { await registerUserProfile(u); setUser(u); }
-          else setUser(null);
+          if (u) {
+            const storedUid = localStorage.getItem("moneyCoachUID");
+            if (!storedUid || storedUid !== u.uid) {
+              localStorage.removeItem("moneyCoachData_v3");
+              localStorage.setItem("moneyCoachUID", u.uid);
+            }
+            setGuestMode(false);
+            await registerUserProfile(u);
+            setUser(u);
+          } else {
+            setUser(null);
+          }
         });
         window._authUnsub = unsub;
       });
@@ -81,7 +96,11 @@ function Root() {
   if (!user && !guestMode) {
     return (
       <div className="auth-root">
-        <AuthScreen onGuest={() => setGuestMode(true)} />
+        <AuthScreen onGuest={() => {
+          // Clear any previous user data when entering guest mode
+          localStorage.removeItem("moneyCoachUID");
+          setGuestMode(true);
+        }} />
       </div>
     );
   }
