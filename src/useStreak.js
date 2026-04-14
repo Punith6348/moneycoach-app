@@ -63,10 +63,17 @@ export function useStreak(safeDailySpend, expenses, checkIns, addCheckIn) {
     const spendByDay = {};
     expenses.forEach(e => { const d = e.date.split("T")[0]; spendByDay[d] = (spendByDay[d]||0) + e.amount; });
     const sorted = [...checkIns].sort((a,b) => a.date.localeCompare(b.date));
+    let prevDate = null;
     sorted.forEach(ci => {
+      // Reset streak if this check-in is not exactly 1 day after the previous one
+      if (prevDate !== null) {
+        const gap = (new Date(ci.date) - new Date(prevDate)) / 86400000;
+        if (gap !== 1) cur = 0;
+      }
       const spent = spendByDay[ci.date] || 0;
       const ok = ci.zeroDay || spent === 0 || (safeDailySpend > 0 && spent <= safeDailySpend);
       if (ok) { cur++; best = Math.max(best, cur); } else cur = 0;
+      prevDate = ci.date;
     });
     return Math.max(best, streak);
   }, [checkIns, expenses, safeDailySpend, streak]);

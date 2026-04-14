@@ -66,59 +66,29 @@ function Root() {
   }, []);
 
   useEffect(() => {
-    setPersistence(auth, browserLocalPersistence)
-      .then(() => {
-        const unsub = onAuthStateChanged(auth, async u => {
-          console.log("🔔 Auth state changed:", u ? `Signed in as ${u.email}` : "Signed out");
-          if (u) {
-            // Always check if localStorage belongs to this Google user
-            const storedUid = localStorage.getItem("moneyCoachUID");
-            
-            if (storedUid !== u.uid) {
-              // Different UID or no UID (was guest) — clear ALL local data
-              console.log("🔄 New user detected, clearing local data:", storedUid, "->", u.uid);
-              localStorage.removeItem("moneyCoachData_v3");
-              localStorage.removeItem("moneyCoachData_v2");
-              localStorage.removeItem("moneyCoachData");
-              localStorage.setItem("moneyCoachUID", u.uid);
-            }
+    let unsub;
+    const handleUser = async u => {
+      console.log("🔔 Auth state changed:", u ? `Signed in as ${u.email}` : "Signed out");
+      if (u) {
+        // localStorage UID clearing is owned by useAppData.js — do not duplicate here
+        setGuestMode(false);
+        await registerUserProfile(u);
+        console.log("✅ User set in React state:", u.email);
+        setUser(u);
+      } else {
+        console.log("❌ User set to null");
+        setUser(null);
+      }
+    };
 
-            setGuestMode(false);
-            await registerUserProfile(u);
-            console.log("✅ User set in React state:", u.email);
-            setUser(u);
-          } else {
-            console.log("❌ User set to null");
-            setUser(null);
-          }
-        });
-        window._authUnsub = unsub;
-      })
+    setPersistence(auth, browserLocalPersistence)
+      .then(() => { unsub = onAuthStateChanged(auth, handleUser); })
       .catch(err => {
         console.warn("Persistence error:", err);
-        const unsub = onAuthStateChanged(auth, async u => {
-          console.log("🔔 Auth state changed (fallback):", u ? `Signed in as ${u.email}` : "Signed out");
-          if (u) {
-            const storedUid = localStorage.getItem("moneyCoachUID");
-            if (storedUid !== u.uid) {
-              localStorage.removeItem("moneyCoachData_v3");
-              localStorage.removeItem("moneyCoachData_v2");
-              localStorage.removeItem("moneyCoachData");
-              localStorage.setItem("moneyCoachUID", u.uid);
-            }
-            setGuestMode(false);
-            await registerUserProfile(u);
-            console.log("✅ User set in React state (fallback):", u.email);
-            setUser(u);
-          } else {
-            console.log("❌ User set to null (fallback)");
-            setUser(null);
-          }
-        });
-        window._authUnsub = unsub;
+        unsub = onAuthStateChanged(auth, handleUser);
       });
 
-    return () => { if (window._authUnsub) window._authUnsub(); };
+    return () => { if (unsub) unsub(); };
   }, []);
 
   // Still checking

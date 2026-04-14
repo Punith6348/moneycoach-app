@@ -68,7 +68,8 @@ export function calcDailyLimit(remaining) {
   const days  = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
   const today = now.getDate();
   const daysLeft = Math.max(1, days - today + 1);
-  return Math.max(0, Math.round(remaining / daysLeft));
+  // Return negative value when over-budget so callers can show the overage
+  return Math.round(remaining / daysLeft);
 }
 
 // ── Loan calculation helpers ──────────────────────────────────────────────
@@ -247,6 +248,7 @@ function checkAndCarryForward(data) {
 
 // ── HOOK ──────────────────────────────────────────────────────────────────
 export function useAppData(firebaseUser = null) {
+  const [syncError, setSyncError] = useState(null);
   const [data, setData] = useState(() => {
     const storedUid = localStorage.getItem("moneyCoachUID");
     const saved = load();
@@ -282,8 +284,8 @@ export function useAppData(firebaseUser = null) {
   // ── Load from Firestore when user logs in ────────────────────────────────
   useEffect(() => {
     if (!firebaseUser) return;
+    let mounted = true;
     (async () => {
-      // ── Load from Firestore when user logs in ────────────────────────────────
       const storedUid = localStorage.getItem("moneyCoachUID");
 
       // If stored UID doesn't match Google UID — clear local data completely
@@ -293,7 +295,7 @@ export function useAppData(firebaseUser = null) {
         localStorage.removeItem("moneyCoachData_v2");
         localStorage.removeItem("moneyCoachData");
         localStorage.setItem("moneyCoachUID", firebaseUser.uid);
-        setData({...DEFAULT_STATE});
+        if (mounted) setData({...DEFAULT_STATE});
       }
 
       // Only migrate to Firestore if SAME user was already stored
@@ -304,6 +306,7 @@ export function useAppData(firebaseUser = null) {
 
       // Load this user's cloud data
       const cloudData = await loadFromFirestore(firebaseUser.uid);
+      if (!mounted) return;
       if (cloudData) {
         // Sanitize allExpenses — remove entries with missing dates
         const rawExp = (cloudData.allExpenses && typeof cloudData.allExpenses==="object") ? cloudData.allExpenses : {};
@@ -335,20 +338,27 @@ export function useAppData(firebaseUser = null) {
         persist(freshState);
       }
     })();
+    return () => { mounted = false; };
   }, [firebaseUser?.uid]);
 
   const commit = (fn) => {
+    let next, prev_;
     setData(prev => {
-      const next = fn(prev);
+      prev_ = prev;
+      next = fn(prev);
       persist(next);
-      // Sync to Firestore if logged in
-      if (firebaseUser) {
-        const ref = doc(db, "users", firebaseUser.uid);
-        setDoc(ref, { data: JSON.stringify(next), updatedAt: Date.now() })
-          .catch(e => console.warn("Sync failed:", e));
-      }
       return next;
     });
+    // Skip Firestore write when state didn't change (e.g. duplicate check-in attempt)
+    if (firebaseUser && next !== undefined && next !== prev_) {
+      const ref = doc(db, "users", firebaseUser.uid);
+      setDoc(ref, { data: JSON.stringify(next), updatedAt: Date.now() })
+        .then(() => setSyncError(null))
+        .catch(e => {
+          console.warn("Sync failed:", e);
+          setSyncError("Changes saved locally but not synced to cloud. Check your connection.");
+        });
+    }
   };
 
   // Onboarding
@@ -616,5 +626,6 @@ export function useAppData(firebaseUser = null) {
     addRecurring, updateRecurring, deleteRecurring, toggleRecurring, autoLogRecurring,
     assets: data.assets || [],
     addAsset, updateAsset, deleteAsset,
+    syncError,
   };
 }

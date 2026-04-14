@@ -1854,8 +1854,9 @@ function DashboardScreen(props) {
     return () => window.removeEventListener("resize", check);
   }, []);
 
-  // Auto-log any due recurring expenses once on mount
-  useEffect(() => { autoLogRecurring(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Auto-log any due recurring expenses on mount and whenever the month rolls over
+  const currentMk = currentMonthKey();
+  useEffect(() => { autoLogRecurring(); }, [currentMk]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const monthBarJsx = <MonthSelector selectedMonth={selectedMonth} onChange={setSelectedMonth} allExpenses={allExpenses}/>;
 
