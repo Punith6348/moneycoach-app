@@ -36,10 +36,12 @@ export default function EmailPasswordAuth({ onError, onLoading }) {
         return;
       }
 
-      await signInWithEmailAndPassword(auth, email, password);
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      console.log("Login success:", result.user.email);
       // onAuthStateChanged in main.jsx handles navigation
+      // Do NOT clear loading state here - let onAuthStateChanged navigate
     } catch (e) {
-      console.error("Login error:", e.code);
+      console.error("Login error:", e.code, e.message);
       const msg =
         e.code === "auth/user-not-found"
           ? "No account found with this email"
@@ -85,6 +87,7 @@ export default function EmailPasswordAuth({ onError, onLoading }) {
 
       // Create account
       const result = await createUserWithEmailAndPassword(auth, email, password);
+      console.log("Signup success:", result.user.email);
 
       // Update profile if name provided
       if (name.trim()) {
@@ -94,8 +97,9 @@ export default function EmailPasswordAuth({ onError, onLoading }) {
       }
 
       // onAuthStateChanged in main.jsx handles navigation
+      // Do NOT clear loading state here - let onAuthStateChanged navigate
     } catch (e) {
-      console.error("Signup error:", e.code);
+      console.error("Signup error:", e.code, e.message);
       const msg =
         e.code === "auth/email-already-in-use"
           ? "This email is already registered"
