@@ -53,7 +53,7 @@ function Root() {
         resolved = true;
         setUser(null);
       }
-    }, 3000);
+    }, 8000);
 
     // Listen for auth state — NO setPersistence (causes hang on iOS WKWebView)
     const unsub = onAuthStateChanged(auth, async u => {
