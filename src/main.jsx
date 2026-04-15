@@ -1,7 +1,7 @@
 // ─── main.jsx ────────────────────────────────────────────────────────────────
 import { StrictMode, useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
-import { onAuthStateChanged, signOut, setPersistence, browserLocalPersistence } from "firebase/auth";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "./firebase";
 import { registerUserProfile } from "./useFirestoreSync";
 import App from "./App.jsx";
@@ -40,68 +40,55 @@ function LoadingScreen() {
 }
 
 function Root() {
-  const [user,      setUser]      = useState(undefined); // undefined=checking
+  const [user,      setUser]      = useState(undefined);
   const [guestMode, setGuestMode] = useState(false);
 
   useEffect(() => {
-    // Timeout fallback — if Firebase doesn't respond in 5s, show login screen
+    let resolved = false;
+
+    // Aggressive timeout — show login after 3 seconds no matter what
     const timeout = setTimeout(() => {
-      if (user === undefined) {
-        console.warn("Firebase auth timeout — showing login screen");
+      if (!resolved) {
+        console.warn("⏱ Auth timeout — forcing login screen");
+        resolved = true;
         setUser(null);
       }
-    }, 5000);
+    }, 3000);
 
-    setPersistence(auth, browserLocalPersistence)
-      .then(() => {
-        const unsub = onAuthStateChanged(auth, async u => {
-          clearTimeout(timeout);
-          if (u) {
-            const storedUid = localStorage.getItem("moneyCoachUID");
-            if (storedUid !== u.uid) {
-              localStorage.removeItem("moneyCoachData_v3");
-              localStorage.removeItem("moneyCoachData_v2");
-              localStorage.removeItem("moneyCoachData");
-              localStorage.setItem("moneyCoachUID", u.uid);
-            }
-            setGuestMode(false);
-            await registerUserProfile(u);
-            setUser(u);
-          } else {
-            setUser(null);
-          }
-        });
-        window._authUnsub = unsub;
-      })
-      .catch(err => {
-        clearTimeout(timeout);
-        console.warn("Persistence error:", err);
-        const unsub = onAuthStateChanged(auth, async u => {
-          if (u) {
-            const storedUid = localStorage.getItem("moneyCoachUID");
-            if (storedUid !== u.uid) {
-              localStorage.removeItem("moneyCoachData_v3");
-              localStorage.removeItem("moneyCoachData_v2");
-              localStorage.removeItem("moneyCoachData");
-              localStorage.setItem("moneyCoachUID", u.uid);
-            }
-            setGuestMode(false);
-            await registerUserProfile(u);
-            setUser(u);
-          } else {
-            setUser(null);
-          }
-        });
-        window._authUnsub = unsub;
-      });
+    // Listen for auth state — NO setPersistence (causes hang on iOS WKWebView)
+    const unsub = onAuthStateChanged(auth, async u => {
+      if (resolved && !u) return; // already timed out and no user
+      clearTimeout(timeout);
+      resolved = true;
 
+      if (u) {
+        try {
+          const storedUid = localStorage.getItem("moneyCoachUID");
+          if (storedUid !== u.uid) {
+            localStorage.removeItem("moneyCoachData_v3");
+            localStorage.removeItem("moneyCoachData_v2");
+            localStorage.removeItem("moneyCoachData");
+            localStorage.setItem("moneyCoachUID", u.uid);
+          }
+          setGuestMode(false);
+          await registerUserProfile(u);
+        } catch(e) {
+          console.warn("Profile register error:", e);
+        }
+        setUser(u);
+      } else {
+        setUser(null);
+      }
+    });
+
+    window._authUnsub = unsub;
     return () => {
       clearTimeout(timeout);
-      if (window._authUnsub) window._authUnsub();
+      unsub();
     };
   }, []);
 
-  // Still checking auth state
+  // Still checking
   if (user === undefined && !guestMode) return <LoadingScreen/>;
 
   // Not logged in
