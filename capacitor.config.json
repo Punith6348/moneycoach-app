@@ -1,5 +1,20 @@
 {
   "appId": "com.turings.moneycoach",
   "appName": "Money Coach",
-  "webDir": "dist"
+  "webDir": "dist",
+  "server": {
+    "allowNavigation": [
+      "*.firebaseapp.com",
+      "*.googleapis.com",
+      "*.google.com",
+      "*.firebase.com",
+      "*.firebasestorage.app",
+      "moneycoach-app.vercel.app"
+    ]
+  },
+  "ios": {
+    "allowsLinkPreview": false,
+    "scrollEnabled": false,
+    "contentInset": "always"
+  }
 }
