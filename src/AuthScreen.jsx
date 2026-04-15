@@ -1,5 +1,5 @@
 // ─── AuthScreen.jsx ───────────────────────────────────────────────────────────
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { auth } from "./firebase";
 import {
   GoogleAuthProvider, signInWithPopup,
@@ -23,7 +23,7 @@ function AppLogo({ size=80 }) {
   return (
     <div style={{ width:size, height:size, borderRadius:size*0.22,
       overflow:"hidden", margin:"0 auto",
-      boxShadow:"0 8px 28px rgba(37,99,235,0.3)" }}>
+      boxShadow:"0 8px 28px rgba(37,99,235,0.3)", flexShrink:0 }}>
       <img src="/icon-512.png" alt="Money Coach"
         style={{ width:"100%", height:"100%", objectFit:"cover" }}
         onError={e=>{
@@ -57,18 +57,30 @@ function AppleIcon() {
 }
 
 export default function AuthScreen({ onGuest }) {
-  const [screen,  setScreen]  = useState("welcome");
-  const [authTab, setAuthTab] = useState("social");
-  const [loading, setLoading] = useState(false);
-  const [loadMsg, setLoadMsg] = useState("");
-  const [error,   setError]   = useState("");
+  const [screen,    setScreen]    = useState("welcome");
+  const [authTab,   setAuthTab]   = useState("social");
+  const [loading,   setLoading]   = useState(false);
+  const [loadMsg,   setLoadMsg]   = useState("");
+  const [error,     setError]     = useState("");
+  const [emailMode, setEmailMode] = useState("login");
+  const [email,     setEmail]     = useState("");
+  const [password,  setPassword]  = useState("");
+  const [confirmPwd,setConfirmPwd]= useState("");
+  const [name,      setName]      = useState("");
+  const [kbVisible, setKbVisible] = useState(false);
 
-  // Email form state — kept here to avoid sub-component remount issues
-  const [emailMode,   setEmailMode]   = useState("login");
-  const [email,       setEmail]       = useState("");
-  const [password,    setPassword]    = useState("");
-  const [confirmPwd,  setConfirmPwd]  = useState("");
-  const [name,        setName]        = useState("");
+  // Detect keyboard on iOS to shrink logo
+  useEffect(() => {
+    if (!isNativeIOS) return;
+    const onResize = () => {
+      const ratio = window.visualViewport
+        ? window.visualViewport.height / window.screen.height
+        : 1;
+      setKbVisible(ratio < 0.75);
+    };
+    window.visualViewport?.addEventListener("resize", onResize);
+    return () => window.visualViewport?.removeEventListener("resize", onResize);
+  }, []);
 
   const startLoading = (msg) => { setError(""); setLoading(true); setLoadMsg(msg); };
   const stopLoading  = ()    => { setLoading(false); setLoadMsg(""); };
@@ -79,29 +91,25 @@ export default function AuthScreen({ onGuest }) {
     try {
       if (isNativeIOS && window.Capacitor?.Plugins?.SignInWithApple) {
         const { SignInWithApple: Plugin } = window.Capacitor.Plugins;
-
-        // Generate nonce for Firebase security requirement
         const rawNonce = Math.random().toString(36).substring(2, 15);
         const msgBuffer = new TextEncoder().encode(rawNonce);
         const hashBuffer = await crypto.subtle.digest("SHA-256", msgBuffer);
         const hashArray  = Array.from(new Uint8Array(hashBuffer));
         const hashedNonce = hashArray.map(b=>b.toString(16).padStart(2,"0")).join("");
-
         const res = await Plugin.authorize({
           clientId:    "com.turings.moneycoach",
           redirectURI: "https://moneycoach-app.vercel.app",
           scopes:      "email name",
           nonce:       hashedNonce,
         });
-
+        if (!res?.response?.identityToken) throw new Error("No identity token from Apple");
         const provider   = new OAuthProvider("apple.com");
         const credential = provider.credential({
-          idToken:   res.response.identityToken,
-          rawNonce:  rawNonce,
+          idToken:  res.response.identityToken,
+          rawNonce: rawNonce,
         });
         await signInWithCredential(auth, credential);
       } else {
-        // Web fallback
         const provider = new OAuthProvider("apple.com");
         provider.addScope("email");
         provider.addScope("name");
@@ -110,13 +118,13 @@ export default function AuthScreen({ onGuest }) {
     } catch(e) {
       console.error("Apple error:", e.code, e.message);
       if (e.code !== "ERR_CANCELED" && e.code !== "auth/cancelled-popup-request") {
-        setError("Apple sign-in failed. Please try again.");
+        setError(`Sign in failed: ${e.message||e.code||"Unknown"}`);
       }
       stopLoading();
     }
   };
 
-  // ── Google Sign In (web/Android only) ─────────────────────────────────────
+  // ── Google Sign In ────────────────────────────────────────────────────────
   const handleGoogle = async () => {
     if (isNativeIOS) return;
     startLoading("Signing in with Google...");
@@ -125,7 +133,6 @@ export default function AuthScreen({ onGuest }) {
       provider.setCustomParameters({ prompt:"select_account" });
       await signInWithPopup(auth, provider);
     } catch(e) {
-      console.error("Google error:", e.code);
       if (e.code !== "auth/popup-closed-by-user" && e.code !== "auth/cancelled-popup-request") {
         setError("Google sign-in failed. Please try again.");
       }
@@ -139,16 +146,16 @@ export default function AuthScreen({ onGuest }) {
     startLoading("Signing you in...");
     try {
       await signInWithEmailAndPassword(auth, email.trim(), password);
-      // onAuthStateChanged in main.jsx handles navigation
     } catch(e) {
-      console.error("Login error:", e.code);
+      console.error("Email login error:", e.code);
       setError(
-        e.code === "auth/user-not-found"     ? "No account found with this email" :
-        e.code === "auth/wrong-password"     ? "Incorrect password" :
-        e.code === "auth/invalid-credential" ? "Incorrect email or password" :
-        e.code === "auth/invalid-email"      ? "Invalid email address" :
-        e.code === "auth/too-many-requests"  ? "Too many attempts. Try again later." :
-        "Login failed. Please try again."
+        e.code === "auth/user-not-found"        ? "No account found with this email" :
+        e.code === "auth/wrong-password"        ? "Incorrect password" :
+        e.code === "auth/invalid-credential"    ? "Incorrect email or password" :
+        e.code === "auth/invalid-email"         ? "Invalid email address" :
+        e.code === "auth/too-many-requests"     ? "Too many attempts. Try again later." :
+        e.code === "auth/network-request-failed"? "Network error. Check connection." :
+        `Error: ${e.code}`
       );
       stopLoading();
     }
@@ -163,14 +170,14 @@ export default function AuthScreen({ onGuest }) {
     try {
       const result = await createUserWithEmailAndPassword(auth, email.trim(), password);
       if (name.trim()) await updateProfile(result.user, { displayName: name.trim() });
-      // onAuthStateChanged in main.jsx handles navigation
     } catch(e) {
       console.error("Signup error:", e.code);
       setError(
-        e.code === "auth/email-already-in-use" ? "Email already registered. Try signing in." :
+        e.code === "auth/email-already-in-use"  ? "Email already registered. Try signing in." :
         e.code === "auth/invalid-email"         ? "Invalid email address" :
         e.code === "auth/weak-password"         ? "Password too weak — use at least 6 characters" :
-        "Signup failed. Please try again."
+        e.code === "auth/network-request-failed"? "Network error. Check connection." :
+        `Error: ${e.code}`
       );
       stopLoading();
     }
@@ -179,26 +186,24 @@ export default function AuthScreen({ onGuest }) {
   const inp = {
     width:"100%", padding:"11px 14px", borderRadius:10,
     border:"1.5px solid #E5E7EB", fontFamily:"inherit",
-    fontSize:14, background:"#F8FAFC", outline:"none",
+    fontSize:15, background:"#F8FAFC", outline:"none",
     marginBottom:10, boxSizing:"border-box",
-  };
-
-  const primaryBtn = {
-    width:"100%", padding:"14px", borderRadius:12, border:"none",
-    background:"#111827", color:"#fff", fontFamily:"inherit",
-    fontSize:14, fontWeight:700, cursor:"pointer", marginBottom:8,
-    boxSizing:"border-box",
+    WebkitAppearance:"none",
   };
 
   // ── Welcome Screen ────────────────────────────────────────────────────────
   if (screen === "welcome") {
     return (
-      <div style={{ fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
-        minHeight:"100vh", overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
-        <div style={{ maxWidth:420, margin:"0 auto", padding:"32px 24px", boxSizing:"border-box" }}>
-          <div style={{ textAlign:"center", marginBottom:32 }}>
-            <AppLogo size={92}/>
-            <h1 style={{ margin:"18px 0 6px", fontSize:28, fontWeight:800,
+      <div style={{
+        position:"fixed", inset:0,
+        overflowY:"auto", WebkitOverflowScrolling:"touch",
+        fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
+        background:"linear-gradient(160deg,#0F172A 0%,#1E293B 60%,#0F172A 100%)",
+      }}>
+        <div style={{ maxWidth:420, margin:"0 auto", padding:"40px 24px 40px", boxSizing:"border-box" }}>
+          <div style={{ textAlign:"center", marginBottom:28 }}>
+            <AppLogo size={88}/>
+            <h1 style={{ margin:"16px 0 6px", fontSize:28, fontWeight:800,
               color:"#F1F5F9", fontFamily:"Georgia,serif" }}>Money Coach</h1>
             <p style={{ margin:0, fontSize:13, color:"#64748B" }}>Track · Plan · Grow</p>
           </div>
@@ -236,182 +241,208 @@ export default function AuthScreen({ onGuest }) {
 
   // ── Login Screen ──────────────────────────────────────────────────────────
   return (
-    <div style={{ fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
-      minHeight:"100vh", overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
-      <div style={{ maxWidth:420, margin:"0 auto", padding:"24px 20px 40px", boxSizing:"border-box" }}>
+    <div style={{
+      position:"fixed", inset:0,
+      overflowY:"auto", WebkitOverflowScrolling:"touch",
+      fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
+      background:"linear-gradient(160deg,#0F172A 0%,#1E293B 60%,#0F172A 100%)",
+    }}>
+      <div style={{
+        minHeight:"100%",
+        display:"flex", flexDirection:"column",
+        alignItems:"center", justifyContent:"center",
+        padding:"20px 20px 40px", boxSizing:"border-box",
+      }}>
+        <div style={{ width:"100%", maxWidth:400 }}>
 
-        <div style={{ textAlign:"center", marginBottom:20 }}>
-          <AppLogo size={64}/>
-          <h2 style={{ margin:"14px 0 4px", fontSize:20, fontWeight:800,
-            color:"#F1F5F9", fontFamily:"Georgia,serif" }}>Welcome back</h2>
-          <p style={{ margin:0, fontSize:12, color:"#64748B" }}>
-            Sign in to sync your data across devices
-          </p>
-        </div>
-
-        <div style={{ background:"#fff", borderRadius:20, padding:"20px",
-          boxShadow:"0 12px 40px rgba(0,0,0,0.3)", boxSizing:"border-box" }}>
-
-          {/* Error */}
-          {error && (
-            <div style={{ background:"#FFF1F2", border:"1px solid #FECACA",
-              borderRadius:10, padding:"10px 14px", marginBottom:14,
-              fontSize:13, color:"#DC2626", textAlign:"center" }}>
-              {error}
+          {/* Logo — hide when keyboard visible */}
+          {!kbVisible && (
+            <div style={{ textAlign:"center", marginBottom:20 }}>
+              <AppLogo size={60}/>
+              <h2 style={{ margin:"12px 0 4px", fontSize:20, fontWeight:800,
+                color:"#F1F5F9", fontFamily:"Georgia,serif" }}>Welcome back</h2>
+              <p style={{ margin:0, fontSize:12, color:"#64748B" }}>
+                Sign in to sync your data
+              </p>
             </div>
           )}
 
-          {/* Loading */}
-          {loading ? (
-            <div style={{ textAlign:"center", padding:"24px 0" }}>
-              <div style={{ width:36, height:36, borderRadius:"50%",
-                border:"3px solid #E5E7EB", borderTopColor:"#111827",
-                animation:"spin 0.8s linear infinite", margin:"0 auto 12px" }}/>
-              <p style={{ margin:0, fontSize:14, color:"#6B7280" }}>{loadMsg||"Please wait..."}</p>
-              <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-            </div>
-          ) : (
-            <>
-              {/* Tabs */}
-              <div style={{ display:"flex", gap:8, marginBottom:16 }}>
-                {[
-                  { k:"social", l:"Social Login" },
-                  { k:"email",  l:"Email/Password" },
-                ].map(t=>(
-                  <button key={t.k} onClick={()=>{ setAuthTab(t.k); setError(""); }}
-                    style={{ flex:1, padding:"9px", borderRadius:10,
-                      border:`1.5px solid ${authTab===t.k?"#2563EB":"#E5E7EB"}`,
-                      background:authTab===t.k?"#EFF6FF":"#fff",
-                      color:authTab===t.k?"#2563EB":"#6B7280",
-                      fontFamily:"inherit", fontSize:12, fontWeight:700, cursor:"pointer" }}>
-                    {t.l}
-                  </button>
-                ))}
+          {/* Card */}
+          <div style={{ background:"#fff", borderRadius:20, padding:"20px",
+            boxShadow:"0 12px 40px rgba(0,0,0,0.4)", boxSizing:"border-box" }}>
+
+            {/* Error */}
+            {error && (
+              <div style={{ background:"#FFF1F2", border:"1px solid #FECACA",
+                borderRadius:10, padding:"10px 12px", marginBottom:12,
+                fontSize:12, color:"#DC2626" }}>
+                {error}
               </div>
+            )}
 
-              {/* Social Tab */}
-              {authTab==="social" && (
-                <>
-                  {/* Apple — always first per Apple guidelines */}
-                  <button onClick={handleApple}
-                    style={{ width:"100%", padding:"14px 16px", borderRadius:14,
-                      border:"none", background:"#000", color:"#fff",
-                      display:"flex", alignItems:"center", justifyContent:"center", gap:10,
-                      cursor:"pointer", fontFamily:"inherit", fontSize:15, fontWeight:700,
-                      marginBottom:10, boxSizing:"border-box" }}>
-                    <AppleIcon/> Sign in with Apple
-                  </button>
-
-                  {/* Google — web/Android only */}
-                  {!isNativeIOS && (
-                    <button onClick={handleGoogle}
-                      style={{ width:"100%", padding:"14px 16px", borderRadius:14,
-                        border:"1.5px solid #E5E7EB", background:"#fff", color:"#111827",
-                        display:"flex", alignItems:"center", justifyContent:"center", gap:10,
-                        cursor:"pointer", fontFamily:"inherit", fontSize:15, fontWeight:700,
-                        marginBottom:10, boxSizing:"border-box",
-                        boxShadow:"0 1px 4px rgba(0,0,0,0.06)" }}>
-                      <GoogleIcon/> Continue with Google
+            {/* Loading */}
+            {loading ? (
+              <div style={{ textAlign:"center", padding:"20px 0" }}>
+                <div style={{ width:32, height:32, borderRadius:"50%",
+                  border:"3px solid #E5E7EB", borderTopColor:"#111827",
+                  animation:"spin 0.8s linear infinite", margin:"0 auto 10px" }}/>
+                <p style={{ margin:0, fontSize:13, color:"#6B7280" }}>{loadMsg||"Please wait..."}</p>
+                <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+              </div>
+            ) : (
+              <>
+                {/* Tabs — Social / Email */}
+                <div style={{ display:"flex", gap:8, marginBottom:14 }}>
+                  {[
+                    { k:"social", l:"Social Login" },
+                    { k:"email",  l:"Email/Password" },
+                  ].map(t=>(
+                    <button key={t.k} onClick={()=>{ setAuthTab(t.k); setError(""); }}
+                      style={{ flex:1, padding:"9px", borderRadius:10,
+                        border:`1.5px solid ${authTab===t.k?"#2563EB":"#E5E7EB"}`,
+                        background:authTab===t.k?"#EFF6FF":"#fff",
+                        color:authTab===t.k?"#2563EB":"#6B7280",
+                        fontFamily:"inherit", fontSize:12, fontWeight:700, cursor:"pointer" }}>
+                      {t.l}
                     </button>
-                  )}
+                  ))}
+                </div>
 
-                  <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:10 }}>
-                    <div style={{ flex:1, height:1, background:"#F1F5F9" }}/>
-                    <span style={{ fontSize:11, color:"#9CA3AF" }}>or</span>
-                    <div style={{ flex:1, height:1, background:"#F1F5F9" }}/>
-                  </div>
-
-                  <button onClick={onGuest}
-                    style={{ width:"100%", padding:"13px", borderRadius:14,
-                      border:"1.5px solid #F1F5F9", background:"#F8FAFC",
-                      cursor:"pointer", fontFamily:"inherit", fontSize:14,
-                      fontWeight:600, color:"#6B7280",
-                      display:"flex", alignItems:"center", justifyContent:"center", gap:8,
-                      boxSizing:"border-box" }}>
-                    👤 Continue as Guest
-                  </button>
-                  <p style={{ textAlign:"center", fontSize:11, color:"#9CA3AF", margin:"6px 0 0" }}>
-                    Guest mode — data stays on this device only
-                  </p>
-                </>
-              )}
-
-              {/* Email Tab */}
-              {authTab==="email" && (
-                <>
-                  {/* Sign In / Create Account toggle */}
-                  <div style={{ display:"flex", gap:8, marginBottom:14 }}>
-                    {[
-                      { k:"login",  l:"Sign In" },
-                      { k:"signup", l:"Create Account" },
-                    ].map(t=>(
-                      <button key={t.k} onClick={()=>{ setEmailMode(t.k); setError(""); }}
-                        style={{ flex:1, padding:"9px", borderRadius:10,
-                          border:`1.5px solid ${emailMode===t.k?"#2563EB":"#E5E7EB"}`,
-                          background:emailMode===t.k?"#EFF6FF":"#fff",
-                          color:emailMode===t.k?"#2563EB":"#6B7280",
-                          fontFamily:"inherit", fontSize:12, fontWeight:700, cursor:"pointer" }}>
-                        {t.l}
+                {/* Social Tab */}
+                {authTab==="social" && (
+                  <>
+                    <button onClick={handleApple}
+                      style={{ width:"100%", padding:"14px 16px", borderRadius:14,
+                        border:"none", background:"#000", color:"#fff",
+                        display:"flex", alignItems:"center", justifyContent:"center", gap:10,
+                        cursor:"pointer", fontFamily:"inherit", fontSize:14, fontWeight:700,
+                        marginBottom:10, boxSizing:"border-box" }}>
+                      <AppleIcon/> Sign in with Apple
+                    </button>
+                    {!isNativeIOS && (
+                      <button onClick={handleGoogle}
+                        style={{ width:"100%", padding:"14px 16px", borderRadius:14,
+                          border:"1.5px solid #E5E7EB", background:"#fff", color:"#111827",
+                          display:"flex", alignItems:"center", justifyContent:"center", gap:10,
+                          cursor:"pointer", fontFamily:"inherit", fontSize:14, fontWeight:700,
+                          marginBottom:10, boxSizing:"border-box" }}>
+                        <GoogleIcon/> Continue with Google
                       </button>
-                    ))}
-                  </div>
+                    )}
+                    <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:10 }}>
+                      <div style={{ flex:1, height:1, background:"#F1F5F9" }}/>
+                      <span style={{ fontSize:11, color:"#9CA3AF" }}>or</span>
+                      <div style={{ flex:1, height:1, background:"#F1F5F9" }}/>
+                    </div>
+                    <button onClick={onGuest}
+                      style={{ width:"100%", padding:"13px", borderRadius:14,
+                        border:"1.5px solid #F1F5F9", background:"#F8FAFC",
+                        cursor:"pointer", fontFamily:"inherit", fontSize:13,
+                        fontWeight:600, color:"#6B7280",
+                        display:"flex", alignItems:"center", justifyContent:"center", gap:8,
+                        boxSizing:"border-box" }}>
+                      👤 Continue as Guest
+                    </button>
+                  </>
+                )}
 
-                  {emailMode==="signup" && (
-                    <>
-                      <p style={{ margin:"0 0 5px", fontSize:11, fontWeight:700, color:"#6B7280",
-                        textTransform:"uppercase", letterSpacing:"0.8px" }}>Name (optional)</p>
-                      <input type="text" value={name} onChange={e=>setName(e.target.value)}
-                        placeholder="Your name" style={inp}/>
-                    </>
-                  )}
+                {/* Email Tab */}
+                {authTab==="email" && (
+                  <>
+                    <div style={{ display:"flex", gap:8, marginBottom:12 }}>
+                      {[
+                        { k:"login",  l:"Sign In" },
+                        { k:"signup", l:"Create Account" },
+                      ].map(t=>(
+                        <button key={t.k} onClick={()=>{ setEmailMode(t.k); setError(""); }}
+                          style={{ flex:1, padding:"8px", borderRadius:10,
+                            border:`1.5px solid ${emailMode===t.k?"#2563EB":"#E5E7EB"}`,
+                            background:emailMode===t.k?"#EFF6FF":"#fff",
+                            color:emailMode===t.k?"#2563EB":"#6B7280",
+                            fontFamily:"inherit", fontSize:12, fontWeight:700, cursor:"pointer" }}>
+                          {t.l}
+                        </button>
+                      ))}
+                    </div>
 
-                  <p style={{ margin:"0 0 5px", fontSize:11, fontWeight:700, color:"#6B7280",
-                    textTransform:"uppercase", letterSpacing:"0.8px" }}>Email *</p>
-                  <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    onKeyDown={e=>e.key==="Enter"&&(emailMode==="login"?handleEmailLogin():null)}
-                    style={inp}/>
+                    {emailMode==="signup" && (
+                      <>
+                        <p style={{ margin:"0 0 4px", fontSize:11, fontWeight:700,
+                          color:"#6B7280", textTransform:"uppercase" }}>Name (optional)</p>
+                        <input type="text" value={name} onChange={e=>setName(e.target.value)}
+                          placeholder="Your name" style={inp}/>
+                      </>
+                    )}
 
-                  <p style={{ margin:"0 0 5px", fontSize:11, fontWeight:700, color:"#6B7280",
-                    textTransform:"uppercase", letterSpacing:"0.8px" }}>Password *</p>
-                  <input type="password" value={password} onChange={e=>setPassword(e.target.value)}
-                    placeholder={emailMode==="login"?"Enter password":"Min 6 characters"}
-                    onKeyDown={e=>e.key==="Enter"&&emailMode==="login"&&handleEmailLogin()}
-                    style={inp}/>
+                    <p style={{ margin:"0 0 4px", fontSize:11, fontWeight:700,
+                      color:"#6B7280", textTransform:"uppercase" }}>Email</p>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={e=>setEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      autoComplete="email"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      onKeyDown={e=>e.key==="Enter"&&emailMode==="login"&&handleEmailLogin()}
+                      style={inp}
+                    />
 
-                  {emailMode==="signup" && (
-                    <>
-                      <p style={{ margin:"0 0 5px", fontSize:11, fontWeight:700, color:"#6B7280",
-                        textTransform:"uppercase", letterSpacing:"0.8px" }}>Confirm Password *</p>
-                      <input type="password" value={confirmPwd} onChange={e=>setConfirmPwd(e.target.value)}
-                        placeholder="Re-enter password"
-                        onKeyDown={e=>e.key==="Enter"&&handleEmailSignup()}
-                        style={{...inp, marginBottom:14}}/>
-                    </>
-                  )}
+                    <p style={{ margin:"0 0 4px", fontSize:11, fontWeight:700,
+                      color:"#6B7280", textTransform:"uppercase" }}>Password</p>
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={e=>setPassword(e.target.value)}
+                      placeholder={emailMode==="login"?"Enter password":"Min 6 characters"}
+                      autoComplete={emailMode==="login"?"current-password":"new-password"}
+                      onKeyDown={e=>e.key==="Enter"&&emailMode==="login"&&handleEmailLogin()}
+                      style={inp}
+                    />
 
-                  <button
-                    onClick={emailMode==="login"?handleEmailLogin:handleEmailSignup}
-                    style={{...primaryBtn, marginTop:4}}>
-                    {emailMode==="login" ? "Sign In →" : "Create Account →"}
-                  </button>
-                </>
-              )}
-            </>
-          )}
-        </div>
+                    {emailMode==="signup" && (
+                      <>
+                        <p style={{ margin:"0 0 4px", fontSize:11, fontWeight:700,
+                          color:"#6B7280", textTransform:"uppercase" }}>Confirm Password</p>
+                        <input
+                          type="password"
+                          value={confirmPwd}
+                          onChange={e=>setConfirmPwd(e.target.value)}
+                          placeholder="Re-enter password"
+                          autoComplete="new-password"
+                          onKeyDown={e=>e.key==="Enter"&&handleEmailSignup()}
+                          style={{...inp, marginBottom:12}}
+                        />
+                      </>
+                    )}
 
-        <div style={{ textAlign:"center", marginTop:16 }}>
-          <button onClick={()=>setScreen("welcome")}
-            style={{ background:"none", border:"none", color:"#475569",
-              cursor:"pointer", fontFamily:"inherit", fontSize:13,
-              display:"block", margin:"0 auto 8px" }}>← Back</button>
-          <p style={{ fontSize:11, color:"#334155", margin:0 }}>
-            By continuing you agree to our{" "}
-            <a href="/privacy-policy.html" style={{ color:"#60A5FA", textDecoration:"none" }}>
-              Privacy Policy
-            </a>
-          </p>
+                    <button
+                      onClick={emailMode==="login"?handleEmailLogin:handleEmailSignup}
+                      style={{ width:"100%", padding:"13px", borderRadius:12, border:"none",
+                        background:"#111827", color:"#fff", fontFamily:"inherit",
+                        fontSize:14, fontWeight:700, cursor:"pointer", marginTop:4,
+                        boxSizing:"border-box" }}>
+                      {emailMode==="login" ? "Sign In →" : "Create Account →"}
+                    </button>
+                  </>
+                )}
+              </>
+            )}
+          </div>
+
+          <div style={{ textAlign:"center", marginTop:14 }}>
+            <button onClick={()=>setScreen("welcome")}
+              style={{ background:"none", border:"none", color:"#475569",
+                cursor:"pointer", fontFamily:"inherit", fontSize:13,
+                display:"block", margin:"0 auto 6px" }}>← Back</button>
+            <p style={{ fontSize:11, color:"#334155", margin:0 }}>
+              By continuing you agree to our{" "}
+              <a href="/privacy-policy.html" style={{ color:"#60A5FA", textDecoration:"none" }}>
+                Privacy Policy
+              </a>
+            </p>
+          </div>
+
         </div>
       </div>
     </div>
