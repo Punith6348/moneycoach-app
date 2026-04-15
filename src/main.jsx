@@ -1,7 +1,7 @@
 // ─── main.jsx ────────────────────────────────────────────────────────────────
 import { StrictMode, useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
-import { onAuthStateChanged, signOut, setPersistence, browserLocalPersistence, getRedirectResult } from "firebase/auth";
+import { onAuthStateChanged, signOut, setPersistence, browserLocalPersistence } from "firebase/auth";
 import { auth } from "./firebase";
 import { registerUserProfile } from "./useFirestoreSync";
 import App from "./App.jsx";
@@ -42,73 +42,73 @@ function LoadingScreen() {
 function Root() {
   const [user,      setUser]      = useState(undefined); // undefined=checking
   const [guestMode, setGuestMode] = useState(false);
-  const [redirectError, setRedirectError] = useState(null);
 
   useEffect(() => {
-    // Handle Google redirect result (from signInWithRedirect)
-    // This must run BEFORE onAuthStateChanged to catch the redirect
-    getRedirectResult(auth)
-      .then(result => {
-        if (result?.user) {
-          console.log("✅ Google redirect completed:", result.user.email);
-          // onAuthStateChanged will handle setting user state below
-        }
-      })
-      .catch(error => {
-        console.error("Redirect result error:", error.code);
-        // Don't show error for cancelled signin
-        if (error.code && !error.code.includes("cancelled")) {
-          setRedirectError(error.message || "Sign-in redirect failed");
-          // Clear error after 5 seconds
-          setTimeout(() => setRedirectError(null), 5000);
-        }
-      });
-  }, []);
-
-  useEffect(() => {
-    let unsub;
-    const handleUser = async u => {
-      console.log("🔔 Auth state changed:", u ? `Signed in as ${u.email}` : "Signed out");
-      if (u) {
-        // localStorage UID clearing is owned by useAppData.js — do not duplicate here
-        setGuestMode(false);
-        await registerUserProfile(u);
-        console.log("✅ User set in React state:", u.email);
-        setUser(u);
-      } else {
-        console.log("❌ User set to null");
+    // Timeout fallback — if Firebase doesn't respond in 5s, show login screen
+    const timeout = setTimeout(() => {
+      if (user === undefined) {
+        console.warn("Firebase auth timeout — showing login screen");
         setUser(null);
       }
-    };
+    }, 5000);
 
     setPersistence(auth, browserLocalPersistence)
-      .then(() => { unsub = onAuthStateChanged(auth, handleUser); })
+      .then(() => {
+        const unsub = onAuthStateChanged(auth, async u => {
+          clearTimeout(timeout);
+          if (u) {
+            const storedUid = localStorage.getItem("moneyCoachUID");
+            if (storedUid !== u.uid) {
+              localStorage.removeItem("moneyCoachData_v3");
+              localStorage.removeItem("moneyCoachData_v2");
+              localStorage.removeItem("moneyCoachData");
+              localStorage.setItem("moneyCoachUID", u.uid);
+            }
+            setGuestMode(false);
+            await registerUserProfile(u);
+            setUser(u);
+          } else {
+            setUser(null);
+          }
+        });
+        window._authUnsub = unsub;
+      })
       .catch(err => {
+        clearTimeout(timeout);
         console.warn("Persistence error:", err);
-        unsub = onAuthStateChanged(auth, handleUser);
+        const unsub = onAuthStateChanged(auth, async u => {
+          if (u) {
+            const storedUid = localStorage.getItem("moneyCoachUID");
+            if (storedUid !== u.uid) {
+              localStorage.removeItem("moneyCoachData_v3");
+              localStorage.removeItem("moneyCoachData_v2");
+              localStorage.removeItem("moneyCoachData");
+              localStorage.setItem("moneyCoachUID", u.uid);
+            }
+            setGuestMode(false);
+            await registerUserProfile(u);
+            setUser(u);
+          } else {
+            setUser(null);
+          }
+        });
+        window._authUnsub = unsub;
       });
 
-    return () => { if (unsub) unsub(); };
+    return () => {
+      clearTimeout(timeout);
+      if (window._authUnsub) window._authUnsub();
+    };
   }, []);
 
-  // Still checking
+  // Still checking auth state
   if (user === undefined && !guestMode) return <LoadingScreen/>;
 
   // Not logged in
   if (!user && !guestMode) {
     return (
       <div className="auth-root">
-        {redirectError && (
-          <div style={{
-            position:"fixed", top:20, left:20, right:20, zIndex:10000,
-            background:"#FEE2E2", border:"1px solid #FECACA", borderRadius:12,
-            padding:"12px 16px", fontSize:13, color:"#DC2626", fontWeight:600,
-          }}>
-            ⚠️ {redirectError}
-          </div>
-        )}
         <AuthScreen onGuest={() => {
-          // Clear any previous user data when entering guest mode
           localStorage.removeItem("moneyCoachUID");
           setGuestMode(true);
         }} />
