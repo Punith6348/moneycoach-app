@@ -1,30 +1,29 @@
 // ─── AuthScreen.jsx ───────────────────────────────────────────────────────────
-// iOS (Capacitor): Apple Sign In only (Google popup blocked in WKWebView)
-// Web/Android: Google + Apple + Email/Password + Guest
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { auth } from "./firebase";
 import {
-  GoogleAuthProvider, signInWithRedirect,
-  OAuthProvider, signInWithCredential, signInWithPopup,
+  GoogleAuthProvider, signInWithPopup,
+  OAuthProvider, signInWithCredential,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updateProfile,
 } from "firebase/auth";
-import EmailPasswordAuth from "./EmailPasswordAuth";
 
-// Detect native iOS app running in Capacitor
-const isNativeIOS = !!(
-  window.Capacitor?.isNativePlatform?.() ||
-  window.webkit?.messageHandlers ||
-  (navigator.userAgent.includes("iPhone") || navigator.userAgent.includes("iPad")) &&
-  !navigator.userAgent.includes("Chrome") &&
-  window.navigator.standalone !== undefined
-);
+// Detect native iOS Capacitor app
+const isNativeIOS = (() => {
+  try {
+    if (window.Capacitor?.isNativePlatform?.()) return true;
+    if (window.Capacitor?.getPlatform?.() === "ios") return true;
+    if (window.Capacitor?.platform === "ios") return true;
+    return false;
+  } catch(e) { return false; }
+})();
 
 function AppLogo({ size=80 }) {
   return (
-    <div style={{
-      width:size, height:size, borderRadius:size*0.22,
+    <div style={{ width:size, height:size, borderRadius:size*0.22,
       overflow:"hidden", margin:"0 auto",
-      boxShadow:"0 8px 28px rgba(37,99,235,0.3)",
-    }}>
+      boxShadow:"0 8px 28px rgba(37,99,235,0.3)" }}>
       <img src="/icon-512.png" alt="Money Coach"
         style={{ width:"100%", height:"100%", objectFit:"cover" }}
         onError={e=>{
@@ -57,113 +56,174 @@ function AppleIcon() {
   );
 }
 
-// ── Apple Sign In handler ─────────────────────────────────────────────────────
-async function signInWithApple() {
-  // Native iOS — use Capacitor Sign In With Apple plugin
-  if (window.Capacitor?.Plugins?.SignInWithApple) {
-    const { SignInWithApple: Plugin } = window.Capacitor.Plugins;
-    const res = await Plugin.authorize({
-      clientId:    "com.turingsxyz.moneycoach",
-      redirectURI: "https://moneycoach-app.vercel.app",
-      scopes:      "email name",
-    });
-    const provider   = new OAuthProvider("apple.com");
-    const credential = provider.credential({ idToken: res.response.identityToken });
-    return signInWithCredential(auth, credential);
-  }
-  // Web fallback — Firebase popup
-  const provider = new OAuthProvider("apple.com");
-  provider.addScope("email");
-  provider.addScope("name");
-  return signInWithPopup(auth, provider);
-}
-
-// ── Main Component ────────────────────────────────────────────────────────────
 export default function AuthScreen({ onGuest }) {
   const [screen,  setScreen]  = useState("welcome");
-  const [authTab, setAuthTab] = useState("social"); // "social" or "email"
+  const [authTab, setAuthTab] = useState("social");
   const [loading, setLoading] = useState(false);
+  const [loadMsg, setLoadMsg] = useState("");
   const [error,   setError]   = useState("");
 
+  // Email form state — kept here to avoid sub-component remount issues
+  const [emailMode,   setEmailMode]   = useState("login");
+  const [email,       setEmail]       = useState("");
+  const [password,    setPassword]    = useState("");
+  const [confirmPwd,  setConfirmPwd]  = useState("");
+  const [name,        setName]        = useState("");
+
+  const startLoading = (msg) => { setError(""); setLoading(true); setLoadMsg(msg); };
+  const stopLoading  = ()    => { setLoading(false); setLoadMsg(""); };
+
+  // ── Apple Sign In ─────────────────────────────────────────────────────────
   const handleApple = async () => {
-    setError(""); setLoading(true);
+    startLoading("Signing in with Apple...");
     try {
-      await signInWithApple();
-      // onAuthStateChanged in main.jsx handles navigation
+      if (isNativeIOS && window.Capacitor?.Plugins?.SignInWithApple) {
+        const { SignInWithApple: Plugin } = window.Capacitor.Plugins;
+
+        // Generate nonce for Firebase security requirement
+        const rawNonce = Math.random().toString(36).substring(2, 15);
+        const msgBuffer = new TextEncoder().encode(rawNonce);
+        const hashBuffer = await crypto.subtle.digest("SHA-256", msgBuffer);
+        const hashArray  = Array.from(new Uint8Array(hashBuffer));
+        const hashedNonce = hashArray.map(b=>b.toString(16).padStart(2,"0")).join("");
+
+        const res = await Plugin.authorize({
+          clientId:    "com.turings.moneycoach",
+          redirectURI: "https://moneycoach-app.vercel.app",
+          scopes:      "email name",
+          nonce:       hashedNonce,
+        });
+
+        const provider   = new OAuthProvider("apple.com");
+        const credential = provider.credential({
+          idToken:   res.response.identityToken,
+          rawNonce:  rawNonce,
+        });
+        await signInWithCredential(auth, credential);
+      } else {
+        // Web fallback
+        const provider = new OAuthProvider("apple.com");
+        provider.addScope("email");
+        provider.addScope("name");
+        await signInWithPopup(auth, provider);
+      }
     } catch(e) {
       console.error("Apple error:", e.code, e.message);
       if (e.code !== "ERR_CANCELED" && e.code !== "auth/cancelled-popup-request") {
         setError("Apple sign-in failed. Please try again.");
       }
-    } finally {
-      setLoading(false);
+      stopLoading();
     }
   };
 
+  // ── Google Sign In (web/Android only) ─────────────────────────────────────
   const handleGoogle = async () => {
-    // Only available on web/Android — never on native iOS
     if (isNativeIOS) return;
-    setError(""); setLoading(true);
+    startLoading("Signing in with Google...");
     try {
       const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: "select_account" });
-      // Use redirect instead of popup for better iPad/mobile support
-      // Avoids popup blocker issues and webview restrictions
-      await signInWithRedirect(auth, provider);
-      // Page will reload after redirect completes, getRedirectResult in main.jsx handles it
+      provider.setCustomParameters({ prompt:"select_account" });
+      await signInWithPopup(auth, provider);
     } catch(e) {
       console.error("Google error:", e.code);
-      if (e.code !== "auth/redirect-cancelled-by-user") {
+      if (e.code !== "auth/popup-closed-by-user" && e.code !== "auth/cancelled-popup-request") {
         setError("Google sign-in failed. Please try again.");
       }
-      setLoading(false);
+      stopLoading();
     }
   };
 
-  // ── Welcome Screen ──────────────────────────────────────────────────────────
+  // ── Email Login ───────────────────────────────────────────────────────────
+  const handleEmailLogin = async () => {
+    if (!email.trim() || !password) { setError("Email and password are required"); return; }
+    startLoading("Signing you in...");
+    try {
+      await signInWithEmailAndPassword(auth, email.trim(), password);
+      // onAuthStateChanged in main.jsx handles navigation
+    } catch(e) {
+      console.error("Login error:", e.code);
+      setError(
+        e.code === "auth/user-not-found"     ? "No account found with this email" :
+        e.code === "auth/wrong-password"     ? "Incorrect password" :
+        e.code === "auth/invalid-credential" ? "Incorrect email or password" :
+        e.code === "auth/invalid-email"      ? "Invalid email address" :
+        e.code === "auth/too-many-requests"  ? "Too many attempts. Try again later." :
+        "Login failed. Please try again."
+      );
+      stopLoading();
+    }
+  };
+
+  // ── Email Signup ──────────────────────────────────────────────────────────
+  const handleEmailSignup = async () => {
+    if (!email.trim() || !password) { setError("Email and password are required"); return; }
+    if (password.length < 6)         { setError("Password must be at least 6 characters"); return; }
+    if (password !== confirmPwd)     { setError("Passwords don't match"); return; }
+    startLoading("Creating your account...");
+    try {
+      const result = await createUserWithEmailAndPassword(auth, email.trim(), password);
+      if (name.trim()) await updateProfile(result.user, { displayName: name.trim() });
+      // onAuthStateChanged in main.jsx handles navigation
+    } catch(e) {
+      console.error("Signup error:", e.code);
+      setError(
+        e.code === "auth/email-already-in-use" ? "Email already registered. Try signing in." :
+        e.code === "auth/invalid-email"         ? "Invalid email address" :
+        e.code === "auth/weak-password"         ? "Password too weak — use at least 6 characters" :
+        "Signup failed. Please try again."
+      );
+      stopLoading();
+    }
+  };
+
+  const inp = {
+    width:"100%", padding:"11px 14px", borderRadius:10,
+    border:"1.5px solid #E5E7EB", fontFamily:"inherit",
+    fontSize:14, background:"#F8FAFC", outline:"none",
+    marginBottom:10, boxSizing:"border-box",
+  };
+
+  const primaryBtn = {
+    width:"100%", padding:"14px", borderRadius:12, border:"none",
+    background:"#111827", color:"#fff", fontFamily:"inherit",
+    fontSize:14, fontWeight:700, cursor:"pointer", marginBottom:8,
+    boxSizing:"border-box",
+  };
+
+  // ── Welcome Screen ────────────────────────────────────────────────────────
   if (screen === "welcome") {
     return (
-      <div style={{ fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" }}>
+      <div style={{ fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
+        minHeight:"100vh", overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
         <div style={{ maxWidth:420, margin:"0 auto", padding:"32px 24px", boxSizing:"border-box" }}>
-          <div style={{ textAlign:"center", marginBottom:36 }}>
-            <AppLogo size={96}/>
-            <h1 style={{ margin:"20px 0 6px", fontSize:30, fontWeight:800,
-              color:"#F1F5F9", fontFamily:"Georgia,serif" }}>
-              Money Coach
-            </h1>
-            <p style={{ margin:0, fontSize:14, color:"#64748B" }}>Track · Plan · Grow</p>
+          <div style={{ textAlign:"center", marginBottom:32 }}>
+            <AppLogo size={92}/>
+            <h1 style={{ margin:"18px 0 6px", fontSize:28, fontWeight:800,
+              color:"#F1F5F9", fontFamily:"Georgia,serif" }}>Money Coach</h1>
+            <p style={{ margin:0, fontSize:13, color:"#64748B" }}>Track · Plan · Grow</p>
           </div>
-
           {[
             { icon:"💸", title:"Daily Expense Tracking",  desc:"Log expenses in seconds" },
             { icon:"💳", title:"Credit Card Smart Guide",  desc:"Know which card to use when" },
             { icon:"🏦", title:"Loan & EMI Tracker",       desc:"Track loans, close them faster" },
             { icon:"☁️", title:"Sync Across All Devices",  desc:"Login anywhere, data follows" },
           ].map((f,i)=>(
-            <div key={i} style={{
-              display:"flex", alignItems:"center", gap:14,
-              padding:"13px 16px", marginBottom:8,
+            <div key={i} style={{ display:"flex", alignItems:"center", gap:14,
+              padding:"12px 16px", marginBottom:8,
               background:"rgba(255,255,255,0.05)", borderRadius:14,
-              border:"1px solid rgba(255,255,255,0.08)",
-            }}>
-              <span style={{ fontSize:24, flexShrink:0 }}>{f.icon}</span>
+              border:"1px solid rgba(255,255,255,0.08)" }}>
+              <span style={{ fontSize:22, flexShrink:0 }}>{f.icon}</span>
               <div>
                 <p style={{ margin:0, fontSize:13, fontWeight:700, color:"#E2E8F0" }}>{f.title}</p>
                 <p style={{ margin:"2px 0 0", fontSize:11, color:"#64748B" }}>{f.desc}</p>
               </div>
             </div>
           ))}
-
-          <button
-            onClick={()=>{ setError(""); setScreen("login"); }}
-            style={{
-              width:"100%", padding:"17px", marginTop:24, borderRadius:16, border:"none",
-              background:"linear-gradient(135deg,#2563EB,#1D4ED8)",
-              color:"#fff", cursor:"pointer", fontFamily:"inherit",
-              fontSize:16, fontWeight:800,
-              boxShadow:"0 4px 20px rgba(37,99,235,0.4)",
-              boxSizing:"border-box",
-            }}>
+          <button onClick={()=>{ setError(""); setScreen("login"); }}
+            style={{ width:"100%", padding:"16px", marginTop:20, borderRadius:16, border:"none",
+              background:"linear-gradient(135deg,#2563EB,#1D4ED8)", color:"#fff",
+              cursor:"pointer", fontFamily:"inherit", fontSize:16, fontWeight:800,
+              boxShadow:"0 4px 20px rgba(37,99,235,0.4)", boxSizing:"border-box" }}>
             Get Started →
           </button>
           <p style={{ textAlign:"center", fontSize:11, color:"#334155", margin:"10px 0 0" }}>
@@ -174,160 +234,185 @@ export default function AuthScreen({ onGuest }) {
     );
   }
 
-  // ── Login Screen ────────────────────────────────────────────────────────────
+  // ── Login Screen ──────────────────────────────────────────────────────────
   return (
-    <div style={{ fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" }}>
-      <div style={{ maxWidth:420, margin:"0 auto", padding:"28px 24px 32px", boxSizing:"border-box" }}>
+    <div style={{ fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
+      minHeight:"100vh", overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
+      <div style={{ maxWidth:420, margin:"0 auto", padding:"24px 20px 40px", boxSizing:"border-box" }}>
 
-        <div style={{ textAlign:"center", marginBottom:28 }}>
-          <AppLogo size={70}/>
-          <h2 style={{ margin:"16px 0 4px", fontSize:22, fontWeight:800,
-            color:"#F1F5F9", fontFamily:"Georgia,serif" }}>
-            Welcome back
-          </h2>
-          <p style={{ margin:0, fontSize:13, color:"#64748B" }}>
+        <div style={{ textAlign:"center", marginBottom:20 }}>
+          <AppLogo size={64}/>
+          <h2 style={{ margin:"14px 0 4px", fontSize:20, fontWeight:800,
+            color:"#F1F5F9", fontFamily:"Georgia,serif" }}>Welcome back</h2>
+          <p style={{ margin:0, fontSize:12, color:"#64748B" }}>
             Sign in to sync your data across devices
           </p>
         </div>
 
-        <div style={{
-          background:"#fff", borderRadius:20, padding:"24px 20px",
-          boxShadow:"0 12px 40px rgba(0,0,0,0.3)", boxSizing:"border-box",
-        }}>
+        <div style={{ background:"#fff", borderRadius:20, padding:"20px",
+          boxShadow:"0 12px 40px rgba(0,0,0,0.3)", boxSizing:"border-box" }}>
+
           {/* Error */}
           {error && (
-            <div style={{
-              background:"#FFF1F2", border:"1px solid #FECACA",
-              borderRadius:10, padding:"10px 14px", marginBottom:16,
-              fontSize:13, color:"#DC2626", textAlign:"center",
-            }}>
+            <div style={{ background:"#FFF1F2", border:"1px solid #FECACA",
+              borderRadius:10, padding:"10px 14px", marginBottom:14,
+              fontSize:13, color:"#DC2626", textAlign:"center" }}>
               {error}
             </div>
           )}
 
+          {/* Loading */}
           {loading ? (
             <div style={{ textAlign:"center", padding:"24px 0" }}>
-              <div style={{
-                width:36, height:36, borderRadius:"50%",
+              <div style={{ width:36, height:36, borderRadius:"50%",
                 border:"3px solid #E5E7EB", borderTopColor:"#111827",
-                animation:"spin 0.8s linear infinite",
-                margin:"0 auto 12px",
-              }}/>
-              <p style={{ margin:0, fontSize:14, color:"#6B7280" }}>Signing you in...</p>
+                animation:"spin 0.8s linear infinite", margin:"0 auto 12px" }}/>
+              <p style={{ margin:0, fontSize:14, color:"#6B7280" }}>{loadMsg||"Please wait..."}</p>
               <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
             </div>
           ) : (
             <>
-              {/* Auth Method Tabs */}
+              {/* Tabs */}
               <div style={{ display:"flex", gap:8, marginBottom:16 }}>
-                <button
-                  onClick={() => setAuthTab("social")}
-                  style={{
-                    flex:1, padding:"10px", borderRadius:10,
-                    border:`1.5px solid ${authTab==="social" ? "#2563EB" : "#E5E7EB"}`,
-                    background: authTab==="social" ? "#EFF6FF" : "#fff",
-                    color: authTab==="social" ? "#2563EB" : "#6B7280",
-                    fontFamily:"inherit", fontSize:12, fontWeight:700,
-                    cursor:"pointer", transition:"all 0.2s",
-                  }}>
-                  Social Login
-                </button>
-                <button
-                  onClick={() => setAuthTab("email")}
-                  style={{
-                    flex:1, padding:"10px", borderRadius:10,
-                    border:`1.5px solid ${authTab==="email" ? "#2563EB" : "#E5E7EB"}`,
-                    background: authTab==="email" ? "#EFF6FF" : "#fff",
-                    color: authTab==="email" ? "#2563EB" : "#6B7280",
-                    fontFamily:"inherit", fontSize:12, fontWeight:700,
-                    cursor:"pointer", transition:"all 0.2s",
-                  }}>
-                  Email/Password
-                </button>
+                {[
+                  { k:"social", l:"Social Login" },
+                  { k:"email",  l:"Email/Password" },
+                ].map(t=>(
+                  <button key={t.k} onClick={()=>{ setAuthTab(t.k); setError(""); }}
+                    style={{ flex:1, padding:"9px", borderRadius:10,
+                      border:`1.5px solid ${authTab===t.k?"#2563EB":"#E5E7EB"}`,
+                      background:authTab===t.k?"#EFF6FF":"#fff",
+                      color:authTab===t.k?"#2563EB":"#6B7280",
+                      fontFamily:"inherit", fontSize:12, fontWeight:700, cursor:"pointer" }}>
+                    {t.l}
+                  </button>
+                ))}
               </div>
 
-              {/* Social Login Methods */}
-              {authTab === "social" && (
+              {/* Social Tab */}
+              {authTab==="social" && (
                 <>
-                  {/* Sign in with Apple — ALWAYS shown first (Apple requirement) */}
-                  <button onClick={handleApple} style={{
-                    width:"100%", padding:"15px 16px", borderRadius:14,
-                    border:"none", background:"#000",
-                    display:"flex", alignItems:"center", justifyContent:"center", gap:10,
-                    cursor:"pointer", fontFamily:"inherit",
-                    fontSize:15, fontWeight:700, color:"#fff",
-                    marginBottom:12, boxSizing:"border-box",
-                  }}>
+                  {/* Apple — always first per Apple guidelines */}
+                  <button onClick={handleApple}
+                    style={{ width:"100%", padding:"14px 16px", borderRadius:14,
+                      border:"none", background:"#000", color:"#fff",
+                      display:"flex", alignItems:"center", justifyContent:"center", gap:10,
+                      cursor:"pointer", fontFamily:"inherit", fontSize:15, fontWeight:700,
+                      marginBottom:10, boxSizing:"border-box" }}>
                     <AppleIcon/> Sign in with Apple
                   </button>
 
-                  {/* Google — only on web/Android, hidden on native iOS */}
+                  {/* Google — web/Android only */}
                   {!isNativeIOS && (
-                    <button onClick={handleGoogle} style={{
-                      width:"100%", padding:"15px 16px", borderRadius:14,
-                      border:"1.5px solid #E5E7EB", background:"#fff",
-                      display:"flex", alignItems:"center", justifyContent:"center", gap:10,
-                      cursor:"pointer", fontFamily:"inherit",
-                      fontSize:15, fontWeight:700, color:"#111827",
-                      marginBottom:12, boxSizing:"border-box",
-                      boxShadow:"0 1px 4px rgba(0,0,0,0.06)",
-                    }}>
+                    <button onClick={handleGoogle}
+                      style={{ width:"100%", padding:"14px 16px", borderRadius:14,
+                        border:"1.5px solid #E5E7EB", background:"#fff", color:"#111827",
+                        display:"flex", alignItems:"center", justifyContent:"center", gap:10,
+                        cursor:"pointer", fontFamily:"inherit", fontSize:15, fontWeight:700,
+                        marginBottom:10, boxSizing:"border-box",
+                        boxShadow:"0 1px 4px rgba(0,0,0,0.06)" }}>
                       <GoogleIcon/> Continue with Google
                     </button>
                   )}
 
-                  {/* Divider */}
-                  <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:10 }}>
                     <div style={{ flex:1, height:1, background:"#F1F5F9" }}/>
                     <span style={{ fontSize:11, color:"#9CA3AF" }}>or</span>
                     <div style={{ flex:1, height:1, background:"#F1F5F9" }}/>
                   </div>
 
-                  {/* Guest */}
-                  <button onClick={onGuest} style={{
-                    width:"100%", padding:"14px", borderRadius:14,
-                    border:"1.5px solid #F1F5F9", background:"#F8FAFC",
-                    cursor:"pointer", fontFamily:"inherit",
-                    fontSize:14, fontWeight:600, color:"#6B7280",
-                    display:"flex", alignItems:"center", justifyContent:"center", gap:8,
-                    boxSizing:"border-box",
-                  }}>
+                  <button onClick={onGuest}
+                    style={{ width:"100%", padding:"13px", borderRadius:14,
+                      border:"1.5px solid #F1F5F9", background:"#F8FAFC",
+                      cursor:"pointer", fontFamily:"inherit", fontSize:14,
+                      fontWeight:600, color:"#6B7280",
+                      display:"flex", alignItems:"center", justifyContent:"center", gap:8,
+                      boxSizing:"border-box" }}>
                     👤 Continue as Guest
                   </button>
-                  <p style={{ textAlign:"center", fontSize:11, color:"#9CA3AF", margin:"8px 0 0" }}>
+                  <p style={{ textAlign:"center", fontSize:11, color:"#9CA3AF", margin:"6px 0 0" }}>
                     Guest mode — data stays on this device only
                   </p>
                 </>
               )}
 
-              {/* Email/Password Auth */}
-              {authTab === "email" && (
+              {/* Email Tab */}
+              {authTab==="email" && (
                 <>
-                  <EmailPasswordAuth
-                    onError={(msg) => setError(msg)}
-                    onLoading={(isLoading) => setLoading(isLoading)}
-                  />
+                  {/* Sign In / Create Account toggle */}
+                  <div style={{ display:"flex", gap:8, marginBottom:14 }}>
+                    {[
+                      { k:"login",  l:"Sign In" },
+                      { k:"signup", l:"Create Account" },
+                    ].map(t=>(
+                      <button key={t.k} onClick={()=>{ setEmailMode(t.k); setError(""); }}
+                        style={{ flex:1, padding:"9px", borderRadius:10,
+                          border:`1.5px solid ${emailMode===t.k?"#2563EB":"#E5E7EB"}`,
+                          background:emailMode===t.k?"#EFF6FF":"#fff",
+                          color:emailMode===t.k?"#2563EB":"#6B7280",
+                          fontFamily:"inherit", fontSize:12, fontWeight:700, cursor:"pointer" }}>
+                        {t.l}
+                      </button>
+                    ))}
+                  </div>
+
+                  {emailMode==="signup" && (
+                    <>
+                      <p style={{ margin:"0 0 5px", fontSize:11, fontWeight:700, color:"#6B7280",
+                        textTransform:"uppercase", letterSpacing:"0.8px" }}>Name (optional)</p>
+                      <input type="text" value={name} onChange={e=>setName(e.target.value)}
+                        placeholder="Your name" style={inp}/>
+                    </>
+                  )}
+
+                  <p style={{ margin:"0 0 5px", fontSize:11, fontWeight:700, color:"#6B7280",
+                    textTransform:"uppercase", letterSpacing:"0.8px" }}>Email *</p>
+                  <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    onKeyDown={e=>e.key==="Enter"&&(emailMode==="login"?handleEmailLogin():null)}
+                    style={inp}/>
+
+                  <p style={{ margin:"0 0 5px", fontSize:11, fontWeight:700, color:"#6B7280",
+                    textTransform:"uppercase", letterSpacing:"0.8px" }}>Password *</p>
+                  <input type="password" value={password} onChange={e=>setPassword(e.target.value)}
+                    placeholder={emailMode==="login"?"Enter password":"Min 6 characters"}
+                    onKeyDown={e=>e.key==="Enter"&&emailMode==="login"&&handleEmailLogin()}
+                    style={inp}/>
+
+                  {emailMode==="signup" && (
+                    <>
+                      <p style={{ margin:"0 0 5px", fontSize:11, fontWeight:700, color:"#6B7280",
+                        textTransform:"uppercase", letterSpacing:"0.8px" }}>Confirm Password *</p>
+                      <input type="password" value={confirmPwd} onChange={e=>setConfirmPwd(e.target.value)}
+                        placeholder="Re-enter password"
+                        onKeyDown={e=>e.key==="Enter"&&handleEmailSignup()}
+                        style={{...inp, marginBottom:14}}/>
+                    </>
+                  )}
+
+                  <button
+                    onClick={emailMode==="login"?handleEmailLogin:handleEmailSignup}
+                    style={{...primaryBtn, marginTop:4}}>
+                    {emailMode==="login" ? "Sign In →" : "Create Account →"}
+                  </button>
                 </>
               )}
             </>
           )}
         </div>
 
-        <div style={{ textAlign:"center", marginTop:18 }}>
-          <button onClick={()=>setScreen("welcome")} style={{
-            background:"none", border:"none", color:"#475569",
-            cursor:"pointer", fontFamily:"inherit", fontSize:13,
-            display:"block", margin:"0 auto 8px",
-          }}>← Back</button>
+        <div style={{ textAlign:"center", marginTop:16 }}>
+          <button onClick={()=>setScreen("welcome")}
+            style={{ background:"none", border:"none", color:"#475569",
+              cursor:"pointer", fontFamily:"inherit", fontSize:13,
+              display:"block", margin:"0 auto 8px" }}>← Back</button>
           <p style={{ fontSize:11, color:"#334155", margin:0 }}>
             By continuing you agree to our{" "}
-            <a href="/privacy-policy.html"
-              style={{ color:"#60A5FA", textDecoration:"none" }}>
+            <a href="/privacy-policy.html" style={{ color:"#60A5FA", textDecoration:"none" }}>
               Privacy Policy
             </a>
           </p>
         </div>
-
       </div>
     </div>
   );
