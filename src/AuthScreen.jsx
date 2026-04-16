@@ -9,14 +9,19 @@ import {
 } from "firebase/auth";
 import { signInWithAppleREST, saveFirebaseSDKSession, saveSession } from "./firebaseAuth";
 
-const isNativeIOS = (() => {
+// Conservative check — defaults to true (hides Google button) until Capacitor
+// is confirmed NOT native. This prevents the Google button from flashing on
+// iPadOS before Capacitor's bridge initialises, which caused a hang on review.
+function checkNativeIOS() {
   try {
     if (window.Capacitor?.isNativePlatform?.()) return true;
     if (window.Capacitor?.getPlatform?.() === "ios") return true;
     if (window.Capacitor?.platform === "ios") return true;
+    // WKWebView handler present = running inside a native app
+    if (typeof window.webkit !== "undefined" && window.webkit?.messageHandlers) return true;
     return false;
   } catch(e) { return false; }
-})();
+}
 
 function AppLogo({ size=80 }) {
   return (
@@ -67,6 +72,13 @@ export default function AuthScreen({ onGuest, onAuthSuccess }) {
   const [confirmPwd,setConfirmPwd]= useState("");
   const [name,      setName]      = useState("");
   const [kbVisible, setKbVisible] = useState(false);
+  // Default true = Google button hidden until we confirm we're on web.
+  // Prevents the button flashing on iPadOS before Capacitor bridge is ready.
+  const [isNativeIOS, setIsNativeIOS] = useState(true);
+
+  useEffect(() => {
+    setIsNativeIOS(checkNativeIOS());
+  }, []);
 
   useEffect(() => {
     if (!isNativeIOS) return;
@@ -142,7 +154,9 @@ export default function AuthScreen({ onGuest, onAuthSuccess }) {
 
   // ── Google Sign In ────────────────────────────────────────────────────────
   const handleGoogle = async () => {
-    if (isNativeIOS) return;
+    // Double-guard: state check + live check to ensure we never run
+    // signInWithPopup inside Capacitor WKWebView (it hangs forever).
+    if (isNativeIOS || checkNativeIOS()) return;
     startLoading("Signing in with Google...");
     try {
       const provider = new GoogleAuthProvider();
