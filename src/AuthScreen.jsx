@@ -100,14 +100,16 @@ export default function AuthScreen({ onGuest, onAuthSuccess }) {
           idToken:  res.response.identityToken,
           rawNonce: rawNonce, // Firebase hashes this and verifies against JWT
         });
-        await signInWithCredential(auth, credential);
+        const result = await signInWithCredential(auth, credential);
+        if (result?.user) { onAuthSuccess?.(result.user); stopLoading(); return; }
       } else {
         const provider = new OAuthProvider("apple.com");
         provider.addScope("email");
         provider.addScope("name");
-        await signInWithPopup(auth, provider);
+        const result = await signInWithPopup(auth, provider);
+        if (result?.user) { onAuthSuccess?.(result.user); stopLoading(); return; }
       }
-      // Explicit callback — onAuthStateChanged may be delayed on Capacitor iOS
+      // Fallback: use auth.currentUser if result.user was somehow null
       if (auth.currentUser) onAuthSuccess?.(auth.currentUser);
       stopLoading();
     } catch(e) {
@@ -126,8 +128,8 @@ export default function AuthScreen({ onGuest, onAuthSuccess }) {
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt:"select_account" });
-      await signInWithPopup(auth, provider);
-      if (auth.currentUser) onAuthSuccess?.(auth.currentUser);
+      const gResult = await signInWithPopup(auth, provider);
+      onAuthSuccess?.(gResult.user);
       stopLoading();
     } catch(e) {
       if (e.code !== "auth/popup-closed-by-user") {
@@ -142,8 +144,8 @@ export default function AuthScreen({ onGuest, onAuthSuccess }) {
     if (!email.trim() || !password) { setError("Email and password are required"); return; }
     startLoading("Signing you in...");
     try {
-      await signInWithEmailAndPassword(auth, email.trim(), password);
-      if (auth.currentUser) onAuthSuccess?.(auth.currentUser);
+      const eResult = await signInWithEmailAndPassword(auth, email.trim(), password);
+      onAuthSuccess?.(eResult.user);
       stopLoading();
     } catch(e) {
       const map = {
@@ -170,7 +172,7 @@ export default function AuthScreen({ onGuest, onAuthSuccess }) {
       if (name.trim()) {
         await updateProfile(result.user, { displayName: name.trim() });
       }
-      if (auth.currentUser) onAuthSuccess?.(auth.currentUser);
+      onAuthSuccess?.(result.user);
       stopLoading();
     } catch(e) {
       const map = {
