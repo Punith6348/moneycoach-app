@@ -3,6 +3,7 @@ import { StrictMode, useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "./firebase";
+import { getSession, clearSession } from "./firebaseAuth";
 import App from "./App.jsx";
 import AuthScreen from "./AuthScreen.jsx";
 import "./App.css";
@@ -19,9 +20,6 @@ globalStyle.textContent = `
     background: linear-gradient(160deg,#0F172A 0%,#1E293B 60%,#0F172A 100%);
     z-index: 9999;
   }
-  input[type=number]::-webkit-inner-spin-button,
-  input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
-  input[type=number] { -moz-appearance:textfield; }
 `;
 document.head.appendChild(globalStyle);
 
@@ -43,16 +41,22 @@ function Root() {
   const [guestMode, setGuestMode] = useState(false);
 
   useEffect(() => {
-    // Timeout — if Firebase doesn't respond in 8s show login screen
+    // Check if we have a REST API session saved (email login)
+    const session = getSession();
+    if (session) {
+      setUser({ uid: session.uid, email: session.email, token: session.token });
+      return;
+    }
+
+    // Timeout — show login after 8s if Firebase doesn't respond
     const timeout = setTimeout(() => {
       setUser(prev => prev === undefined ? null : prev);
     }, 8000);
 
-    // Simple auth listener — NO registerUserProfile (causes Firestore hang on iOS)
+    // Firebase SDK auth listener — for Google/Apple login
     const unsub = onAuthStateChanged(auth, u => {
       clearTimeout(timeout);
       if (u) {
-        // Store UID — clear data if different user
         const storedUid = localStorage.getItem("moneyCoachUID");
         if (storedUid && storedUid !== u.uid) {
           localStorage.removeItem("moneyCoachData_v3");
@@ -68,36 +72,41 @@ function Root() {
     });
 
     window._authUnsub = unsub;
-    return () => {
-      clearTimeout(timeout);
-      unsub();
-    };
+    return () => { clearTimeout(timeout); unsub(); };
   }, []);
 
-  // Still checking auth
+  // Handle email/password auth from REST API
+  const handleEmailAuth = (sessionData) => {
+    localStorage.setItem("moneyCoachUID", sessionData.uid);
+    setGuestMode(false);
+    setUser(sessionData);
+  };
+
   if (user === undefined && !guestMode) return <LoadingScreen/>;
 
-  // Not logged in
   if (!user && !guestMode) {
     return (
       <div className="auth-root">
-        <AuthScreen onGuest={() => {
-          localStorage.removeItem("moneyCoachUID");
-          setGuestMode(true);
-        }} />
+        <AuthScreen
+          onGuest={() => {
+            localStorage.removeItem("moneyCoachUID");
+            setGuestMode(true);
+          }}
+          onEmailAuth={handleEmailAuth}
+        />
       </div>
     );
   }
 
-  // Logged in or guest
   return (
     <App
       firebaseUser={user || null}
       isGuest={guestMode}
       onSignOut={async () => {
+        clearSession();
         localStorage.removeItem("moneyCoachData_v3");
         localStorage.removeItem("moneyCoachUID");
-        if (user) await signOut(auth);
+        try { if (user?.uid && auth.currentUser) await signOut(auth); } catch(e) {}
         setGuestMode(false);
         setUser(null);
       }}

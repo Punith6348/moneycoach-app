@@ -4,12 +4,12 @@ import { auth } from "./firebase";
 import {
   GoogleAuthProvider, signInWithPopup,
   OAuthProvider, signInWithCredential,
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  updateProfile,
 } from "firebase/auth";
+import {
+  signUpWithEmail, signInWithEmail,
+  saveSession, formatAuthError,
+} from "./firebaseAuth";
 
-// Detect native iOS Capacitor app
 const isNativeIOS = (() => {
   try {
     if (window.Capacitor?.isNativePlatform?.()) return true;
@@ -22,8 +22,8 @@ const isNativeIOS = (() => {
 function AppLogo({ size=80 }) {
   return (
     <div style={{ width:size, height:size, borderRadius:size*0.22,
-      overflow:"hidden", margin:"0 auto",
-      boxShadow:"0 8px 28px rgba(37,99,235,0.3)", flexShrink:0 }}>
+      overflow:"hidden", margin:"0 auto", flexShrink:0,
+      boxShadow:"0 8px 28px rgba(37,99,235,0.3)" }}>
       <img src="/icon-512.png" alt="Money Coach"
         style={{ width:"100%", height:"100%", objectFit:"cover" }}
         onError={e=>{
@@ -56,7 +56,7 @@ function AppleIcon() {
   );
 }
 
-export default function AuthScreen({ onGuest }) {
+export default function AuthScreen({ onGuest, onEmailAuth }) {
   const [screen,    setScreen]    = useState("welcome");
   const [authTab,   setAuthTab]   = useState("social");
   const [loading,   setLoading]   = useState(false);
@@ -69,7 +69,6 @@ export default function AuthScreen({ onGuest }) {
   const [name,      setName]      = useState("");
   const [kbVisible, setKbVisible] = useState(false);
 
-  // Detect keyboard on iOS to shrink logo
   useEffect(() => {
     if (!isNativeIOS) return;
     const onResize = () => {
@@ -94,15 +93,15 @@ export default function AuthScreen({ onGuest }) {
         const rawNonce = Math.random().toString(36).substring(2, 15);
         const msgBuffer = new TextEncoder().encode(rawNonce);
         const hashBuffer = await crypto.subtle.digest("SHA-256", msgBuffer);
-        const hashArray  = Array.from(new Uint8Array(hashBuffer));
-        const hashedNonce = hashArray.map(b=>b.toString(16).padStart(2,"0")).join("");
+        const hashedNonce = Array.from(new Uint8Array(hashBuffer))
+          .map(b=>b.toString(16).padStart(2,"0")).join("");
         const res = await Plugin.authorize({
           clientId:    "com.turings.moneycoach",
           redirectURI: "https://moneycoach-app.vercel.app",
           scopes:      "email name",
           nonce:       hashedNonce,
         });
-        if (!res?.response?.identityToken) throw new Error("No identity token from Apple");
+        if (!res?.response?.identityToken) throw new Error("No identity token");
         const provider   = new OAuthProvider("apple.com");
         const credential = provider.credential({
           idToken:  res.response.identityToken,
@@ -118,7 +117,7 @@ export default function AuthScreen({ onGuest }) {
     } catch(e) {
       console.error("Apple error:", e.code, e.message);
       if (e.code !== "ERR_CANCELED" && e.code !== "auth/cancelled-popup-request") {
-        setError(`Sign in failed: ${e.message||e.code||"Unknown"}`);
+        setError(`Apple: ${e.message||e.code||"Failed"}`);
       }
       stopLoading();
     }
@@ -133,52 +132,40 @@ export default function AuthScreen({ onGuest }) {
       provider.setCustomParameters({ prompt:"select_account" });
       await signInWithPopup(auth, provider);
     } catch(e) {
-      if (e.code !== "auth/popup-closed-by-user" && e.code !== "auth/cancelled-popup-request") {
-        setError("Google sign-in failed. Please try again.");
+      if (e.code !== "auth/popup-closed-by-user") {
+        setError("Google sign-in failed.");
       }
       stopLoading();
     }
   };
 
-  // ── Email Login ───────────────────────────────────────────────────────────
+  // ── Email Login — uses REST API directly (bypasses Firebase SDK WKWebView issue)
   const handleEmailLogin = async () => {
     if (!email.trim() || !password) { setError("Email and password are required"); return; }
     startLoading("Signing you in...");
     try {
-      await signInWithEmailAndPassword(auth, email.trim(), password);
+      const data = await signInWithEmail(email.trim(), password);
+      saveSession(data);
+      // Notify main.jsx with the session data
+      onEmailAuth({ uid: data.localId, email: data.email, token: data.idToken });
     } catch(e) {
-      console.error("Email login error:", e.code);
-      setError(
-        e.code === "auth/user-not-found"        ? "No account found with this email" :
-        e.code === "auth/wrong-password"        ? "Incorrect password" :
-        e.code === "auth/invalid-credential"    ? "Incorrect email or password" :
-        e.code === "auth/invalid-email"         ? "Invalid email address" :
-        e.code === "auth/too-many-requests"     ? "Too many attempts. Try again later." :
-        e.code === "auth/network-request-failed"? "Network error. Check connection." :
-        `Error: ${e.code}`
-      );
+      setError(formatAuthError(e.code));
       stopLoading();
     }
   };
 
-  // ── Email Signup ──────────────────────────────────────────────────────────
+  // ── Email Signup — uses REST API directly
   const handleEmailSignup = async () => {
     if (!email.trim() || !password) { setError("Email and password are required"); return; }
     if (password.length < 6)         { setError("Password must be at least 6 characters"); return; }
     if (password !== confirmPwd)     { setError("Passwords don't match"); return; }
     startLoading("Creating your account...");
     try {
-      const result = await createUserWithEmailAndPassword(auth, email.trim(), password);
-      if (name.trim()) await updateProfile(result.user, { displayName: name.trim() });
+      const data = await signUpWithEmail(email.trim(), password);
+      saveSession(data);
+      onEmailAuth({ uid: data.localId, email: data.email, token: data.idToken });
     } catch(e) {
-      console.error("Signup error:", e.code);
-      setError(
-        e.code === "auth/email-already-in-use"  ? "Email already registered. Try signing in." :
-        e.code === "auth/invalid-email"         ? "Invalid email address" :
-        e.code === "auth/weak-password"         ? "Password too weak — use at least 6 characters" :
-        e.code === "auth/network-request-failed"? "Network error. Check connection." :
-        `Error: ${e.code}`
-      );
+      setError(formatAuthError(e.code));
       stopLoading();
     }
   };
@@ -194,13 +181,11 @@ export default function AuthScreen({ onGuest }) {
   // ── Welcome Screen ────────────────────────────────────────────────────────
   if (screen === "welcome") {
     return (
-      <div style={{
-        position:"fixed", inset:0,
-        overflowY:"auto", WebkitOverflowScrolling:"touch",
+      <div style={{ position:"fixed", inset:0, overflowY:"auto",
+        WebkitOverflowScrolling:"touch",
         fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
-        background:"linear-gradient(160deg,#0F172A 0%,#1E293B 60%,#0F172A 100%)",
-      }}>
-        <div style={{ maxWidth:420, margin:"0 auto", padding:"40px 24px 40px", boxSizing:"border-box" }}>
+        background:"linear-gradient(160deg,#0F172A 0%,#1E293B 60%,#0F172A 100%)" }}>
+        <div style={{ maxWidth:420, margin:"0 auto", padding:"40px 24px", boxSizing:"border-box" }}>
           <div style={{ textAlign:"center", marginBottom:28 }}>
             <AppLogo size={88}/>
             <h1 style={{ margin:"16px 0 6px", fontSize:28, fontWeight:800,
@@ -241,21 +226,15 @@ export default function AuthScreen({ onGuest }) {
 
   // ── Login Screen ──────────────────────────────────────────────────────────
   return (
-    <div style={{
-      position:"fixed", inset:0,
-      overflowY:"auto", WebkitOverflowScrolling:"touch",
+    <div style={{ position:"fixed", inset:0, overflowY:"auto",
+      WebkitOverflowScrolling:"touch",
       fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
-      background:"linear-gradient(160deg,#0F172A 0%,#1E293B 60%,#0F172A 100%)",
-    }}>
-      <div style={{
-        minHeight:"100%",
-        display:"flex", flexDirection:"column",
+      background:"linear-gradient(160deg,#0F172A 0%,#1E293B 60%,#0F172A 100%)" }}>
+      <div style={{ minHeight:"100%", display:"flex", flexDirection:"column",
         alignItems:"center", justifyContent:"center",
-        padding:"20px 20px 40px", boxSizing:"border-box",
-      }}>
+        padding:"20px 20px 40px", boxSizing:"border-box" }}>
         <div style={{ width:"100%", maxWidth:400 }}>
 
-          {/* Logo — hide when keyboard visible */}
           {!kbVisible && (
             <div style={{ textAlign:"center", marginBottom:20 }}>
               <AppLogo size={60}/>
@@ -267,11 +246,9 @@ export default function AuthScreen({ onGuest }) {
             </div>
           )}
 
-          {/* Card */}
           <div style={{ background:"#fff", borderRadius:20, padding:"20px",
             boxShadow:"0 12px 40px rgba(0,0,0,0.4)", boxSizing:"border-box" }}>
 
-            {/* Error */}
             {error && (
               <div style={{ background:"#FFF1F2", border:"1px solid #FECACA",
                 borderRadius:10, padding:"10px 12px", marginBottom:12,
@@ -280,18 +257,16 @@ export default function AuthScreen({ onGuest }) {
               </div>
             )}
 
-            {/* Loading */}
             {loading ? (
               <div style={{ textAlign:"center", padding:"20px 0" }}>
                 <div style={{ width:32, height:32, borderRadius:"50%",
                   border:"3px solid #E5E7EB", borderTopColor:"#111827",
                   animation:"spin 0.8s linear infinite", margin:"0 auto 10px" }}/>
-                <p style={{ margin:0, fontSize:13, color:"#6B7280" }}>{loadMsg||"Please wait..."}</p>
+                <p style={{ margin:0, fontSize:13, color:"#6B7280" }}>{loadMsg}</p>
                 <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
               </div>
             ) : (
               <>
-                {/* Tabs — Social / Email */}
                 <div style={{ display:"flex", gap:8, marginBottom:14 }}>
                   {[
                     { k:"social", l:"Social Login" },
@@ -308,7 +283,6 @@ export default function AuthScreen({ onGuest }) {
                   ))}
                 </div>
 
-                {/* Social Tab */}
                 {authTab==="social" && (
                   <>
                     <button onClick={handleApple}
@@ -346,7 +320,6 @@ export default function AuthScreen({ onGuest }) {
                   </>
                 )}
 
-                {/* Email Tab */}
                 {authTab==="email" && (
                   <>
                     <div style={{ display:"flex", gap:8, marginBottom:12 }}>
@@ -376,43 +349,30 @@ export default function AuthScreen({ onGuest }) {
 
                     <p style={{ margin:"0 0 4px", fontSize:11, fontWeight:700,
                       color:"#6B7280", textTransform:"uppercase" }}>Email</p>
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={e=>setEmail(e.target.value)}
+                    <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
                       placeholder="you@example.com"
-                      autoComplete="email"
-                      autoCapitalize="none"
-                      autoCorrect="off"
+                      autoComplete="email" autoCapitalize="none" autoCorrect="off"
                       onKeyDown={e=>e.key==="Enter"&&emailMode==="login"&&handleEmailLogin()}
-                      style={inp}
-                    />
+                      style={inp}/>
 
                     <p style={{ margin:"0 0 4px", fontSize:11, fontWeight:700,
                       color:"#6B7280", textTransform:"uppercase" }}>Password</p>
-                    <input
-                      type="password"
-                      value={password}
-                      onChange={e=>setPassword(e.target.value)}
+                    <input type="password" value={password} onChange={e=>setPassword(e.target.value)}
                       placeholder={emailMode==="login"?"Enter password":"Min 6 characters"}
                       autoComplete={emailMode==="login"?"current-password":"new-password"}
                       onKeyDown={e=>e.key==="Enter"&&emailMode==="login"&&handleEmailLogin()}
-                      style={inp}
-                    />
+                      style={inp}/>
 
                     {emailMode==="signup" && (
                       <>
                         <p style={{ margin:"0 0 4px", fontSize:11, fontWeight:700,
                           color:"#6B7280", textTransform:"uppercase" }}>Confirm Password</p>
-                        <input
-                          type="password"
-                          value={confirmPwd}
+                        <input type="password" value={confirmPwd}
                           onChange={e=>setConfirmPwd(e.target.value)}
                           placeholder="Re-enter password"
                           autoComplete="new-password"
                           onKeyDown={e=>e.key==="Enter"&&handleEmailSignup()}
-                          style={{...inp, marginBottom:12}}
-                        />
+                          style={{...inp, marginBottom:12}}/>
                       </>
                     )}
 
@@ -442,7 +402,6 @@ export default function AuthScreen({ onGuest }) {
               </a>
             </p>
           </div>
-
         </div>
       </div>
     </div>
