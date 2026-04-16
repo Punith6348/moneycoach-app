@@ -16,8 +16,11 @@ const DASH_CSS = `
     gap: 6px;
     margin-bottom: 10px;
   }
+  /* Last card spans full width when it's alone in its row (odd total count) */
+  .mc-summary-row > *:last-child:nth-child(odd) { grid-column: span 2; }
   @media(min-width:860px){
-    .mc-summary-row { grid-template-columns: repeat(4,1fr); gap:8px; margin-bottom:12px; }
+    .mc-summary-row { grid-template-columns: repeat(5,1fr); gap:8px; margin-bottom:12px; }
+    .mc-summary-row > *:last-child:nth-child(odd) { grid-column: span 1; }
   }
   .mc-summary-card { padding:8px 10px; }
   @media(min-width:480px){ .mc-summary-card { padding:9px 11px; } }

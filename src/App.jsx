@@ -137,9 +137,9 @@ const APP_CSS = `
     overscroll-behavior:contain;
   }
 
-  /* ── Content padding ── */
+  /* ── Content padding (sides use safe-area for landscape iPhone notch) ── */
   .mc-content {
-    padding:16px 16px 16px;
+    padding: 16px max(16px, env(safe-area-inset-right, 0px)) 16px max(16px, env(safe-area-inset-left, 0px));
     max-width:960px;
     width:100%;
     margin:0 auto;
@@ -430,8 +430,8 @@ function OnboardingScreen({onComplete}) {
   );
 
   return (
-    <div style={{ minHeight:"100vh", background:"linear-gradient(160deg,#0F172A,#1E293B)",
-      overflow:"auto", padding:"20px 16px" }}>
+    <div style={{ minHeight:"100dvh", background:"linear-gradient(160deg,#0F172A,#1E293B)",
+      overflow:"auto", padding:`max(20px, env(safe-area-inset-top, 20px)) 16px 40px max(16px, env(safe-area-inset-left, 16px))` }}>
       <div style={{ width:"100%", maxWidth:440, margin:"0 auto" }}>
 
         {/* Logo */}
@@ -815,7 +815,7 @@ function EditModal({expense,monthKey,onSave,onClose}) {
   };
   return (
     <div onClick={e=>e.target===e.currentTarget&&onClose()} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:9999,display:"flex",alignItems:"flex-end",justifyContent:"center",padding:"0"}}>
-      <div style={{background:"#fff",borderRadius:"20px 20px 0 0",padding:"20px 20px 32px",width:"100%",maxWidth:480,boxShadow:"0 -8px 40px rgba(0,0,0,0.18)",maxHeight:"92vh",overflowY:"auto"}}>
+      <div style={{background:"#fff",borderRadius:"20px 20px 0 0",padding:"20px 20px 0",paddingBottom:"calc(env(safe-area-inset-bottom, 0px) + 24px)",width:"100%",maxWidth:480,boxShadow:"0 -8px 40px rgba(0,0,0,0.18)",maxHeight:"92dvh",overflowY:"auto"}}>
         {/* Handle bar */}
         <div style={{width:36,height:4,borderRadius:99,background:"#E5E7EB",margin:"0 auto 16px"}}/>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
