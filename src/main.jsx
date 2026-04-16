@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "./firebase";
 import { clearSession } from "./firebaseAuth";
+import { registerUserProfile } from "./useFirestoreSync";
 import App from "./App.jsx";
 import AuthScreen from "./AuthScreen.jsx";
 import "./App.css";
@@ -65,6 +66,7 @@ function Root() {
         }
         localStorage.setItem("moneyCoachUID", u.uid);
         setGuestMode(false);
+        registerUserProfile(u).catch(() => {}); // save email/name to Firestore; non-blocking
         setUser(u);
       } else {
         setUser(null);

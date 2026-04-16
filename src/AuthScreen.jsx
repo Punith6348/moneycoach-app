@@ -5,6 +5,7 @@ import {
   GoogleAuthProvider, signInWithPopup,
   OAuthProvider, signInWithCredential,
   signInWithEmailAndPassword, createUserWithEmailAndPassword,
+  updateProfile,
 } from "firebase/auth";
 
 const isNativeIOS = (() => {
@@ -130,6 +131,7 @@ export default function AuthScreen({ onGuest }) {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt:"select_account" });
       await signInWithPopup(auth, provider);
+      stopLoading(); // safety net — onAuthStateChanged handles navigation
     } catch(e) {
       if (e.code !== "auth/popup-closed-by-user") {
         setError("Google sign-in failed.");
@@ -166,7 +168,10 @@ export default function AuthScreen({ onGuest }) {
     if (password !== confirmPwd)     { setError("Passwords don't match"); return; }
     startLoading("Creating your account...");
     try {
-      await createUserWithEmailAndPassword(auth, email.trim(), password);
+      const result = await createUserWithEmailAndPassword(auth, email.trim(), password);
+      if (name.trim()) {
+        await updateProfile(result.user, { displayName: name.trim() });
+      }
       // onAuthStateChanged in main.jsx handles navigation
     } catch(e) {
       const map = {
