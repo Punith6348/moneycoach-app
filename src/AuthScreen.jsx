@@ -89,21 +89,16 @@ export default function AuthScreen({ onGuest }) {
       if (isNativeIOS && window.Capacitor?.Plugins?.SignInWithApple) {
         const { SignInWithApple: Plugin } = window.Capacitor.Plugins;
         const rawNonce = Math.random().toString(36).substring(2, 15);
-        const msgBuffer = new TextEncoder().encode(rawNonce);
-        const hashBuffer = await crypto.subtle.digest("SHA-256", msgBuffer);
-        const hashedNonce = Array.from(new Uint8Array(hashBuffer))
-          .map(b=>b.toString(16).padStart(2,"0")).join("");
         const res = await Plugin.authorize({
-          clientId:    "com.turings.moneycoach",
-          redirectURI: "https://moneycoach-app.vercel.app",
-          scopes:      "email name",
-          nonce:       hashedNonce,
+          clientId: "com.turings.moneycoach",
+          scopes:   "email name",
+          nonce:    rawNonce, // pass raw nonce — Apple hashes it internally before embedding in JWT
         });
         if (!res?.response?.identityToken) throw new Error("No identity token");
         const provider   = new OAuthProvider("apple.com");
         const credential = provider.credential({
           idToken:  res.response.identityToken,
-          rawNonce: rawNonce,
+          rawNonce: rawNonce, // Firebase hashes this and verifies against JWT
         });
         await signInWithCredential(auth, credential);
       } else {
