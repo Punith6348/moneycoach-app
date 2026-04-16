@@ -3,7 +3,7 @@ import { StrictMode, useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "./firebase";
-import { getSession, clearSession } from "./firebaseAuth";
+import { clearSession } from "./firebaseAuth";
 import App from "./App.jsx";
 import AuthScreen from "./AuthScreen.jsx";
 import "./App.css";
@@ -28,7 +28,12 @@ function LoadingScreen() {
     <div className="auth-root" style={{ display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column", gap:16 }}>
       <div style={{ width:72, height:72, borderRadius:18, overflow:"hidden", boxShadow:"0 8px 24px rgba(37,99,235,0.4)" }}>
         <img src="/icon-512.png" alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}
-          onError={e=>{ const p=e.target.parentNode; p.style.cssText="background:linear-gradient(135deg,#1E40AF,#06B6D4);display:flex;align-items:center;justify-content:center;width:72px;height:72px;border-radius:18px"; e.target.remove(); p.innerHTML='<span style="font-size:32px;color:#fff;font-family:Georgia,serif;font-weight:700">₹</span>'; }}
+          onError={e=>{
+            const p=e.target.parentNode;
+            p.style.cssText="background:linear-gradient(135deg,#1E40AF,#06B6D4);display:flex;align-items:center;justify-content:center;width:72px;height:72px;border-radius:18px";
+            e.target.remove();
+            p.innerHTML='<span style="font-size:32px;color:#fff;font-family:Georgia,serif;font-weight:700">₹</span>';
+          }}
         />
       </div>
       <p style={{ color:"#64748B", fontSize:13, margin:0, fontFamily:"sans-serif" }}>Loading...</p>
@@ -37,28 +42,23 @@ function LoadingScreen() {
 }
 
 function Root() {
-  const [user,      setUser]      = useState(undefined);
+  const [user,      setUser]      = useState(undefined); // undefined = still checking
   const [guestMode, setGuestMode] = useState(false);
 
   useEffect(() => {
-    // Check if we have a REST API session saved (email login)
-    const session = getSession();
-    if (session) {
-      setUser({ uid: session.uid, email: session.email, token: session.token });
-      return;
-    }
-
     // Timeout — show login after 8s if Firebase doesn't respond
     const timeout = setTimeout(() => {
       setUser(prev => prev === undefined ? null : prev);
     }, 8000);
 
-    // Firebase SDK auth listener — for Google/Apple login
-    const unsub = onAuthStateChanged(auth, u => {
+    // Firebase SDK auth listener — handles Google, Apple, and Email/Password
+    let unsub;
+    unsub = onAuthStateChanged(auth, u => {
       clearTimeout(timeout);
       if (u) {
         const storedUid = localStorage.getItem("moneyCoachUID");
         if (storedUid && storedUid !== u.uid) {
+          // Different user — clear previous user's local data
           localStorage.removeItem("moneyCoachData_v3");
           localStorage.removeItem("moneyCoachData_v2");
           localStorage.removeItem("moneyCoachData");
@@ -71,16 +71,8 @@ function Root() {
       }
     });
 
-    window._authUnsub = unsub;
-    return () => { clearTimeout(timeout); unsub(); };
+    return () => { clearTimeout(timeout); if (unsub) unsub(); };
   }, []);
-
-  // Handle email/password auth from REST API
-  const handleEmailAuth = (sessionData) => {
-    localStorage.setItem("moneyCoachUID", sessionData.uid);
-    setGuestMode(false);
-    setUser(sessionData);
-  };
 
   if (user === undefined && !guestMode) return <LoadingScreen/>;
 
@@ -92,7 +84,6 @@ function Root() {
             localStorage.removeItem("moneyCoachUID");
             setGuestMode(true);
           }}
-          onEmailAuth={handleEmailAuth}
         />
       </div>
     );
@@ -106,7 +97,7 @@ function Root() {
         clearSession();
         localStorage.removeItem("moneyCoachData_v3");
         localStorage.removeItem("moneyCoachUID");
-        try { if (user?.uid && auth.currentUser) await signOut(auth); } catch(e) {}
+        try { if (auth.currentUser) await signOut(auth); } catch(e) {}
         setGuestMode(false);
         setUser(null);
       }}
@@ -115,5 +106,7 @@ function Root() {
 }
 
 createRoot(document.getElementById("root")).render(
-  <StrictMode><Root/></StrictMode>
+  <StrictMode>
+    <Root/>
+  </StrictMode>
 );

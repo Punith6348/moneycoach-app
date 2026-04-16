@@ -4,11 +4,8 @@ import { auth } from "./firebase";
 import {
   GoogleAuthProvider, signInWithPopup,
   OAuthProvider, signInWithCredential,
+  signInWithEmailAndPassword, createUserWithEmailAndPassword,
 } from "firebase/auth";
-import {
-  signUpWithEmail, signInWithEmail,
-  saveSession, formatAuthError,
-} from "./firebaseAuth";
 
 const isNativeIOS = (() => {
   try {
@@ -56,7 +53,7 @@ function AppleIcon() {
   );
 }
 
-export default function AuthScreen({ onGuest, onEmailAuth }) {
+export default function AuthScreen({ onGuest }) {
   const [screen,    setScreen]    = useState("welcome");
   const [authTab,   setAuthTab]   = useState("social");
   const [loading,   setLoading]   = useState(false);
@@ -114,6 +111,8 @@ export default function AuthScreen({ onGuest, onEmailAuth }) {
         provider.addScope("name");
         await signInWithPopup(auth, provider);
       }
+      // onAuthStateChanged in main.jsx handles navigation — stop spinner as safety net
+      stopLoading();
     } catch(e) {
       console.error("Apple error:", e.code, e.message);
       if (e.code !== "ERR_CANCELED" && e.code !== "auth/cancelled-popup-request") {
@@ -139,33 +138,43 @@ export default function AuthScreen({ onGuest, onEmailAuth }) {
     }
   };
 
-  // ── Email Login — uses REST API directly (bypasses Firebase SDK WKWebView issue)
+  // ── Email Login — Firebase SDK (works on iOS, ensures Firestore auth context)
   const handleEmailLogin = async () => {
     if (!email.trim() || !password) { setError("Email and password are required"); return; }
     startLoading("Signing you in...");
     try {
-      const data = await signInWithEmail(email.trim(), password);
-      saveSession(data);
-      // Notify main.jsx with the session data
-      onEmailAuth({ uid: data.localId, email: data.email, token: data.idToken });
+      await signInWithEmailAndPassword(auth, email.trim(), password);
+      // onAuthStateChanged in main.jsx handles navigation
     } catch(e) {
-      setError(formatAuthError(e.code));
+      const map = {
+        "auth/user-not-found":      "No account found with this email",
+        "auth/wrong-password":      "Incorrect password",
+        "auth/invalid-credential":  "Incorrect email or password",
+        "auth/invalid-email":       "Invalid email address",
+        "auth/too-many-requests":   "Too many attempts. Try again later.",
+        "auth/user-disabled":       "Account disabled. Contact support.",
+      };
+      setError(map[e.code] || e.message || "Sign in failed");
       stopLoading();
     }
   };
 
-  // ── Email Signup — uses REST API directly
+  // ── Email Signup — Firebase SDK
   const handleEmailSignup = async () => {
     if (!email.trim() || !password) { setError("Email and password are required"); return; }
     if (password.length < 6)         { setError("Password must be at least 6 characters"); return; }
     if (password !== confirmPwd)     { setError("Passwords don't match"); return; }
     startLoading("Creating your account...");
     try {
-      const data = await signUpWithEmail(email.trim(), password);
-      saveSession(data);
-      onEmailAuth({ uid: data.localId, email: data.email, token: data.idToken });
+      await createUserWithEmailAndPassword(auth, email.trim(), password);
+      // onAuthStateChanged in main.jsx handles navigation
     } catch(e) {
-      setError(formatAuthError(e.code));
+      const map = {
+        "auth/email-already-in-use": "Email already registered. Try signing in.",
+        "auth/invalid-email":        "Invalid email address",
+        "auth/weak-password":        "Password too weak — use at least 6 characters",
+      };
+      setError(map[e.code] || e.message || "Sign up failed");
       stopLoading();
     }
   };
