@@ -54,7 +54,7 @@ function AppleIcon() {
   );
 }
 
-export default function AuthScreen({ onGuest }) {
+export default function AuthScreen({ onGuest, onAuthSuccess }) {
   const [screen,    setScreen]    = useState("welcome");
   const [authTab,   setAuthTab]   = useState("social");
   const [loading,   setLoading]   = useState(false);
@@ -107,7 +107,8 @@ export default function AuthScreen({ onGuest }) {
         provider.addScope("name");
         await signInWithPopup(auth, provider);
       }
-      // onAuthStateChanged in main.jsx handles navigation — stop spinner as safety net
+      // Explicit callback — onAuthStateChanged may be delayed on Capacitor iOS
+      if (auth.currentUser) onAuthSuccess?.(auth.currentUser);
       stopLoading();
     } catch(e) {
       console.error("Apple error:", e.code, e.message);
@@ -126,7 +127,8 @@ export default function AuthScreen({ onGuest }) {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt:"select_account" });
       await signInWithPopup(auth, provider);
-      stopLoading(); // safety net — onAuthStateChanged handles navigation
+      if (auth.currentUser) onAuthSuccess?.(auth.currentUser);
+      stopLoading();
     } catch(e) {
       if (e.code !== "auth/popup-closed-by-user") {
         setError("Google sign-in failed.");
@@ -141,7 +143,8 @@ export default function AuthScreen({ onGuest }) {
     startLoading("Signing you in...");
     try {
       await signInWithEmailAndPassword(auth, email.trim(), password);
-      // onAuthStateChanged in main.jsx handles navigation
+      if (auth.currentUser) onAuthSuccess?.(auth.currentUser);
+      stopLoading();
     } catch(e) {
       const map = {
         "auth/user-not-found":      "No account found with this email",
@@ -167,7 +170,8 @@ export default function AuthScreen({ onGuest }) {
       if (name.trim()) {
         await updateProfile(result.user, { displayName: name.trim() });
       }
-      // onAuthStateChanged in main.jsx handles navigation
+      if (auth.currentUser) onAuthSuccess?.(auth.currentUser);
+      stopLoading();
     } catch(e) {
       const map = {
         "auth/email-already-in-use": "Email already registered. Try signing in.",
