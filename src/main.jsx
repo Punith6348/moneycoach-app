@@ -1,7 +1,7 @@
 // ─── main.jsx ────────────────────────────────────────────────────────────────
 import { StrictMode, useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import { onAuthStateChanged, signOut, setPersistence, browserLocalPersistence } from "firebase/auth";
 import { auth } from "./firebase";
 import { clearSession } from "./firebaseAuth";
 import { registerUserProfile } from "./useFirestoreSync";
@@ -52,9 +52,8 @@ function Root() {
       setUser(prev => prev === undefined ? null : prev);
     }, 8000);
 
-    // Firebase SDK auth listener — handles Google, Apple, and Email/Password
     let unsub;
-    unsub = onAuthStateChanged(auth, u => {
+    const handleUser = u => {
       clearTimeout(timeout);
       if (u) {
         const storedUid = localStorage.getItem("moneyCoachUID");
@@ -66,12 +65,19 @@ function Root() {
         }
         localStorage.setItem("moneyCoachUID", u.uid);
         setGuestMode(false);
-        registerUserProfile(u).catch(() => {}); // save email/name to Firestore; non-blocking
+        registerUserProfile(u).catch(() => {});
         setUser(u);
       } else {
         setUser(null);
       }
-    });
+    };
+
+    // Force localStorage persistence — Capacitor iOS WKWebView has issues
+    // with Firebase's default IndexedDB persistence, causing onAuthStateChanged
+    // to never fire and the app to be stuck on the loading screen forever.
+    setPersistence(auth, browserLocalPersistence)
+      .then(() => { unsub = onAuthStateChanged(auth, handleUser); })
+      .catch(() => { unsub = onAuthStateChanged(auth, handleUser); }); // fallback if persistence fails
 
     return () => { clearTimeout(timeout); if (unsub) unsub(); };
   }, []);
