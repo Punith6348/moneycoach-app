@@ -172,7 +172,7 @@ function InlineForm({fields, onSave, onCancel, title}) {
       marginTop:8, border:`1px solid ${C.border}`,
     }}>
       <p style={{fontSize:13, fontWeight:700, color:C.ink, margin:"0 0 10px"}}>{title}</p>
-      <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:8}}>
+      <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(min(160px,100%),1fr))", gap:8}}>
         {fields.map(f => (
           <div key={f.key}>
             <Label>{f.label}{f.required?" *":""}</Label>

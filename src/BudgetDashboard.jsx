@@ -680,9 +680,9 @@ export default function BudgetDashboard({
               {label:"Outstanding",   value:fmt(totalOutstanding),   color:C.red},
               {label:"Interest Left", value:fmt(totalLoanInterest),  color:C.amber},
             ].map((m,i)=>(
-              <div key={m.label} style={{padding:"10px 14px",borderRight:i<2?`1px solid ${C.bg}`:"none"}}>
-                <p style={{margin:0,fontSize:9,color:C.muted,textTransform:"uppercase",letterSpacing:"0.8px",fontWeight:600}}>{m.label}</p>
-                <p style={{margin:"3px 0 0",fontSize:14,fontWeight:700,color:m.color,fontFamily:"Georgia,serif"}}>{m.value}</p>
+              <div key={m.label} style={{padding:"10px 8px",borderRight:i<2?`1px solid ${C.bg}`:"none",minWidth:0}}>
+                <p style={{margin:0,fontSize:8,color:C.muted,textTransform:"uppercase",letterSpacing:"0.6px",fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{m.label}</p>
+                <p style={{margin:"3px 0 0",fontSize:13,fontWeight:700,color:m.color,fontFamily:"Georgia,serif",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.value}</p>
               </div>
             ))}
           </div>
@@ -769,16 +769,16 @@ export function MonthCloseReport({ allExpenses, totalIncome, totalFixed, totalSa
         <div style={{padding:"12px 14px"}}>
 
           {/* Top-line summary */}
-          <div style={{display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:14}}>
+          <div style={{display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:6, marginBottom:14}}>
             {[
               { label:"Variable Spent", value:fmt(prevVarTotal), color:C.red   },
               { label:"Savings Plan",   value:fmt(totalSavings), color:C.blue  },
               { label:"Month Balance",  value:prevBalance>=0?fmt(prevBalance):`−${fmt(Math.abs(prevBalance))}`,
                 color: prevBalance >= 0 ? C.green : C.red },
             ].map(t => (
-              <div key={t.label} style={{background:C.bg, borderRadius:9, padding:"8px 10px", border:`1px solid ${C.border}`}}>
-                <p style={{margin:0, fontSize:8, color:C.muted, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.6px"}}>{t.label}</p>
-                <p style={{margin:"3px 0 0", fontSize:13, fontWeight:700, color:t.color, fontFamily:"Georgia,serif"}}>{t.value}</p>
+              <div key={t.label} style={{background:C.bg, borderRadius:9, padding:"8px 7px", border:`1px solid ${C.border}`, minWidth:0}}>
+                <p style={{margin:0, fontSize:8, color:C.muted, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.5px", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{t.label}</p>
+                <p style={{margin:"3px 0 0", fontSize:12, fontWeight:700, color:t.color, fontFamily:"Georgia,serif", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{t.value}</p>
               </div>
             ))}
           </div>

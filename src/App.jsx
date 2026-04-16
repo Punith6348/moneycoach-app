@@ -2484,19 +2484,19 @@ function DashboardScreen(props) {
 
               {/* Stats strip — selected month only */}
               {totalSpent > 0 ? (
-                <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:12}}>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6,marginBottom:12}}>
                   {[
                     {label:"Total Spent",   value:fmt(totalSpent), color:"#DC2626"},
                     {label:"Avg/Spend Day", value:fmt(avgDaily),   color:"#D97706"},
                     {label:"Transactions",  value:String(txCount), color:"#2563EB"},
                   ].map(s=>(
                     <div key={s.label} style={{background:"#fff",borderRadius:11,
-                      border:`1px solid ${C.border}`,padding:"9px 11px",
+                      border:`1px solid ${C.border}`,padding:"9px 8px",minWidth:0,
                       boxShadow:"0 1px 2px rgba(0,0,0,0.04)"}}>
                       <p style={{margin:0,fontSize:8,color:C.muted,textTransform:"uppercase",
-                                 letterSpacing:"0.7px",fontWeight:700}}>{s.label}</p>
-                      <p style={{margin:"3px 0 0",fontSize:15,fontWeight:700,color:s.color,
-                                 fontFamily:"Georgia,serif"}}>{s.value}</p>
+                                 letterSpacing:"0.5px",fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.label}</p>
+                      <p style={{margin:"3px 0 0",fontSize:13,fontWeight:700,color:s.color,
+                                 fontFamily:"Georgia,serif",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.value}</p>
                     </div>
                   ))}
                 </div>

@@ -74,7 +74,7 @@ function Donut({ data, grandTotal, selected, onSelect }) {
 
   return(
     <div style={{display:"flex",justifyContent:"center",marginBottom:4}}>
-      <svg width={SIZE} height={SIZE} style={{overflow:"visible"}}>
+      <svg viewBox={`0 0 ${SIZE} ${SIZE}`} width="100%" style={{maxWidth:SIZE,overflow:"visible",display:"block"}}>
         {segs.map(s=>(
           <path key={s.name} d={s.path} fill={s.color}
             opacity={selected&&selected!==s.name?0.15:1}
