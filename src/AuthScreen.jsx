@@ -95,13 +95,19 @@ export default function AuthScreen({ onGuest, onAuthSuccess }) {
         // The REST API lets us pass the correct authorized requestUri instead.
         const { SignInWithApple: Plugin } = window.Capacitor.Plugins;
         const rawNonce = Math.random().toString(36).substring(2, 15);
+        // Apple requires the SHA256 hash of the nonce on the request.
+        // Apple embeds that hash in the JWT. Firebase then verifies by
+        // hashing rawNonce itself and comparing — so Firebase gets rawNonce.
+        const hashBuffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(rawNonce));
+        const hashedNonce = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2,"0")).join("");
         const res = await Plugin.authorize({
           clientId: "com.turings.moneycoach",
           scopes:   "email name",
-          nonce:    rawNonce,
+          nonce:    hashedNonce,   // hashed → Apple embeds this hash in the JWT
         });
         if (!res?.response?.identityToken) throw new Error("No identity token");
         const data = await signInWithAppleREST(res.response.identityToken, rawNonce);
+        // rawNonce → Firebase hashes it → matches hashedNonce in JWT ✓
         // Write session in Firebase SDK format so onAuthStateChanged restores
         // the user correctly on next app open
         saveFirebaseSDKSession(data);
