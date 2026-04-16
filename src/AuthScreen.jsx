@@ -3,10 +3,11 @@ import { useState, useEffect } from "react";
 import { auth } from "./firebase";
 import {
   GoogleAuthProvider, signInWithPopup,
-  OAuthProvider, signInWithCredential,
+  OAuthProvider,
   signInWithEmailAndPassword, createUserWithEmailAndPassword,
   updateProfile,
 } from "firebase/auth";
+import { signInWithAppleREST, saveFirebaseSDKSession, saveSession } from "./firebaseAuth";
 
 const isNativeIOS = (() => {
   try {
@@ -87,29 +88,41 @@ export default function AuthScreen({ onGuest, onAuthSuccess }) {
     startLoading("Signing in with Apple...");
     try {
       if (isNativeIOS && window.Capacitor?.Plugins?.SignInWithApple) {
+        // ── Native iOS: use REST API directly ────────────────────────────────
+        // Firebase SDK's signInWithCredential hangs on Capacitor iOS because
+        // the SDK sends "capacitor://localhost" as requestUri which Firebase
+        // servers reject as an unauthorized domain, causing a silent hang.
+        // The REST API lets us pass the correct authorized requestUri instead.
         const { SignInWithApple: Plugin } = window.Capacitor.Plugins;
         const rawNonce = Math.random().toString(36).substring(2, 15);
         const res = await Plugin.authorize({
           clientId: "com.turings.moneycoach",
           scopes:   "email name",
-          nonce:    rawNonce, // pass raw nonce — Apple hashes it internally before embedding in JWT
+          nonce:    rawNonce,
         });
         if (!res?.response?.identityToken) throw new Error("No identity token");
-        const provider   = new OAuthProvider("apple.com");
-        const credential = provider.credential({
-          idToken:  res.response.identityToken,
-          rawNonce: rawNonce, // Firebase hashes this and verifies against JWT
-        });
-        const result = await signInWithCredential(auth, credential);
-        if (result?.user) { onAuthSuccess?.(result.user); stopLoading(); return; }
+        const data = await signInWithAppleREST(res.response.identityToken, rawNonce);
+        // Write session in Firebase SDK format so onAuthStateChanged restores
+        // the user correctly on next app open
+        saveFirebaseSDKSession(data);
+        saveSession(data);
+        const appleUser = {
+          uid:         data.localId,
+          email:       data.email       || null,
+          displayName: data.displayName || data.fullName || null,
+          photoURL:    data.photoUrl    || null,
+        };
+        onAuthSuccess?.(appleUser);
+        stopLoading();
+        return;
       } else {
+        // ── Web: use Firebase SDK popup (works fine on web) ──────────────────
         const provider = new OAuthProvider("apple.com");
         provider.addScope("email");
         provider.addScope("name");
         const result = await signInWithPopup(auth, provider);
         if (result?.user) { onAuthSuccess?.(result.user); stopLoading(); return; }
       }
-      // Fallback: use auth.currentUser if result.user was somehow null
       if (auth.currentUser) onAuthSuccess?.(auth.currentUser);
       stopLoading();
     } catch(e) {
