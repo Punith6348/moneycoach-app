@@ -14,7 +14,7 @@ globalStyle.textContent = `
   *, *::before, *::after { box-sizing: border-box; }
   html { margin:0; padding:0; height:100%; }
   body { margin:0; padding:0; min-height:100%; overscroll-behavior:none; -webkit-text-size-adjust:100%; }
-  #root { min-height:100vh; min-height:100dvh; }
+  #root { min-height:100dvh; width:100%; margin:0; padding:0; }
   .auth-root {
     position: fixed; inset: 0;
     overflow-y: auto; overflow-x: hidden;
@@ -91,6 +91,15 @@ function Root() {
           onGuest={() => {
             localStorage.removeItem("moneyCoachUID");
             setGuestMode(true);
+          }}
+          onAuthSuccess={(u) => {
+            // Explicit callback — don't rely solely on onAuthStateChanged for navigation.
+            // Capacitor iOS WKWebView can delay or suppress onAuthStateChanged for OAuth
+            // (Apple/Google) sign-ins due to the capacitor:// origin.
+            localStorage.setItem("moneyCoachUID", u.uid);
+            setGuestMode(false);
+            registerUserProfile(u).catch(() => {});
+            setUser(u);
           }}
         />
       </div>

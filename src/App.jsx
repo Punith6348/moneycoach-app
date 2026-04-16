@@ -398,10 +398,10 @@ function OnboardingScreen({onComplete}) {
   const toggleRow = (item, amtKey, placeholder, onToggle, onAmt) => (
     <div key={item.id} style={{ marginBottom:8 }}>
       <div style={{ display:"flex", alignItems:"center", gap:10,
-        padding:"9px 12px", borderRadius:10,
+        padding:"11px 12px", borderRadius:10,
         background:item.active?"#EFF6FF":"#F8FAFC",
         border:`1.5px solid ${item.active?C.blue:C.border}`,
-        cursor:"pointer" }}
+        cursor:"pointer", WebkitTapHighlightColor:"transparent" }}
         onClick={onToggle}>
         <span style={{ fontSize:18, flexShrink:0 }}>{item.icon}</span>
         <p style={{ margin:0, fontSize:13, fontWeight:600,
@@ -413,25 +413,35 @@ function OnboardingScreen({onComplete}) {
         </div>
       </div>
       {item.active && (
-        <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:6, paddingLeft:12 }}
-          onClick={e=>e.stopPropagation()}>
+        <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:6,
+          paddingLeft:12, paddingBottom:4 }}
+          onClick={e=>e.stopPropagation()}
+          onTouchEnd={e=>e.stopPropagation()}>
           <span style={{ fontSize:12, color:C.muted, flexShrink:0 }}>₹</span>
           <input
-            type="number"
+            type="number" inputMode="numeric"
             value={item[amtKey]}
             onChange={e=>onAmt(e.target.value)}
             placeholder={placeholder}
-            style={{...inp, flex:1}}
+            style={{...inp, flex:1, fontSize:16}}
           />
-          <span style={{ fontSize:12, color:C.muted, flexShrink:0 }}>/month</span>
+          <span style={{ fontSize:12, color:C.muted, flexShrink:0 }}>/mo</span>
         </div>
       )}
     </div>
   );
 
   return (
-    <div style={{ minHeight:"100dvh", background:"linear-gradient(160deg,#0F172A,#1E293B)",
-      overflow:"auto", padding:`max(20px, env(safe-area-inset-top, 20px)) 16px 40px max(16px, env(safe-area-inset-left, 16px))` }}>
+    <div style={{
+      position:"fixed", inset:0,
+      background:"linear-gradient(160deg,#0F172A,#1E293B)",
+      overflowY:"auto", overflowX:"hidden",
+      WebkitOverflowScrolling:"touch",
+      paddingTop:"env(safe-area-inset-top, 20px)",
+      paddingBottom:"env(safe-area-inset-bottom, 20px)",
+      paddingLeft:"max(16px, env(safe-area-inset-left, 16px))",
+      paddingRight:"max(16px, env(safe-area-inset-right, 16px))",
+    }}>
       <div style={{ width:"100%", maxWidth:440, margin:"0 auto" }}>
 
         {/* Logo */}
