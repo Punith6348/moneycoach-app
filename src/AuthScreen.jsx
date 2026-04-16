@@ -161,6 +161,7 @@ export default function AuthScreen({ onGuest, onAuthSuccess }) {
   // ── Email Login — Firebase SDK (works on iOS, ensures Firestore auth context)
   const handleEmailLogin = async () => {
     if (!email.trim() || !password) { setError("Email and password are required"); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { setError("Enter a valid email address"); return; }
     startLoading("Signing you in...");
     try {
       const eResult = await signInWithEmailAndPassword(auth, email.trim(), password);
@@ -183,6 +184,7 @@ export default function AuthScreen({ onGuest, onAuthSuccess }) {
   // ── Email Signup — Firebase SDK
   const handleEmailSignup = async () => {
     if (!email.trim() || !password) { setError("Email and password are required"); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { setError("Enter a valid email address"); return; }
     if (password.length < 6)         { setError("Password must be at least 6 characters"); return; }
     if (password !== confirmPwd)     { setError("Passwords don't match"); return; }
     startLoading("Creating your account...");
@@ -207,7 +209,7 @@ export default function AuthScreen({ onGuest, onAuthSuccess }) {
   const inp = {
     width:"100%", padding:"11px 14px", borderRadius:10,
     border:"1.5px solid #E5E7EB", fontFamily:"inherit",
-    fontSize:15, background:"#F8FAFC", outline:"none",
+    fontSize:16, background:"#F8FAFC", outline:"none",
     marginBottom:10, boxSizing:"border-box",
     WebkitAppearance:"none",
   };

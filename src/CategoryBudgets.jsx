@@ -67,7 +67,7 @@ function BudgetInput({ value, onChange }) {
           onChange={e => setDraft(e.target.value)}
           onKeyDown={e => { if (e.key === "Enter") save(); if (e.key === "Escape") cancel(); }}
           style={{
-            width:90, padding:"5px 8px", borderRadius:7, fontSize:13,
+            width:90, padding:"5px 8px", borderRadius:7, fontSize:16,
             border:`1.5px solid ${C.blue}`, outline:"none", fontFamily:"Georgia,serif",
             background:"#fff", boxSizing:"border-box",
           }}
@@ -198,17 +198,19 @@ function SummaryStrip({ cats, spentMap, budgets }) {
         { label:"Total Budget",   value:fmt(totalBudgeted), color:C.blue  },
         { label:"Total Spent",    value:fmt(totalSpent),    color:totalSpent>totalBudgeted?C.red:C.ink },
         { label:"Alerts",
-          value: overCount > 0 ? `${overCount} over` : warnCount > 0 ? `${warnCount} warning` : "All clear",
+          value: overCount > 0 ? `${overCount} over` : warnCount > 0 ? `${warnCount} warn` : "All clear",
           color: overCount > 0 ? C.red : warnCount > 0 ? C.amber : C.green },
       ].map(t => (
         <div key={t.label} style={{
           background:"#fff", borderRadius:10, border:`1px solid ${C.border}`,
-          padding:"9px 11px", boxShadow:"0 1px 2px rgba(0,0,0,0.04)",
+          padding:"9px 8px", boxShadow:"0 1px 2px rgba(0,0,0,0.04)", minWidth:0,
         }}>
           <p style={{ margin:0, fontSize:8, color:C.muted, textTransform:"uppercase",
-                      letterSpacing:"0.7px", fontWeight:700 }}>{t.label}</p>
-          <p style={{ margin:"3px 0 0", fontSize:14, fontWeight:700, color:t.color,
-                      fontFamily:"Georgia,serif" }}>{t.value}</p>
+                      letterSpacing:"0.5px", fontWeight:700,
+                      overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{t.label}</p>
+          <p style={{ margin:"3px 0 0", fontSize:13, fontWeight:700, color:t.color,
+                      fontFamily:"Georgia,serif",
+                      overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{t.value}</p>
         </div>
       ))}
     </div>

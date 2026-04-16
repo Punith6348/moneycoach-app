@@ -96,7 +96,7 @@ function CardForm({ card, onSave, onCancel }) {
   const inp = {
     width:"100%", padding:"12px", borderRadius:10,
     border:`1.5px solid ${C.border}`, fontFamily:"inherit",
-    fontSize:15, outline:"none", boxSizing:"border-box", color:C.ink,
+    fontSize:16, outline:"none", boxSizing:"border-box", color:C.ink,
   };
 
   const save = () => {

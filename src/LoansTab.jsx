@@ -30,7 +30,7 @@ const LOAN_CSS = `
 
 const inp = (x={}) => ({ width:"100%", padding:"9px 11px", borderRadius:8,
   border:`1.5px solid ${C.border}`, fontFamily:"inherit",
-  fontSize:13, background:"#fff", outline:"none", boxSizing:"border-box", ...x });
+  fontSize:16, background:"#fff", outline:"none", boxSizing:"border-box", ...x });
 
 const Lbl = ({children, req}) => (
   <p style={{fontSize:10,color:C.muted,textTransform:"uppercase",letterSpacing:"1px",fontWeight:700,margin:"0 0 4px"}}>

@@ -842,10 +842,10 @@ function EditModal({expense,monthKey,onSave,onClose}) {
         <Label>Date *</Label>
         <input type="date" value={date} max={new Date().toISOString().split("T")[0]}
           onChange={e=>setDate(e.target.value)}
-          style={{width:"100%",padding:"10px 12px",borderRadius:8,border:`1.5px solid ${C.border}`,fontFamily:"inherit",fontSize:14,background:C.bg,outline:"none",marginTop:6,marginBottom:12,boxSizing:"border-box"}} />
+          style={{width:"100%",padding:"10px 12px",borderRadius:8,border:`1.5px solid ${C.border}`,fontFamily:"inherit",fontSize:16,background:C.bg,outline:"none",marginTop:6,marginBottom:12,boxSizing:"border-box"}} />
         <Label>Note (optional)</Label>
-        <input type="text" value={note} onChange={e=>setNote(e.target.value)} placeholder="Optional note"
-          style={{width:"100%",padding:"10px 12px",borderRadius:8,border:`1.5px solid ${C.border}`,fontFamily:"inherit",fontSize:14,background:C.bg,outline:"none",marginTop:6,marginBottom:16,boxSizing:"border-box"}} />
+        <input type="text" value={note} onChange={e=>setNote(e.target.value)} placeholder="Optional note" maxLength={120}
+          style={{width:"100%",padding:"10px 12px",borderRadius:8,border:`1.5px solid ${C.border}`,fontFamily:"inherit",fontSize:16,background:C.bg,outline:"none",marginTop:6,marginBottom:16,boxSizing:"border-box"}} />
         <div style={{display:"flex",gap:10}}>
           <button onClick={onClose} style={{flex:1,padding:12,borderRadius:10,border:`1px solid ${C.border}`,background:"#fff",color:C.muted,fontFamily:"inherit",fontSize:13,cursor:"pointer"}}>Cancel</button>
           <button onClick={save} style={{flex:2,padding:12,borderRadius:10,border:"none",background:C.ink,color:"#fff",fontFamily:"inherit",fontSize:13,fontWeight:700,cursor:"pointer"}}>Save Changes ✓</button>
@@ -1190,8 +1190,8 @@ function LogExpenseForm({onAdd, disabled, currentExpenses=[], dailyLimit=0}) {
       <p style={{fontSize:11,color:C.muted,margin:"2px 0 6px"}}>For fixed bills like Rent or EMI, use the <strong>Plan tab</strong>.</p>
       <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>{VARIABLE_CATS.map(chip)}</div>
       <Label>Note (optional)</Label>
-      <input type="text" value={note} onChange={e=>setNote(e.target.value)} placeholder={NOTE_PLACEHOLDER[label]||"e.g. Misc expense"} disabled={disabled}
-        style={{width:"100%",padding:"8px 12px",borderRadius:8,border:`1.5px solid ${C.border}`,fontFamily:"inherit",fontSize:14,background:C.bg,outline:"none",marginTop:6,marginBottom:10,boxSizing:"border-box"}} />
+      <input type="text" value={note} onChange={e=>setNote(e.target.value)} placeholder={NOTE_PLACEHOLDER[label]||"e.g. Misc expense"} disabled={disabled} maxLength={120}
+        style={{width:"100%",padding:"8px 12px",borderRadius:8,border:`1.5px solid ${C.border}`,fontFamily:"inherit",fontSize:16,background:C.bg,outline:"none",marginTop:6,marginBottom:10,boxSizing:"border-box"}} />
       {!disabled&&dailyLimit>0&&(
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 11px",borderRadius:8,marginBottom:10,background:overLimit?"#FFF1F2":todaySpent>0?"#F0FDF4":C.bg,border:`1px solid ${overLimit?"#FECACA":todaySpent>0?"#86EFAC":C.border}`}}>
           <p style={{margin:0,fontSize:11,color:C.muted,fontWeight:500}}>{overLimit?"⚠ Over daily limit":"Today spent"}</p>
@@ -1387,7 +1387,7 @@ function RecurringTab({
   const [editingCF, setEditingCF] = useState(null); // {type, id, amount}
 
   const ordinal = (d) => { const s=["th","st","nd","rd"]; const v=d%100; return d+(s[(v-20)%10]||s[v]||s[0]); };
-  const inp2 = { width:"100%", padding:"9px 11px", borderRadius:8, border:`1px solid ${C.border}`, fontFamily:"inherit", fontSize:13, background:"#fff", outline:"none", boxSizing:"border-box" };
+  const inp2 = { width:"100%", padding:"9px 11px", borderRadius:8, border:`1px solid ${C.border}`, fontFamily:"inherit", fontSize:16, background:"#fff", outline:"none", boxSizing:"border-box" };
 
   const openNew  = () => { setFLabel(""); setFCat("Rent"); setFAmt(""); setFDay(1); setFNote(""); setEditId(null); setShowForm(true); };
   const openEdit = (r) => { setFLabel(r.label); setFCat(r.category); setFAmt(String(r.amount)); setFDay(r.dayOfMonth); setFNote(r.note||""); setEditId(r.id); setShowForm(true); };

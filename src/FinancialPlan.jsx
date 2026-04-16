@@ -162,7 +162,7 @@ function InlineForm({fields, onSave, onCancel, title}) {
   const inputStyle = (k, required) => ({
     width:"100%", marginTop:3, padding:"8px 10px", borderRadius:8,
     border:`1.5px solid ${tried&&required&&!String(vals[k]).trim()?C.red:C.border}`,
-    fontFamily:"inherit", fontSize:13,
+    fontFamily:"inherit", fontSize:16,
     background:"#fff", outline:"none", boxSizing:"border-box",
   });
 
