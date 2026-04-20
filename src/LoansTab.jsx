@@ -234,6 +234,7 @@ function LoanForm({initial, onSave, onCancel}) {
         <div>
           <Lbl>Loan Start Date</Lbl>
           <input type="date" value={f.startDate}
+            max={today}
             onChange={e=>set("startDate",e.target.value)} style={inp()}/>
           {endDate&&<p style={{margin:"4px 0 0",fontSize:11,color:C.purple}}>📅 Finishes: {endDate}</p>}
         </div>

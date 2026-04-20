@@ -12,14 +12,9 @@ export default function SettingsPanel({
   firebaseUser=null, isGuest=false, onSignOut=null,
   onLoadTestData=null,
 }) {
-  const [resetArmed,  setResetArmed]  = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [draftName,   setDraftName]   = useState(name||"");
-
-  const handleReset = () => {
-    if (!resetArmed) { setResetArmed(true); return; }
-    onResetAll(); onClose();
-  };
 
   const saveNameEdit = () => {
     if (draftName.trim()) onNameChange(draftName.trim());
@@ -124,19 +119,11 @@ export default function SettingsPanel({
           {/* ── Reset ── */}
           <Row
             icon="🗑"
-            label={resetArmed ? "Tap again to confirm" : "Reset All Data"}
-            sublabel={resetArmed ? "⚠ Cannot be undone" : "Delete all your data permanently"}
-            danger={resetArmed}
-            onTap={handleReset}
+            label="Reset All Data"
+            sublabel="Delete all your data permanently"
+            danger
+            onTap={() => setShowResetModal(true)}
           />
-          {resetArmed && (
-            <button onClick={()=>setResetArmed(false)} style={{
-              display:"block", margin:"4px 16px 0", padding:"11px",
-              width:"calc(100% - 32px)", borderRadius:12,
-              border:`1px solid ${C.border}`, background:"#fff",
-              cursor:"pointer", fontFamily:"inherit", fontSize:13, color:C.muted, fontWeight:600,
-            }}>Cancel</button>
-          )}
 
           {/* ── Sign out — always at bottom ── */}
           <div style={{ marginTop:16, borderTop:`1px solid ${C.border}`, paddingTop:8 }}>
@@ -174,6 +161,24 @@ export default function SettingsPanel({
             <div style={{ display:"flex", gap:10 }}>
               <button onClick={()=>setEditingName(false)} style={{ flex:1, padding:"13px", borderRadius:12, border:`1px solid ${C.border}`, background:"#fff", cursor:"pointer", fontFamily:"inherit", fontSize:14, color:C.muted, fontWeight:600 }}>Cancel</button>
               <button onClick={saveNameEdit} style={{ flex:2, padding:"13px", borderRadius:12, border:"none", background:C.ink, cursor:"pointer", fontFamily:"inherit", fontSize:14, color:"#fff", fontWeight:700 }}>Save Nickname</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Reset confirmation modal ── */}
+      {showResetModal && (
+        <div onClick={()=>setShowResetModal(false)} style={{ position:"fixed", inset:0, zIndex:1100, background:"rgba(0,0,0,0.5)", display:"flex", alignItems:"flex-end" }}>
+          <div onClick={e=>e.stopPropagation()} style={{
+            background:"#fff", borderRadius:"20px 20px 0 0",
+            padding:"24px 20px", width:"100%",
+            paddingBottom:"calc(env(safe-area-inset-bottom,0px) + 24px)",
+          }}>
+            <p style={{ margin:"0 0 4px", fontSize:17, fontWeight:700, color:C.red }}>🗑 Reset All Data?</p>
+            <p style={{ margin:"0 0 20px", fontSize:13, color:C.muted }}>This will permanently delete all your expenses, plans, loans, and settings. This cannot be undone.</p>
+            <div style={{ display:"flex", gap:10 }}>
+              <button onClick={()=>setShowResetModal(false)} style={{ flex:1, padding:"13px", borderRadius:12, border:`1px solid ${C.border}`, background:"#fff", cursor:"pointer", fontFamily:"inherit", fontSize:14, color:C.muted, fontWeight:600 }}>Cancel</button>
+              <button onClick={()=>{ setShowResetModal(false); onResetAll(); onClose(); }} style={{ flex:2, padding:"13px", borderRadius:12, border:"none", background:C.red, cursor:"pointer", fontFamily:"inherit", fontSize:14, color:"#fff", fontWeight:700 }}>Yes, Delete Everything</button>
             </div>
           </div>
         </div>

@@ -288,9 +288,9 @@ export function useAppData(firebaseUser = null) {
     (async () => {
       const storedUid = localStorage.getItem("moneyCoachUID");
 
-      // If stored UID doesn't match Google UID — clear local data completely
-      // This handles: guest → Google, different user → Google
-      if (storedUid !== firebaseUser.uid) {
+      // Clear local data ONLY when a different signed-in user was stored.
+      // If storedUid is null (guest mode) we preserve local data and migrate it.
+      if (storedUid && storedUid !== firebaseUser.uid) {
         localStorage.removeItem("moneyCoachData_v3");
         localStorage.removeItem("moneyCoachData_v2");
         localStorage.removeItem("moneyCoachData");
@@ -298,9 +298,8 @@ export function useAppData(firebaseUser = null) {
         if (mounted) setData({...DEFAULT_STATE});
       }
 
-      // Only migrate to Firestore if SAME user was already stored
-      // Never migrate guest/unknown data up to Firestore
-      if (storedUid === firebaseUser.uid) {
+      // Migrate local → Firestore for same user OR guest signing in for the first time
+      if (!storedUid || storedUid === firebaseUser.uid) {
         await migrateLocalToFirestore(firebaseUser.uid);
       }
 
@@ -520,7 +519,7 @@ export function useAppData(firebaseUser = null) {
   const totalFixed    = calcTotalFixed(data.fixedExpenses);
   const totalSavings  = calcTotalSavings(data.savingsPlans);
   const totalReserve  = calcTotalReserve(data.futurePayments);
-  const totalLoanEmi  = (data.loans||[]).reduce((s,l) => s + (l.emi||0), 0);
+  const totalLoanEmi  = (data.loans||[]).reduce((s,l) => s + (l.manualEmi || l.emi || calcEMI(l.principal, l.rate, l.tenureMonths) || 0), 0);
 
   // ── Current month expenses only ──────────────────────────────────────────
   const curMonthKey    = currentMonthKey();

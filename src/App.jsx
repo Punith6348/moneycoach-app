@@ -109,6 +109,8 @@ const APP_CSS = `
   /* ── Reset ── */
   html, body { margin:0; padding:0; height:100%; overflow:hidden; background:#F8FAFC; }
   #root { height:100%; }
+  *, *::before, *::after { touch-action: manipulation; }
+  button, a, input, select, textarea { touch-action: manipulation; }
 
   /* ── App shell — fills entire screen edge to edge ── */
   .mc-app {
@@ -144,6 +146,9 @@ const APP_CSS = `
     width:100%;
     margin:0 auto;
     box-sizing:border-box;
+    overflow-x:hidden;
+    overflow-wrap:break-word;
+    word-break:break-word;
   }
 
   /* ── Mobile bottom nav — safe area aware ── */
@@ -376,7 +381,7 @@ function OnboardingScreen({onComplete}) {
 
   const inp = {
     padding:"9px 12px", borderRadius:9, border:`1.5px solid ${C.border}`,
-    fontFamily:"Georgia,serif", fontSize:14, outline:"none",
+    fontFamily:"Georgia,serif", fontSize:16, outline:"none",
     boxSizing:"border-box", background:"#fff", width:"100%",
   };
 
@@ -497,8 +502,8 @@ function OnboardingScreen({onComplete}) {
                 fontSize:15, fontFamily:"inherit", fontWeight:700, cursor:"pointer" }}>
                 Next → Income
               </button>
-              <p style={{ textAlign:"center", fontSize:11, color:C.muted, margin:"8px 0 0" }}>
-                Optional — you can skip
+              <p style={{ textAlign:"center", fontSize:12, color:"#2563EB", margin:"8px 0 0", fontWeight:600 }}>
+                👆 Name is optional — tap Next to skip
               </p>
             </>
           )}
@@ -742,6 +747,14 @@ function OnboardingScreen({onComplete}) {
                       {leftover>=0?fmt(leftover):`−${fmt(Math.abs(leftover))}`}
                     </span>
                   </div>
+                  {leftover < 0 && (
+                    <div style={{ marginTop:8, padding:"8px 10px", borderRadius:8,
+                      background:"#FEF2F2", border:"1px solid #FCA5A5" }}>
+                      <p style={{ margin:0, fontSize:11, color:C.red, fontWeight:600 }}>
+                        ⚠ Your bills/savings/loans exceed your income. You may want to review the amounts above before continuing.
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -763,7 +776,7 @@ function OnboardingScreen({onComplete}) {
         </div>
 
         <p style={{ textAlign:"center", marginTop:12, fontSize:11, color:"#334155" }}>
-          Free forever · Data synced to your Google account
+          Free forever · Your data is private &amp; secure
         </p>
       </div>
     </div>
@@ -1786,6 +1799,7 @@ function DashboardScreen(props) {
     creditCards, addCreditCard, updateCreditCard, deleteCreditCard,
     updateName,
     firebaseUser, isGuest, onSignOut,
+    syncError,
   } = props;
 
   const [selectedMonth,setSelectedMonth] = useState(currentMonthKey());
@@ -1879,9 +1893,19 @@ function DashboardScreen(props) {
     <div className="mc-app">
       <style>{APP_CSS}</style>{/* fallback for environments where useEffect head injection isn't immediate */}
 
+      {/* ── Sync error banner ── */}
+      {syncError && (
+        <div style={{position:"fixed",top:0,left:0,right:0,
+                     background:"#B45309",color:"#fff",padding:"8px 16px",
+                     fontSize:12,zIndex:9998,textAlign:"center",
+                     boxShadow:"0 2px 8px rgba(0,0,0,0.25)"}}>
+          ⚠️ {syncError}
+        </div>
+      )}
+
       {/* ── Toast ── */}
       {toast && (
-        <div style={{position:"fixed",top:20,left:"50%",transform:"translateX(-50%)",
+        <div style={{position:"fixed",top:syncError?36:20,left:"50%",transform:"translateX(-50%)",
                      background:C.ink,color:"#fff",padding:"9px 20px",borderRadius:99,
                      fontSize:13,zIndex:9999,whiteSpace:"nowrap",
                      boxShadow:"0 4px 20px rgba(0,0,0,0.18)",animation:"fadeUp 0.2s ease"}}>

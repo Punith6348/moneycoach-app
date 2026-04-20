@@ -1,27 +1,11 @@
 // ─── AuthScreen.jsx ───────────────────────────────────────────────────────────
 import { useState, useEffect } from "react";
 import { auth } from "./firebase";
+import { OAuthProvider, signInWithPopup } from "firebase/auth";
 import {
-  GoogleAuthProvider, signInWithPopup,
-  OAuthProvider,
-  signInWithEmailAndPassword, createUserWithEmailAndPassword,
-  updateProfile,
-} from "firebase/auth";
-import { signInWithAppleREST, saveFirebaseSDKSession, saveSession } from "./firebaseAuth";
-
-// Conservative check — defaults to true (hides Google button) until Capacitor
-// is confirmed NOT native. This prevents the Google button from flashing on
-// iPadOS before Capacitor's bridge initialises, which caused a hang on review.
-function checkNativeIOS() {
-  try {
-    if (window.Capacitor?.isNativePlatform?.()) return true;
-    if (window.Capacitor?.getPlatform?.() === "ios") return true;
-    if (window.Capacitor?.platform === "ios") return true;
-    // WKWebView handler present = running inside a native app
-    if (typeof window.webkit !== "undefined" && window.webkit?.messageHandlers) return true;
-    return false;
-  } catch(e) { return false; }
-}
+  signInWithAppleREST, saveFirebaseSDKSession, saveSession,
+  signUpWithEmail, signInWithEmail, saveEmailSDKSession, formatAuthError,
+} from "./firebaseAuth";
 
 function AppLogo({ size=80 }) {
   return (
@@ -41,17 +25,6 @@ function AppLogo({ size=80 }) {
   );
 }
 
-function GoogleIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 18 18" style={{flexShrink:0}}>
-      <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/>
-      <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/>
-      <path fill="#FBBC05" d="M3.964 10.706A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.038l3.007-2.332z"/>
-      <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.962L3.964 7.294C4.672 5.163 6.656 3.58 9 3.58z"/>
-    </svg>
-  );
-}
-
 function AppleIcon() {
   return (
     <svg width="18" height="22" viewBox="0 0 814 1000" style={{flexShrink:0}}>
@@ -61,27 +34,19 @@ function AppleIcon() {
 }
 
 export default function AuthScreen({ onGuest, onAuthSuccess }) {
-  const [screen,    setScreen]    = useState("welcome");
-  const [authTab,   setAuthTab]   = useState("social");
-  const [loading,   setLoading]   = useState(false);
-  const [loadMsg,   setLoadMsg]   = useState("");
-  const [error,     setError]     = useState("");
-  const [emailMode, setEmailMode] = useState("login");
-  const [email,     setEmail]     = useState("");
-  const [password,  setPassword]  = useState("");
-  const [confirmPwd,setConfirmPwd]= useState("");
-  const [name,      setName]      = useState("");
-  const [kbVisible, setKbVisible] = useState(false);
-  // Default true = Google button hidden until we confirm we're on web.
-  // Prevents the button flashing on iPadOS before Capacitor bridge is ready.
-  const [isNativeIOS, setIsNativeIOS] = useState(true);
+  const [screen,     setScreen]    = useState("welcome");
+  const [loading,    setLoading]   = useState(false);
+  const [loadMsg,    setLoadMsg]   = useState("");
+  const [error,      setError]     = useState("");
+  const [emailMode,  setEmailMode] = useState("login");
+  const [email,      setEmail]     = useState("");
+  const [password,   setPassword]  = useState("");
+  const [confirmPwd, setConfirmPwd]= useState("");
+  const [name,       setName]      = useState("");
+  const [kbVisible,  setKbVisible] = useState(false);
 
+  // Detect keyboard on iOS so we hide the logo and save space
   useEffect(() => {
-    setIsNativeIOS(checkNativeIOS());
-  }, []);
-
-  useEffect(() => {
-    if (!isNativeIOS) return;
     const onResize = () => {
       const ratio = window.visualViewport
         ? window.visualViewport.height / window.screen.height
@@ -99,123 +64,84 @@ export default function AuthScreen({ onGuest, onAuthSuccess }) {
   const handleApple = async () => {
     startLoading("Signing in with Apple...");
     try {
-      if (isNativeIOS && window.Capacitor?.Plugins?.SignInWithApple) {
-        // ── Native iOS: use REST API directly ────────────────────────────────
-        // Firebase SDK's signInWithCredential hangs on Capacitor iOS because
-        // the SDK sends "capacitor://localhost" as requestUri which Firebase
-        // servers reject as an unauthorized domain, causing a silent hang.
-        // The REST API lets us pass the correct authorized requestUri instead.
+      if (window.Capacitor?.Plugins?.SignInWithApple) {
+        // Native iOS path — use Capacitor plugin + REST API
+        // (Firebase SDK's signInWithCredential hangs on Capacitor because it
+        //  uses "capacitor://localhost" as requestUri which Firebase rejects)
         const { SignInWithApple: Plugin } = window.Capacitor.Plugins;
         const rawNonce = Math.random().toString(36).substring(2, 15);
-        // Apple requires the SHA256 hash of the nonce on the request.
-        // Apple embeds that hash in the JWT. Firebase then verifies by
-        // hashing rawNonce itself and comparing — so Firebase gets rawNonce.
         const hashBuffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(rawNonce));
-        const hashedNonce = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2,"0")).join("");
+        const hashedNonce = Array.from(new Uint8Array(hashBuffer))
+          .map(b => b.toString(16).padStart(2,"0")).join("");
         const res = await Plugin.authorize({
           clientId: "com.turings.moneycoach",
           scopes:   "email name",
-          nonce:    hashedNonce,   // hashed → Apple embeds this hash in the JWT
+          nonce:    hashedNonce,
         });
         if (!res?.response?.identityToken) throw new Error("No identity token");
         const data = await signInWithAppleREST(res.response.identityToken, rawNonce);
-        // rawNonce → Firebase hashes it → matches hashedNonce in JWT ✓
-        // Write session in Firebase SDK format so onAuthStateChanged restores
-        // the user correctly on next app open
         saveFirebaseSDKSession(data);
         saveSession(data);
-        const appleUser = {
+        onAuthSuccess?.({
           uid:         data.localId,
           email:       data.email       || null,
           displayName: data.displayName || data.fullName || null,
           photoURL:    data.photoUrl    || null,
-        };
-        onAuthSuccess?.(appleUser);
-        stopLoading();
-        return;
+        });
       } else {
-        // ── Web: use Firebase SDK popup (works fine on web) ──────────────────
+        // Web fallback — Firebase SDK popup
+        await persistenceReady;
         const provider = new OAuthProvider("apple.com");
         provider.addScope("email");
         provider.addScope("name");
         const result = await signInWithPopup(auth, provider);
-        if (result?.user) { onAuthSuccess?.(result.user); stopLoading(); return; }
+        if (result?.user) onAuthSuccess?.(result.user);
       }
-      if (auth.currentUser) onAuthSuccess?.(auth.currentUser);
       stopLoading();
     } catch(e) {
       console.error("Apple error:", e.code, e.message);
       if (e.code !== "ERR_CANCELED" && e.code !== "auth/cancelled-popup-request") {
-        setError(`Apple: ${e.message||e.code||"Failed"}`);
+        setError(`Apple sign-in failed. Please try email instead.`);
       }
       stopLoading();
     }
   };
 
-  // ── Google Sign In ────────────────────────────────────────────────────────
-  const handleGoogle = async () => {
-    // Double-guard: state check + live check to ensure we never run
-    // signInWithPopup inside Capacitor WKWebView (it hangs forever).
-    if (isNativeIOS || checkNativeIOS()) return;
-    startLoading("Signing in with Google...");
-    try {
-      const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({ prompt:"select_account" });
-      const gResult = await signInWithPopup(auth, provider);
-      onAuthSuccess?.(gResult.user);
-      stopLoading();
-    } catch(e) {
-      if (e.code !== "auth/popup-closed-by-user") {
-        setError("Google sign-in failed.");
-      }
-      stopLoading();
-    }
-  };
-
-  // ── Email Login — Firebase SDK (works on iOS, ensures Firestore auth context)
+  // ── Email Login ───────────────────────────────────────────────────────────
   const handleEmailLogin = async () => {
-    if (!email.trim() || !password) { setError("Email and password are required"); return; }
+    if (!email.trim() || !password) { setError("Enter your email and password"); return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { setError("Enter a valid email address"); return; }
     startLoading("Signing you in...");
     try {
-      const eResult = await signInWithEmailAndPassword(auth, email.trim(), password);
-      onAuthSuccess?.(eResult.user);
+      const data = await signInWithEmail(email.trim(), password);
+      saveSession(data);
+      saveEmailSDKSession(data, data.displayName || null);
+      onAuthSuccess?.({ uid: data.localId, email: data.email || null, displayName: data.displayName || null, photoURL: null });
       stopLoading();
     } catch(e) {
-      const map = {
-        "auth/user-not-found":      "No account found with this email",
-        "auth/wrong-password":      "Incorrect password",
-        "auth/invalid-credential":  "Incorrect email or password",
-        "auth/invalid-email":       "Invalid email address",
-        "auth/too-many-requests":   "Too many attempts. Try again later.",
-        "auth/user-disabled":       "Account disabled. Contact support.",
-      };
-      setError(map[e.code] || e.message || "Sign in failed");
+      console.error("Login error:", e.code, e.message);
+      setError(formatAuthError(e.code) || `Sign in failed (${e.code || e.message})`);
       stopLoading();
     }
   };
 
-  // ── Email Signup — Firebase SDK
+  // ── Email Signup ──────────────────────────────────────────────────────────
   const handleEmailSignup = async () => {
-    if (!email.trim() || !password) { setError("Email and password are required"); return; }
+    if (!name.trim())               { setError("Please enter your name"); return; }
+    if (!email.trim() || !password) { setError("Enter your email and password"); return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { setError("Enter a valid email address"); return; }
-    if (password.length < 6)         { setError("Password must be at least 6 characters"); return; }
-    if (password !== confirmPwd)     { setError("Passwords don't match"); return; }
+    if (password.length < 6)        { setError("Password must be at least 6 characters"); return; }
+    if (password !== confirmPwd)    { setError("Passwords don't match. Check and try again."); return; }
     startLoading("Creating your account...");
     try {
-      const result = await createUserWithEmailAndPassword(auth, email.trim(), password);
-      if (name.trim()) {
-        await updateProfile(result.user, { displayName: name.trim() });
-      }
-      onAuthSuccess?.(result.user);
+      const data = await signUpWithEmail(email.trim(), password);
+      saveSession(data);
+      saveEmailSDKSession(data, name.trim() || null);
+      onAuthSuccess?.({ uid: data.localId, email: data.email || null, displayName: name.trim() || null, photoURL: null });
       stopLoading();
     } catch(e) {
-      const map = {
-        "auth/email-already-in-use": "Email already registered. Try signing in.",
-        "auth/invalid-email":        "Invalid email address",
-        "auth/weak-password":        "Password too weak — use at least 6 characters",
-      };
-      setError(map[e.code] || e.message || "Sign up failed");
+      console.error("Signup error:", e.code, e.message);
+      setError(formatAuthError(e.code) || `Sign up failed (${e.code || e.message})`);
       stopLoading();
     }
   };
@@ -317,134 +243,112 @@ export default function AuthScreen({ onGuest, onAuthSuccess }) {
               </div>
             ) : (
               <>
+                {/* ── Sign in with Apple — always first and visible ── */}
+                <button onClick={handleApple}
+                  style={{ width:"100%", padding:"14px 16px", borderRadius:14,
+                    border:"none", background:"#000", color:"#fff",
+                    display:"flex", alignItems:"center", justifyContent:"center", gap:10,
+                    cursor:"pointer", fontFamily:"inherit", fontSize:15, fontWeight:700,
+                    marginBottom:16, boxSizing:"border-box" }}>
+                  <AppleIcon/> Sign in with Apple
+                </button>
+
+                {/* ── Divider ── */}
+                <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
+                  <div style={{ flex:1, height:1, background:"#E5E7EB" }}/>
+                  <span style={{ fontSize:11, color:"#9CA3AF" }}>or sign in with email</span>
+                  <div style={{ flex:1, height:1, background:"#E5E7EB" }}/>
+                </div>
+
+                {/* ── Sign In / Create Account toggle ── */}
                 <div style={{ display:"flex", gap:8, marginBottom:14 }}>
                   {[
-                    { k:"social", l:"Social Login" },
-                    { k:"email",  l:"Email/Password" },
+                    { k:"login",  l:"Sign In" },
+                    { k:"signup", l:"Create Account" },
                   ].map(t=>(
-                    <button key={t.k} onClick={()=>{ setAuthTab(t.k); setError(""); }}
-                      style={{ flex:1, padding:"9px", borderRadius:10,
-                        border:`1.5px solid ${authTab===t.k?"#2563EB":"#E5E7EB"}`,
-                        background:authTab===t.k?"#EFF6FF":"#fff",
-                        color:authTab===t.k?"#2563EB":"#6B7280",
+                    <button key={t.k} onClick={()=>{ setEmailMode(t.k); setError(""); }}
+                      style={{ flex:1, padding:"8px", borderRadius:10,
+                        border:`1.5px solid ${emailMode===t.k?"#2563EB":"#E5E7EB"}`,
+                        background:emailMode===t.k?"#EFF6FF":"#fff",
+                        color:emailMode===t.k?"#2563EB":"#6B7280",
                         fontFamily:"inherit", fontSize:12, fontWeight:700, cursor:"pointer" }}>
                       {t.l}
                     </button>
                   ))}
                 </div>
 
-                {authTab==="social" && (
+                {emailMode==="signup" && (
                   <>
-                    <button onClick={handleApple}
-                      style={{ width:"100%", padding:"14px 16px", borderRadius:14,
-                        border:"none", background:"#000", color:"#fff",
-                        display:"flex", alignItems:"center", justifyContent:"center", gap:10,
-                        cursor:"pointer", fontFamily:"inherit", fontSize:14, fontWeight:700,
-                        marginBottom:10, boxSizing:"border-box" }}>
-                      <AppleIcon/> Sign in with Apple
-                    </button>
-                    {!isNativeIOS && (
-                      <button onClick={handleGoogle}
-                        style={{ width:"100%", padding:"14px 16px", borderRadius:14,
-                          border:"1.5px solid #E5E7EB", background:"#fff", color:"#111827",
-                          display:"flex", alignItems:"center", justifyContent:"center", gap:10,
-                          cursor:"pointer", fontFamily:"inherit", fontSize:14, fontWeight:700,
-                          marginBottom:10, boxSizing:"border-box" }}>
-                        <GoogleIcon/> Continue with Google
-                      </button>
-                    )}
-                    <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:10 }}>
-                      <div style={{ flex:1, height:1, background:"#F1F5F9" }}/>
-                      <span style={{ fontSize:11, color:"#9CA3AF" }}>or</span>
-                      <div style={{ flex:1, height:1, background:"#F1F5F9" }}/>
-                    </div>
-                    <button onClick={onGuest}
-                      style={{ width:"100%", padding:"13px", borderRadius:14,
-                        border:"1.5px solid #F1F5F9", background:"#F8FAFC",
-                        cursor:"pointer", fontFamily:"inherit", fontSize:13,
-                        fontWeight:600, color:"#6B7280",
-                        display:"flex", alignItems:"center", justifyContent:"center", gap:8,
-                        boxSizing:"border-box" }}>
-                      👤 Continue as Guest
-                    </button>
+                    <p style={{ margin:"0 0 4px", fontSize:11, fontWeight:700,
+                      color:"#6B7280", textTransform:"uppercase" }}>Your Name *</p>
+                    <input type="text" value={name} onChange={e=>setName(e.target.value)}
+                      placeholder="Enter your name" style={inp} autoComplete="name"/>
                   </>
                 )}
 
-                {authTab==="email" && (
+                <p style={{ margin:"0 0 4px", fontSize:11, fontWeight:700,
+                  color:"#6B7280", textTransform:"uppercase" }}>Email</p>
+                <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  autoComplete="email" autoCapitalize="none" autoCorrect="off"
+                  onKeyDown={e=>e.key==="Enter"&&emailMode==="login"&&handleEmailLogin()}
+                  style={inp}/>
+
+                <p style={{ margin:"0 0 4px", fontSize:11, fontWeight:700,
+                  color:"#6B7280", textTransform:"uppercase" }}>Password</p>
+                <input type="password" value={password} onChange={e=>setPassword(e.target.value)}
+                  placeholder={emailMode==="login"?"Enter password":"Min 6 characters"}
+                  autoComplete={emailMode==="login"?"current-password":"new-password"}
+                  onKeyDown={e=>e.key==="Enter"&&emailMode==="login"&&handleEmailLogin()}
+                  style={inp}/>
+
+                {emailMode==="signup" && (
                   <>
-                    <div style={{ display:"flex", gap:8, marginBottom:12 }}>
-                      {[
-                        { k:"login",  l:"Sign In" },
-                        { k:"signup", l:"Create Account" },
-                      ].map(t=>(
-                        <button key={t.k} onClick={()=>{ setEmailMode(t.k); setError(""); }}
-                          style={{ flex:1, padding:"8px", borderRadius:10,
-                            border:`1.5px solid ${emailMode===t.k?"#2563EB":"#E5E7EB"}`,
-                            background:emailMode===t.k?"#EFF6FF":"#fff",
-                            color:emailMode===t.k?"#2563EB":"#6B7280",
-                            fontFamily:"inherit", fontSize:12, fontWeight:700, cursor:"pointer" }}>
-                          {t.l}
-                        </button>
-                      ))}
-                    </div>
-
-                    {emailMode==="signup" && (
-                      <>
-                        <p style={{ margin:"0 0 4px", fontSize:11, fontWeight:700,
-                          color:"#6B7280", textTransform:"uppercase" }}>Name (optional)</p>
-                        <input type="text" value={name} onChange={e=>setName(e.target.value)}
-                          placeholder="Your name" style={inp}/>
-                      </>
-                    )}
-
                     <p style={{ margin:"0 0 4px", fontSize:11, fontWeight:700,
-                      color:"#6B7280", textTransform:"uppercase" }}>Email</p>
-                    <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
-                      placeholder="you@example.com"
-                      autoComplete="email" autoCapitalize="none" autoCorrect="off"
-                      onKeyDown={e=>e.key==="Enter"&&emailMode==="login"&&handleEmailLogin()}
-                      style={inp}/>
-
-                    <p style={{ margin:"0 0 4px", fontSize:11, fontWeight:700,
-                      color:"#6B7280", textTransform:"uppercase" }}>Password</p>
-                    <input type="password" value={password} onChange={e=>setPassword(e.target.value)}
-                      placeholder={emailMode==="login"?"Enter password":"Min 6 characters"}
-                      autoComplete={emailMode==="login"?"current-password":"new-password"}
-                      onKeyDown={e=>e.key==="Enter"&&emailMode==="login"&&handleEmailLogin()}
-                      style={inp}/>
-
-                    {emailMode==="signup" && (
-                      <>
-                        <p style={{ margin:"0 0 4px", fontSize:11, fontWeight:700,
-                          color:"#6B7280", textTransform:"uppercase" }}>Confirm Password</p>
-                        <input type="password" value={confirmPwd}
-                          onChange={e=>setConfirmPwd(e.target.value)}
-                          placeholder="Re-enter password"
-                          autoComplete="new-password"
-                          onKeyDown={e=>e.key==="Enter"&&handleEmailSignup()}
-                          style={{...inp, marginBottom:12}}/>
-                      </>
-                    )}
-
-                    <button
-                      onClick={emailMode==="login"?handleEmailLogin:handleEmailSignup}
-                      style={{ width:"100%", padding:"13px", borderRadius:12, border:"none",
-                        background:"#111827", color:"#fff", fontFamily:"inherit",
-                        fontSize:14, fontWeight:700, cursor:"pointer", marginTop:4,
-                        boxSizing:"border-box" }}>
-                      {emailMode==="login" ? "Sign In →" : "Create Account →"}
-                    </button>
+                      color:"#6B7280", textTransform:"uppercase" }}>Confirm Password</p>
+                    <input type="password" value={confirmPwd}
+                      onChange={e=>setConfirmPwd(e.target.value)}
+                      placeholder="Re-enter password"
+                      autoComplete="new-password"
+                      onKeyDown={e=>e.key==="Enter"&&handleEmailSignup()}
+                      style={{...inp, marginBottom:14}}/>
                   </>
                 )}
+
+                <button onClick={emailMode==="login"?handleEmailLogin:handleEmailSignup}
+                  style={{ width:"100%", padding:"13px", borderRadius:12, border:"none",
+                    background:"#111827", color:"#fff", fontFamily:"inherit",
+                    fontSize:14, fontWeight:700, cursor:"pointer", marginTop:2,
+                    boxSizing:"border-box" }}>
+                  {emailMode==="login" ? "Sign In →" : "Create Account →"}
+                </button>
+
+                {/* ── Guest ── */}
+                <div style={{ display:"flex", alignItems:"center", gap:10, margin:"14px 0 10px" }}>
+                  <div style={{ flex:1, height:1, background:"#F1F5F9" }}/>
+                  <span style={{ fontSize:11, color:"#9CA3AF" }}>or</span>
+                  <div style={{ flex:1, height:1, background:"#F1F5F9" }}/>
+                </div>
+                <button onClick={onGuest}
+                  style={{ width:"100%", padding:"12px", borderRadius:14,
+                    border:"1.5px solid #F1F5F9", background:"#F8FAFC",
+                    cursor:"pointer", fontFamily:"inherit", fontSize:13,
+                    fontWeight:600, color:"#6B7280",
+                    display:"flex", alignItems:"center", justifyContent:"center", gap:8,
+                    boxSizing:"border-box" }}>
+                  👤 Continue as Guest
+                </button>
               </>
             )}
           </div>
 
           <div style={{ textAlign:"center", marginTop:14 }}>
-            <button onClick={()=>setScreen("welcome")}
-              style={{ background:"none", border:"none", color:"#475569",
-                cursor:"pointer", fontFamily:"inherit", fontSize:13,
-                display:"block", margin:"0 auto 6px" }}>← Back</button>
+            {!loading && (
+              <button onClick={()=>setScreen("welcome")}
+                style={{ background:"none", border:"none", color:"#475569",
+                  cursor:"pointer", fontFamily:"inherit", fontSize:13,
+                  display:"block", margin:"0 auto 6px" }}>← Back</button>
+            )}
             <p style={{ fontSize:11, color:"#334155", margin:0 }}>
               By continuing you agree to our{" "}
               <a href="/privacy-policy.html" style={{ color:"#60A5FA", textDecoration:"none" }}>

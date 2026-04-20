@@ -133,6 +133,51 @@ export function saveFirebaseSDKSession(data) {
   return sdkUser;
 }
 
+// ── Write email/password auth state to localStorage in Firebase SDK format ───
+export function saveEmailSDKSession(data, displayName) {
+  const expiresIn      = parseInt(data.expiresIn || "3600", 10);
+  const expirationTime = Date.now() + expiresIn * 1000;
+  const sdkUser = {
+    uid:           data.localId,
+    email:         data.email         || null,
+    emailVerified: data.emailVerified || false,
+    displayName:   displayName        || data.displayName || null,
+    isAnonymous:   false,
+    photoURL:      null,
+    phoneNumber:   null,
+    tenantId:      null,
+    providerData: [{
+      providerId:  "password",
+      uid:         data.email         || data.localId,
+      displayName: displayName        || null,
+      email:       data.email         || null,
+      phoneNumber: null,
+      photoURL:    null,
+    }],
+    stsTokenManager: {
+      refreshToken:   data.refreshToken,
+      accessToken:    data.idToken,
+      expirationTime,
+    },
+    createdAt:   String(Date.now()),
+    lastLoginAt: String(Date.now()),
+    apiKey:   API_KEY,
+    appName:  "[DEFAULT]",
+  };
+  const key = `firebase:authUser:${API_KEY}:[DEFAULT]`;
+  localStorage.setItem(key, JSON.stringify(sdkUser));
+  try {
+    window.dispatchEvent(new StorageEvent("storage", {
+      key,
+      newValue:    localStorage.getItem(key),
+      oldValue:    null,
+      storageArea: window.localStorage,
+      url:         window.location.href,
+    }));
+  } catch (_) {}
+  return sdkUser;
+}
+
 // ── Format error codes ────────────────────────────────────────────────────────
 export function formatAuthError(code) {
   const map = {

@@ -1,6 +1,6 @@
 // ─── firebase.js ─────────────────────────────────────────────────────────────
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -15,3 +15,9 @@ const firebaseConfig = {
 const app  = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db   = getFirestore(app);
+
+// Set localStorage persistence at module load time — before any component
+// mounts or any sign-in is attempted. Without this, Capacitor WKWebView uses
+// IndexedDB by default, which hangs on iOS and causes login to never complete.
+// Export the promise so auth operations can await it before proceeding.
+export const persistenceReady = setPersistence(auth, browserLocalPersistence).catch(() => {});

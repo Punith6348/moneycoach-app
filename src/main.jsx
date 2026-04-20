@@ -1,7 +1,7 @@
 // ─── main.jsx ────────────────────────────────────────────────────────────────
 import { StrictMode, useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
-import { onAuthStateChanged, signOut, setPersistence, browserLocalPersistence } from "firebase/auth";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "./firebase";
 import { clearSession } from "./firebaseAuth";
 import { registerUserProfile } from "./useFirestoreSync";
@@ -11,10 +11,11 @@ import "./App.css";
 
 const globalStyle = document.createElement("style");
 globalStyle.textContent = `
-  *, *::before, *::after { box-sizing: border-box; }
-  html { margin:0; padding:0; height:100%; }
-  body { margin:0; padding:0; min-height:100%; overscroll-behavior:none; -webkit-text-size-adjust:100%; }
+  *, *::before, *::after { box-sizing: border-box; touch-action: manipulation; }
+  html { margin:0; padding:0; height:100%; overflow-x:hidden; }
+  body { margin:0; padding:0; min-height:100%; overscroll-behavior:none; -webkit-text-size-adjust:100%; overflow-x:hidden; }
   #root { min-height:100dvh; width:100%; margin:0; padding:0; }
+  img, svg, video { max-width:100%; }
   .auth-root {
     position: fixed; inset: 0;
     overflow-y: auto; overflow-x: hidden;
@@ -47,18 +48,15 @@ function Root() {
   const [guestMode, setGuestMode] = useState(false);
 
   useEffect(() => {
-    // Timeout — show login after 8s if Firebase doesn't respond
-    const timeout = setTimeout(() => {
-      setUser(prev => prev === undefined ? null : prev);
-    }, 8000);
+    // Persistence is already set in firebase.js at module load time.
+    // Just subscribe to auth state with a 1.5s safety timeout.
+    const timeout = setTimeout(() => setUser(null), 1500);
 
-    let unsub;
-    const handleUser = u => {
+    const unsub = onAuthStateChanged(auth, u => {
       clearTimeout(timeout);
       if (u) {
         const storedUid = localStorage.getItem("moneyCoachUID");
         if (storedUid && storedUid !== u.uid) {
-          // Different user — clear previous user's local data
           localStorage.removeItem("moneyCoachData_v3");
           localStorage.removeItem("moneyCoachData_v2");
           localStorage.removeItem("moneyCoachData");
@@ -70,16 +68,9 @@ function Root() {
       } else {
         setUser(null);
       }
-    };
+    });
 
-    // Force localStorage persistence — Capacitor iOS WKWebView has issues
-    // with Firebase's default IndexedDB persistence, causing onAuthStateChanged
-    // to never fire and the app to be stuck on the loading screen forever.
-    setPersistence(auth, browserLocalPersistence)
-      .then(() => { unsub = onAuthStateChanged(auth, handleUser); })
-      .catch(() => { unsub = onAuthStateChanged(auth, handleUser); }); // fallback if persistence fails
-
-    return () => { clearTimeout(timeout); if (unsub) unsub(); };
+    return () => { clearTimeout(timeout); unsub(); };
   }, []);
 
   if (user === undefined && !guestMode) return <LoadingScreen/>;
