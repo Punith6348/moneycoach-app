@@ -55,7 +55,8 @@ export function saveSession(data) {
   localStorage.setItem("mc_uid",   data.localId);
   localStorage.setItem("mc_email", data.email);
   localStorage.setItem("mc_token", data.idToken);
-  localStorage.setItem("moneyCoachUID", data.localId);
+  // moneyCoachUID is set by onAuthSuccess AFTER the user-change check,
+  // so it must NOT be set here (would defeat the prevUid comparison).
 }
 
 // ── Get current session ───────────────────────────────────────────────────────
