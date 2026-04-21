@@ -598,9 +598,6 @@ function OnboardingScreen({onComplete}) {
               <p style={{ fontSize:12, color:C.muted, margin:"0 0 6px" }}>
                 Tap to select bills you pay every month
               </p>
-              <p style={{ fontSize:10, color:C.blue, fontWeight:600, margin:"0 0 14px", textTransform:"uppercase", letterSpacing:"0.5px" }}>
-                Optional — can update later in settings
-              </p>
 
               {bills.map(b=>
                 toggleRow(b, "amount", "e.g. 15000",
@@ -654,9 +651,6 @@ function OnboardingScreen({onComplete}) {
               <p style={{ fontSize:12, color:C.muted, margin:"0 0 6px" }}>
                 Monthly SIPs, RDs or any savings you do
               </p>
-              <p style={{ fontSize:10, color:C.blue, fontWeight:600, margin:"0 0 14px", textTransform:"uppercase", letterSpacing:"0.5px" }}>
-                Optional — can update later in settings
-              </p>
 
               {savings.map(s=>
                 toggleRow(s, "amount", "e.g. 5000",
@@ -703,9 +697,6 @@ function OnboardingScreen({onComplete}) {
               </div>
               <p style={{ fontSize:12, color:C.muted, margin:"0 0 6px" }}>
                 Any active loan EMIs you pay monthly
-              </p>
-              <p style={{ fontSize:10, color:C.blue, fontWeight:600, margin:"0 0 14px", textTransform:"uppercase", letterSpacing:"0.5px" }}>
-                Optional — can update later in settings
               </p>
 
               {loans.map(l=>
