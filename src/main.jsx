@@ -103,8 +103,8 @@ function Root() {
       isGuest={guestMode}
       onSignOut={async () => {
         clearSession();
-        localStorage.removeItem("moneyCoachData_v3");
-        localStorage.removeItem("moneyCoachUID");
+        // Don't wipe data — same user signing back in should get their data from localStorage.
+        // Different user is handled in useAppData (clears when storedUid !== uid).
         try { if (auth.currentUser) await signOut(auth); } catch(e) {}
         setGuestMode(false);
         setUser(null);

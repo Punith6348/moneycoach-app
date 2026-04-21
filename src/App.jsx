@@ -502,9 +502,6 @@ function OnboardingScreen({onComplete}) {
                 fontSize:15, fontFamily:"inherit", fontWeight:700, cursor:"pointer" }}>
                 Next → Income
               </button>
-              <p style={{ textAlign:"center", fontSize:12, color:"#2563EB", margin:"8px 0 0", fontWeight:600 }}>
-                👆 Name is optional — tap Next to skip
-              </p>
             </>
           )}
 

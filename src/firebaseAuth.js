@@ -73,7 +73,9 @@ export function clearSession() {
   localStorage.removeItem("mc_email");
   localStorage.removeItem("mc_token");
   localStorage.removeItem("moneyCoachUID");
-  localStorage.removeItem("moneyCoachData_v3");
+  // moneyCoachData_v3 is intentionally kept — same user signing back in
+  // can resume from localStorage while Firestore syncs in background.
+  // Different user sign-in clears it via the storedUid check in useAppData.
 }
 
 // ── Apple Sign In via REST API ────────────────────────────────────────────────
