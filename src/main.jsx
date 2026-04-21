@@ -86,9 +86,13 @@ function Root() {
             setGuestMode(true);
           }}
           onAuthSuccess={(u) => {
-            // Explicit callback — don't rely solely on onAuthStateChanged for navigation.
-            // Capacitor iOS WKWebView can delay or suppress onAuthStateChanged for OAuth
-            // (Apple/Google) sign-ins due to the capacitor:// origin.
+            // If a different user signs in, wipe local data so they start clean.
+            const prevUid = localStorage.getItem("moneyCoachUID");
+            if (prevUid && prevUid !== u.uid) {
+              localStorage.removeItem("moneyCoachData_v3");
+              localStorage.removeItem("moneyCoachData_v2");
+              localStorage.removeItem("moneyCoachData");
+            }
             localStorage.setItem("moneyCoachUID", u.uid);
             setGuestMode(false);
             registerUserProfile(u).catch(() => {});
