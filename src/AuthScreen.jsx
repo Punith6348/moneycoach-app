@@ -5,6 +5,7 @@ import { OAuthProvider, signInWithPopup } from "firebase/auth";
 import {
   signInWithAppleREST, saveFirebaseSDKSession, saveSession,
   signUpWithEmail, signInWithEmail, saveEmailSDKSession, formatAuthError,
+  loadFirestoreREST,
 } from "./firebaseAuth";
 
 function AppLogo({ size=80 }) {
@@ -114,6 +115,11 @@ export default function AuthScreen({ onGuest, onAuthSuccess }) {
     startLoading("Signing you in...");
     try {
       const data = await signInWithEmail(email.trim(), password);
+      // Pre-load cloud data into localStorage BEFORE onAuthSuccess so
+      // useAppData's useState initialiser finds the saved dashboard state.
+      // This avoids depending on onAuthStateChanged firing (which races
+      // with the StorageEvent on Capacitor WKWebView).
+      await loadFirestoreREST(data.localId, data.idToken);
       saveSession(data);
       saveEmailSDKSession(data, data.displayName || null);
       onAuthSuccess?.({ uid: data.localId, email: data.email || null, displayName: data.displayName || null, photoURL: null });

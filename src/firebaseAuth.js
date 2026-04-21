@@ -10,6 +10,8 @@
 const API_KEY    = "AIzaSyCi2YckhXYnZk8Fis4PE3SB7A2QrGdn_wI";
 const BASE       = "https://identitytoolkit.googleapis.com/v1/accounts";
 const AUTH_DOMAIN = "https://money-coach-aaa8c.firebaseapp.com"; // authorized domain
+const PROJECT_ID  = "money-coach-aaa8c";
+const FIRESTORE   = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 
 // ── Fetch with 10-second timeout ─────────────────────────────────────────────
 async function fetchWithTimeout(url, options, ms = 10000) {
@@ -194,6 +196,43 @@ export function saveEmailSDKSession(data, displayName) {
     }));
   } catch (_) {}
   return sdkUser;
+}
+
+// ── Load user data from Firestore via REST (no Firebase SDK auth needed) ─────
+// Uses the idToken from REST auth directly. Called on sign-in before onAuthSuccess
+// so cloud data is in localStorage when useAppData initialises.
+export async function loadFirestoreREST(uid, idToken) {
+  try {
+    const res = await fetchWithTimeout(`${FIRESTORE}/users/${uid}`, {
+      headers: { "Authorization": `Bearer ${idToken}` },
+    });
+    if (!res.ok) return null;
+    const doc = await res.json();
+    const raw = doc.fields?.data?.stringValue;
+    if (raw) {
+      localStorage.setItem("moneyCoachData_v3", raw);
+      return true;
+    }
+  } catch(e) { console.warn("Firestore REST load failed:", e); }
+  return null;
+}
+
+// ── Save user data to Firestore via REST (no Firebase SDK auth needed) ────────
+// Called on sign-up after onboarding so data reaches Firestore even if
+// onAuthStateChanged never fires (race with StorageEvent on Capacitor WKWebView).
+export async function saveFirestoreREST(uid, idToken, dataJson) {
+  try {
+    await fetchWithTimeout(`${FIRESTORE}/users/${uid}?updateMask.fieldPaths=data&updateMask.fieldPaths=updatedAt`, {
+      method:  "PATCH",
+      headers: { "Authorization": `Bearer ${idToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fields: {
+          data:      { stringValue: dataJson },
+          updatedAt: { integerValue: String(Date.now()) },
+        },
+      }),
+    });
+  } catch(e) { console.warn("Firestore REST save failed:", e); }
 }
 
 // ── Format error codes ────────────────────────────────────────────────────────

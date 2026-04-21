@@ -4,6 +4,7 @@ import { doc, setDoc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "./firebase.js";
 import { loadFromFirestore, migrateLocalToFirestore } from "./useFirestoreSync.js";
+import { saveFirestoreREST } from "./firebaseAuth.js";
 
 const STORAGE_KEY = "moneyCoachData_v3";
 
@@ -368,18 +369,28 @@ export function useAppData(firebaseUser = null) {
       return next;
     });
     // Skip Firestore write when state didn't change (e.g. duplicate check-in attempt)
-    // Also skip if Firebase SDK hasn't authenticated yet — REST auth writes the session
-    // to localStorage async; the SDK may not have auth.currentUser set yet.
-    // migrateLocalToFirestore() will sync the data once the SDK is ready.
-    if (firebaseUser && next !== undefined && next !== prev_
-        && auth.currentUser?.uid === firebaseUser.uid) {
-      const ref = doc(db, "users", firebaseUser.uid);
-      setDoc(ref, { data: JSON.stringify(next), updatedAt: Date.now() })
-        .then(() => setSyncError(null))
-        .catch(e => {
-          console.warn("Sync failed:", e);
-          setSyncError("Changes saved locally but not synced to cloud. Check your connection.");
-        });
+    if (firebaseUser && next !== undefined && next !== prev_) {
+      if (auth.currentUser?.uid === firebaseUser.uid) {
+        // Firebase SDK is authenticated — use SDK path (token auto-refreshed)
+        const ref = doc(db, "users", firebaseUser.uid);
+        setDoc(ref, { data: JSON.stringify(next), updatedAt: Date.now() })
+          .then(() => setSyncError(null))
+          .catch(e => {
+            console.warn("Sync failed:", e);
+            setSyncError("Changes saved locally but not synced to cloud. Check your connection.");
+          });
+      } else {
+        // SDK not ready yet (REST auth session not yet processed by Firebase SDK).
+        // Use the raw idToken from localStorage to write directly via Firestore REST API.
+        // This ensures sign-up onboarding data reaches the cloud even if
+        // onAuthStateChanged never fires (StorageEvent race on Capacitor WKWebView).
+        const token = localStorage.getItem("mc_token");
+        if (token) {
+          saveFirestoreREST(firebaseUser.uid, token, JSON.stringify(next))
+            .then(() => setSyncError(null))
+            .catch(() => {});
+        }
+      }
     }
   };
 
