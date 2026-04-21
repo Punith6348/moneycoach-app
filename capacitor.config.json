@@ -15,6 +15,6 @@
   "ios": {
     "allowsLinkPreview": false,
     "scrollEnabled": true,
-    "contentInset": "always"
+    "contentInset": "never"
   }
 }

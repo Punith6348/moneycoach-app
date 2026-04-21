@@ -1885,7 +1885,9 @@ function DashboardScreen(props) {
       {/* ── Sync error banner ── */}
       {syncError && (
         <div style={{position:"fixed",top:0,left:0,right:0,
-                     background:"#B45309",color:"#fff",padding:"8px 16px",
+                     background:"#B45309",color:"#fff",
+                     paddingTop:"calc(env(safe-area-inset-top, 0px) + 8px)",
+                     paddingBottom:"8px",paddingLeft:"16px",paddingRight:"16px",
                      fontSize:12,zIndex:9998,textAlign:"center",
                      boxShadow:"0 2px 8px rgba(0,0,0,0.25)"}}>
           ⚠️ {syncError}
@@ -1894,7 +1896,7 @@ function DashboardScreen(props) {
 
       {/* ── Toast ── */}
       {toast && (
-        <div style={{position:"fixed",top:syncError?36:20,left:"50%",transform:"translateX(-50%)",
+        <div style={{position:"fixed",top:syncError?"calc(env(safe-area-inset-top, 0px) + 52px)":"calc(env(safe-area-inset-top, 0px) + 12px)",left:"50%",transform:"translateX(-50%)",
                      background:C.ink,color:"#fff",padding:"9px 20px",borderRadius:99,
                      fontSize:13,zIndex:9999,whiteSpace:"nowrap",
                      boxShadow:"0 4px 20px rgba(0,0,0,0.18)",animation:"fadeUp 0.2s ease"}}>

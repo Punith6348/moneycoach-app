@@ -368,7 +368,11 @@ export function useAppData(firebaseUser = null) {
       return next;
     });
     // Skip Firestore write when state didn't change (e.g. duplicate check-in attempt)
-    if (firebaseUser && next !== undefined && next !== prev_) {
+    // Also skip if Firebase SDK hasn't authenticated yet — REST auth writes the session
+    // to localStorage async; the SDK may not have auth.currentUser set yet.
+    // migrateLocalToFirestore() will sync the data once the SDK is ready.
+    if (firebaseUser && next !== undefined && next !== prev_
+        && auth.currentUser?.uid === firebaseUser.uid) {
       const ref = doc(db, "users", firebaseUser.uid);
       setDoc(ref, { data: JSON.stringify(next), updatedAt: Date.now() })
         .then(() => setSyncError(null))
