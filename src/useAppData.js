@@ -1,7 +1,8 @@
 // ─── useAppData.js — Extended with financial planning data ───────────────
 import { useState, useEffect } from "react";
 import { doc, setDoc } from "firebase/firestore";
-import { db } from "./firebase.js";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth, db } from "./firebase.js";
 import { loadFromFirestore, migrateLocalToFirestore } from "./useFirestoreSync.js";
 
 const STORAGE_KEY = "moneyCoachData_v3";
@@ -285,26 +286,27 @@ export function useAppData(firebaseUser = null) {
   useEffect(() => {
     if (!firebaseUser) return;
     let mounted = true;
-    (async () => {
+
+    const doLoad = async (uid) => {
       const storedUid = localStorage.getItem("moneyCoachUID");
 
       // Clear local data ONLY when a different signed-in user was stored.
       // If storedUid is null (guest mode) we preserve local data and migrate it.
-      if (storedUid && storedUid !== firebaseUser.uid) {
+      if (storedUid && storedUid !== uid) {
         localStorage.removeItem("moneyCoachData_v3");
         localStorage.removeItem("moneyCoachData_v2");
         localStorage.removeItem("moneyCoachData");
-        localStorage.setItem("moneyCoachUID", firebaseUser.uid);
+        localStorage.setItem("moneyCoachUID", uid);
         if (mounted) setData({...DEFAULT_STATE});
       }
 
       // Migrate local → Firestore for same user OR guest signing in for the first time
-      if (!storedUid || storedUid === firebaseUser.uid) {
-        await migrateLocalToFirestore(firebaseUser.uid);
+      if (!storedUid || storedUid === uid) {
+        await migrateLocalToFirestore(uid);
       }
 
       // Load this user's cloud data
-      const cloudData = await loadFromFirestore(firebaseUser.uid);
+      const cloudData = await loadFromFirestore(uid);
       if (!mounted) return;
       if (cloudData) {
         // Sanitize allExpenses — remove entries with missing dates
@@ -336,7 +338,24 @@ export function useAppData(firebaseUser = null) {
         setData(freshState);
         persist(freshState);
       }
-    })();
+    };
+
+    // If Firebase SDK already has this user authenticated, load immediately.
+    // Otherwise wait — REST-based auth writes the session to localStorage and
+    // dispatches a StorageEvent; Firebase SDK processes it async, so
+    // auth.currentUser may not be set yet when this effect first runs.
+    if (auth.currentUser?.uid === firebaseUser.uid) {
+      doLoad(firebaseUser.uid);
+    } else {
+      const unsub = onAuthStateChanged(auth, u => {
+        if (u && u.uid === firebaseUser.uid && mounted) {
+          unsub();
+          doLoad(u.uid);
+        }
+      });
+      return () => { mounted = false; unsub(); };
+    }
+
     return () => { mounted = false; };
   }, [firebaseUser?.uid]);
 
