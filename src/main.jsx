@@ -11,14 +11,16 @@ import "./App.css";
 
 const globalStyle = document.createElement("style");
 globalStyle.textContent = `
-  *, *::before, *::after { box-sizing: border-box; touch-action: manipulation; }
-  html { margin:0; padding:0; height:100%; overflow-x:hidden; }
+  *, *::before, *::after { box-sizing: border-box; }
+  html { margin:0; padding:0; height:100%; overflow-x:hidden; touch-action:pan-y; }
   body { margin:0; padding:0; min-height:100%; overscroll-behavior:none; -webkit-text-size-adjust:100%; overflow-x:hidden; }
   #root { min-height:100dvh; width:100%; margin:0; padding:0; }
   img, svg, video { max-width:100%; }
+  button, a, input, select, textarea { touch-action: manipulation; }
   .auth-root {
     position: fixed; inset: 0;
-    overflow-y: auto; overflow-x: hidden;
+    overflow-y: scroll; overflow-x: hidden;
+    -webkit-overflow-scrolling: touch; touch-action: pan-y;
     background: linear-gradient(160deg,#0F172A 0%,#1E293B 60%,#0F172A 100%);
     z-index: 9999;
   }

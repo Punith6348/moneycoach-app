@@ -157,8 +157,8 @@ export default function AuthScreen({ onGuest, onAuthSuccess }) {
   // ── Welcome Screen ────────────────────────────────────────────────────────
   if (screen === "welcome") {
     return (
-      <div style={{ position:"fixed", inset:0, overflowY:"auto",
-        WebkitOverflowScrolling:"touch",
+      <div style={{ position:"fixed", inset:0, overflowY:"scroll",
+        WebkitOverflowScrolling:"touch", touchAction:"pan-y",
         fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
         background:"linear-gradient(160deg,#0F172A 0%,#1E293B 60%,#0F172A 100%)" }}>
         <div style={{ maxWidth:420, margin:"0 auto", padding:"40px 24px", boxSizing:"border-box" }}>

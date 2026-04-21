@@ -440,8 +440,9 @@ function OnboardingScreen({onComplete}) {
     <div style={{
       position:"fixed", inset:0,
       background:"linear-gradient(160deg,#0F172A,#1E293B)",
-      overflowY:"auto", overflowX:"hidden",
+      overflowY:"scroll", overflowX:"hidden",
       WebkitOverflowScrolling:"touch",
+      touchAction:"pan-y",
       paddingTop:"env(safe-area-inset-top, 20px)",
       paddingBottom:"env(safe-area-inset-bottom, 20px)",
       paddingLeft:"max(16px, env(safe-area-inset-left, 16px))",
