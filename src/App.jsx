@@ -107,9 +107,8 @@ const C = {ink:"#111827",muted:"#6B7280",border:"#E5E7EB",bg:"#F8FAFC",red:"#DC2
 // Responsive CSS injected once into <head> equivalent via a style tag in the app shell
 const APP_CSS = `
   /* ── Reset ── */
-  html, body { margin:0; padding:0; height:100%; overflow:hidden; background:#F8FAFC; }
+  html, body { margin:0; padding:0; height:100%; overflow:hidden; background:#F8FAFC; touch-action:pan-y; }
   #root { height:100%; }
-  *, *::before, *::after { touch-action: manipulation; }
   button, a, input, select, textarea { touch-action: manipulation; }
 
   /* ── App shell — fills entire screen edge to edge ── */
@@ -133,10 +132,11 @@ const APP_CSS = `
   /* ── Scrollable content ── */
   .mc-scroll {
     flex:1;
-    overflow-y:auto;
+    overflow-y:scroll;
     overflow-x:hidden;
     -webkit-overflow-scrolling:touch;
     overscroll-behavior:contain;
+    touch-action:pan-y;
   }
 
   /* ── Content padding (sides use safe-area for landscape iPhone notch) ── */
@@ -2036,9 +2036,9 @@ function DashboardScreen(props) {
                   {new Date().toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"})}
                 </p>
                 <p style={{margin:0,fontSize:14,fontWeight:700,color:"#111827",fontFamily:"Georgia,serif",lineHeight:1.15}}>
-                  {getGreeting(name)} 👋
+                  {tab==="budget" ? `${getGreeting(name)} 👋` : (TABS.find(t=>t.key===tab)?.label || "Money Coach")}
                 </p>
-                {(() => {
+                {tab==="budget" && (() => {
                   try {
                     const insight = getSmartInsight(remaining||0, totalIncome||0, thisMonthSpent||0, dailyLimit||0, streak||0);
                     return insight ? (
@@ -2082,10 +2082,12 @@ function DashboardScreen(props) {
               <div>
                 <p style={{margin:0,fontSize:11,color:C.muted,textTransform:"uppercase",
                            letterSpacing:"1.1px",fontWeight:600,marginBottom:2}}>
-                  {new Date().toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"short"})}
+                  {tab==="budget"
+                    ? new Date().toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"short"})
+                    : (TABS.find(t=>t.key===tab)?.label || "Money Coach")}
                 </p>
                 <h1 style={{fontSize:16,fontWeight:700,color:C.ink,fontFamily:"Georgia,serif",margin:0}}>
-                  {getGreeting(name)} 👋
+                  {tab==="budget" ? `${getGreeting(name)} 👋` : new Date().toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"short"})}
                 </h1>
               </div>
               <button onClick={() => setShowSettings(true)}
