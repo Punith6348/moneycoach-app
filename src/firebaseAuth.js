@@ -11,9 +11,24 @@ const API_KEY    = "AIzaSyCi2YckhXYnZk8Fis4PE3SB7A2QrGdn_wI";
 const BASE       = "https://identitytoolkit.googleapis.com/v1/accounts";
 const AUTH_DOMAIN = "https://money-coach-aaa8c.firebaseapp.com"; // authorized domain
 
+// ── Fetch with 10-second timeout ─────────────────────────────────────────────
+async function fetchWithTimeout(url, options, ms = 10000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  try {
+    const res = await fetch(url, { ...options, signal: ctrl.signal });
+    clearTimeout(timer);
+    return res;
+  } catch(e) {
+    clearTimeout(timer);
+    if (e.name === "AbortError") throw { code: "NETWORK_TIMEOUT", message: "Request timed out. Check your internet and try again." };
+    throw { code: "NETWORK_ERROR", message: "No internet connection. Check your network." };
+  }
+}
+
 // ── Sign up with email/password ───────────────────────────────────────────────
 export async function signUpWithEmail(email, password) {
-  const res = await fetch(`${BASE}:signUp?key=${API_KEY}`, {
+  const res = await fetchWithTimeout(`${BASE}:signUp?key=${API_KEY}`, {
     method:  "POST",
     headers: { "Content-Type": "application/json" },
     body:    JSON.stringify({ email, password, returnSecureToken: true }),
@@ -25,7 +40,7 @@ export async function signUpWithEmail(email, password) {
 
 // ── Sign in with email/password ───────────────────────────────────────────────
 export async function signInWithEmail(email, password) {
-  const res = await fetch(`${BASE}:signInWithPassword?key=${API_KEY}`, {
+  const res = await fetchWithTimeout(`${BASE}:signInWithPassword?key=${API_KEY}`, {
     method:  "POST",
     headers: { "Content-Type": "application/json" },
     body:    JSON.stringify({ email, password, returnSecureToken: true }),
@@ -181,14 +196,17 @@ export function saveEmailSDKSession(data, displayName) {
 // ── Format error codes ────────────────────────────────────────────────────────
 export function formatAuthError(code) {
   const map = {
-    "EMAIL_NOT_FOUND":        "No account found with this email",
-    "INVALID_PASSWORD":       "Incorrect password",
-    "INVALID_LOGIN_CREDENTIALS": "Incorrect email or password",
-    "EMAIL_EXISTS":           "Email already registered. Try signing in.",
-    "WEAK_PASSWORD":          "Password too weak — use at least 6 characters",
-    "INVALID_EMAIL":          "Invalid email address",
-    "TOO_MANY_ATTEMPTS_TRY_LATER": "Too many attempts. Try again later.",
+    "EMAIL_NOT_FOUND":        "No account found with this email. Create one below.",
+    "INVALID_PASSWORD":       "Incorrect password. Try again.",
+    "INVALID_LOGIN_CREDENTIALS": "Incorrect email or password.",
+    "EMAIL_EXISTS":           "Email already registered. Tap Sign In instead.",
+    "WEAK_PASSWORD":          "Password too weak — use at least 6 characters.",
+    "INVALID_EMAIL":          "Invalid email address.",
+    "TOO_MANY_ATTEMPTS_TRY_LATER": "Too many attempts. Wait a moment and try again.",
     "USER_DISABLED":          "Account disabled. Contact support.",
+    "OPERATION_NOT_ALLOWED":  "Email sign-in is not enabled. Contact support.",
+    "NETWORK_TIMEOUT":        "Request timed out. Check your internet and try again.",
+    "NETWORK_ERROR":          "No internet connection. Check your network.",
   };
-  return map[code] || `Error: ${code}`;
+  return map[code] || (code ? `Sign in failed: ${code}` : "Something went wrong. Try again.");
 }

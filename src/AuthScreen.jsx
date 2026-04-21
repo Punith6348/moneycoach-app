@@ -120,7 +120,7 @@ export default function AuthScreen({ onGuest, onAuthSuccess }) {
       stopLoading();
     } catch(e) {
       console.error("Login error:", e.code, e.message);
-      setError(formatAuthError(e.code) || `Sign in failed (${e.code || e.message})`);
+      setError(e.message && !e.code ? e.message : formatAuthError(e.code));
       stopLoading();
     }
   };
@@ -141,7 +141,7 @@ export default function AuthScreen({ onGuest, onAuthSuccess }) {
       stopLoading();
     } catch(e) {
       console.error("Signup error:", e.code, e.message);
-      setError(formatAuthError(e.code) || `Sign up failed (${e.code || e.message})`);
+      setError(e.message && !e.code ? e.message : formatAuthError(e.code));
       stopLoading();
     }
   };
