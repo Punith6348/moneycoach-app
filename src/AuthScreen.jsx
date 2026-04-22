@@ -1,7 +1,7 @@
 // ─── AuthScreen.jsx ───────────────────────────────────────────────────────────
 import { useState, useEffect } from "react";
 import { auth } from "./firebase";
-import { OAuthProvider, signInWithPopup } from "firebase/auth";
+import { OAuthProvider, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from "firebase/auth";
 import {
   signInWithAppleREST, saveFirebaseSDKSession, saveSession,
   signUpWithEmail, signInWithEmail, saveEmailSDKSession, formatAuthError,
@@ -70,8 +70,50 @@ export default function AuthScreen({ onGuest, onAuthSuccess }) {
     return () => window.visualViewport?.removeEventListener("resize", onResize);
   }, []);
 
+  // Pick up Google redirect result when the app loads after redirect
+  useEffect(() => {
+    if (isCapacitorIOS) return; // iOS uses Apple, not Google redirect
+    getRedirectResult(auth).then(async result => {
+      if (!result?.user) return;
+      startLoading("Signing you in...");
+      try {
+        await loadFirestoreREST(result.user.uid, await result.user.getIdToken());
+        onAuthSuccess?.(result.user);
+      } catch(e) {
+        console.error("Google redirect result error:", e);
+      }
+      stopLoading();
+    }).catch(() => {});
+  }, []);
+
   const startLoading = (msg) => { setError(""); setLoading(true); setLoadMsg(msg); };
   const stopLoading  = ()    => { setLoading(false); setLoadMsg(""); };
+
+  // ── Google Sign In — Android/web only ─────────────────────────────────────
+  // Uses redirect (not popup) so it works correctly inside TWA on Android.
+  // After redirect, getRedirectResult() picks up the result on return.
+  const handleGoogle = async () => {
+    startLoading("Signing in with Google...");
+    try {
+      const provider = new GoogleAuthProvider();
+      // On Android TWA, signInWithRedirect navigates within Chrome (no new tab).
+      // On web desktop, popup works fine but redirect is also safe there.
+      await signInWithRedirect(auth, provider);
+      // Execution continues after the user returns from the redirect.
+      const result = await getRedirectResult(auth);
+      if (result?.user) {
+        await loadFirestoreREST(result.user.uid, await result.user.getIdToken());
+        onAuthSuccess?.(result.user);
+      }
+      stopLoading();
+    } catch(e) {
+      console.error("Google error:", e.code, e.message);
+      if (e.code !== "auth/cancelled-popup-request" && e.code !== "auth/popup-closed-by-user") {
+        setError("Google sign-in failed. Please try email instead.");
+      }
+      stopLoading();
+    }
+  };
 
   // ── Apple Sign In ─────────────────────────────────────────────────────────
   const handleApple = async () => {
@@ -278,6 +320,34 @@ export default function AuthScreen({ onGuest, onAuthSuccess }) {
                     </button>
 
                     {/* ── Divider ── */}
+                    <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
+                      <div style={{ flex:1, height:1, background:"#E5E7EB" }}/>
+                      <span style={{ fontSize:11, color:"#9CA3AF" }}>or sign in with email</span>
+                      <div style={{ flex:1, height:1, background:"#E5E7EB" }}/>
+                    </div>
+                  </>
+                )}
+
+                {/* ── Google Sign In — Android & web only ── */}
+                {!isCapacitorIOS && (
+                  <>
+                    <button onClick={handleGoogle}
+                      style={{ width:"100%", padding:"13px 16px", borderRadius:14,
+                        border:"1.5px solid #E5E7EB", background:"#fff", color:"#111827",
+                        display:"flex", alignItems:"center", justifyContent:"center", gap:10,
+                        cursor:"pointer", fontFamily:"inherit", fontSize:15, fontWeight:700,
+                        marginBottom:16, boxSizing:"border-box",
+                        boxShadow:"0 1px 4px rgba(0,0,0,0.08)" }}>
+                      {/* Google G logo */}
+                      <svg width="18" height="18" viewBox="0 0 48 48" style={{flexShrink:0}}>
+                        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                      </svg>
+                      Sign in with Google
+                    </button>
+
                     <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
                       <div style={{ flex:1, height:1, background:"#E5E7EB" }}/>
                       <span style={{ fontSize:11, color:"#9CA3AF" }}>or sign in with email</span>
