@@ -323,8 +323,7 @@ function SetupChecklist({ totalIncome, fixedExpenses, savingsPlans, onNavigate }
 
 // ─── ONBOARDING — 5 step setup ───────────────────────────────────────────────
 function OnboardingScreen({onComplete, defaultName=""}) {
-  // If name already provided by Apple/Google, skip step 1 entirely
-  const [step, setStep] = useState(defaultName ? 2 : 1);
+  const [step, setStep] = useState(1);
   const [name, setName] = useState(defaultName || "");
 
   // Step 2 — Income
@@ -464,26 +463,20 @@ function OnboardingScreen({onComplete, defaultName=""}) {
         {/* Step indicators */}
         <div style={{ display:"flex", alignItems:"center", justifyContent:"center",
           gap:4, marginBottom:16, flexWrap:"wrap" }}>
-          {STEPS.map((s,i)=>{
-            // When name came from Apple/Google, treat step 1 as already done
-            const effectiveStep = defaultName && i===0 ? step+1 : step;
-            const done    = effectiveStep > i+1;
-            const current = step === i+1;
-            return (
-              <div key={i} style={{ display:"flex", alignItems:"center", gap:4 }}>
-                <div style={{ display:"flex", alignItems:"center", gap:4,
-                  padding:"4px 10px", borderRadius:99,
-                  background:current?"#2563EB":done?"#16A34A22":"#1E293B",
-                  border:`1px solid ${current?"#60A5FA":done?"#16A34A":"#334155"}` }}>
-                  <span style={{ fontSize:10, color:done?"#16A34A":current?"#fff":"#475569",
-                    fontWeight:700 }}>
-                    {done?"✓":s}
-                  </span>
-                </div>
-                {i<STEPS.length-1&&<div style={{ width:10, height:1, background:"#334155" }}/>}
+          {STEPS.map((s,i)=>(
+            <div key={i} style={{ display:"flex", alignItems:"center", gap:4 }}>
+              <div style={{ display:"flex", alignItems:"center", gap:4,
+                padding:"4px 10px", borderRadius:99,
+                background:step===i+1?"#2563EB":step>i+1?"#16A34A22":"#1E293B",
+                border:`1px solid ${step===i+1?"#60A5FA":step>i+1?"#16A34A":"#334155"}` }}>
+                <span style={{ fontSize:10, color:step>i+1?"#16A34A":step===i+1?"#fff":"#475569",
+                  fontWeight:700 }}>
+                  {step>i+1?"✓":s}
+                </span>
               </div>
-            );
-          })}
+              {i<STEPS.length-1&&<div style={{ width:10, height:1, background:"#334155" }}/>}
+            </div>
+          ))}
         </div>
 
         {/* Card */}
@@ -517,11 +510,8 @@ function OnboardingScreen({onComplete, defaultName=""}) {
           {step===2 && (
             <>
               <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
-                {/* Only show back arrow if step 1 (name) was not skipped */}
-                {!defaultName && (
-                  <button onClick={()=>setStep(1)} style={{ background:"none", border:"none",
-                    cursor:"pointer", fontSize:18, color:C.muted, padding:0 }}>←</button>
-                )}
+                <button onClick={()=>setStep(1)} style={{ background:"none", border:"none",
+                  cursor:"pointer", fontSize:18, color:C.muted, padding:0 }}>←</button>
                 <p style={{ fontSize:17, fontWeight:700, color:C.ink, margin:0 }}>
                   💰 Monthly Income
                 </p>
