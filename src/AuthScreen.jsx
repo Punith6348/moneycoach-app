@@ -34,6 +34,18 @@ function AppleIcon() {
   );
 }
 
+// True only when running inside the Capacitor iOS native shell.
+// On Android (TWA) and web, this is false — Apple Sign In native plugin
+// is not available there, so we hide the button to avoid a browser popup.
+const isCapacitorIOS = typeof window !== "undefined"
+  && window.Capacitor?.getPlatform?.() === "ios";
+
+// Global style injected once so auth screens hide scrollbars on all platforms
+const AUTH_GLOBAL_CSS = `
+  ::-webkit-scrollbar { display:none !important; }
+  * { scrollbar-width:none !important; }
+`;
+
 export default function AuthScreen({ onGuest, onAuthSuccess }) {
   const [screen,     setScreen]    = useState("welcome");
   const [loading,    setLoading]   = useState(false);
@@ -249,22 +261,30 @@ export default function AuthScreen({ onGuest, onAuthSuccess }) {
               </div>
             ) : (
               <>
-                {/* ── Sign in with Apple — always first and visible ── */}
-                <button onClick={handleApple}
-                  style={{ width:"100%", padding:"14px 16px", borderRadius:14,
-                    border:"none", background:"#000", color:"#fff",
-                    display:"flex", alignItems:"center", justifyContent:"center", gap:10,
-                    cursor:"pointer", fontFamily:"inherit", fontSize:15, fontWeight:700,
-                    marginBottom:16, boxSizing:"border-box" }}>
-                  <AppleIcon/> Sign in with Apple
-                </button>
+                <style>{AUTH_GLOBAL_CSS}</style>
 
-                {/* ── Divider ── */}
-                <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
-                  <div style={{ flex:1, height:1, background:"#E5E7EB" }}/>
-                  <span style={{ fontSize:11, color:"#9CA3AF" }}>or sign in with email</span>
-                  <div style={{ flex:1, height:1, background:"#E5E7EB" }}/>
-                </div>
+                {/* ── Sign in with Apple — iOS Capacitor only ── */}
+                {/* Hidden on Android/web: native plugin unavailable there,   */}
+                {/* falling back to signInWithPopup opens an external browser. */}
+                {isCapacitorIOS && (
+                  <>
+                    <button onClick={handleApple}
+                      style={{ width:"100%", padding:"14px 16px", borderRadius:14,
+                        border:"none", background:"#000", color:"#fff",
+                        display:"flex", alignItems:"center", justifyContent:"center", gap:10,
+                        cursor:"pointer", fontFamily:"inherit", fontSize:15, fontWeight:700,
+                        marginBottom:16, boxSizing:"border-box" }}>
+                      <AppleIcon/> Sign in with Apple
+                    </button>
+
+                    {/* ── Divider ── */}
+                    <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
+                      <div style={{ flex:1, height:1, background:"#E5E7EB" }}/>
+                      <span style={{ fontSize:11, color:"#9CA3AF" }}>or sign in with email</span>
+                      <div style={{ flex:1, height:1, background:"#E5E7EB" }}/>
+                    </div>
+                  </>
+                )}
 
                 {/* ── Sign In / Create Account toggle ── */}
                 <div style={{ display:"flex", gap:8, marginBottom:14 }}>
