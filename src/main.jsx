@@ -3,7 +3,7 @@ import { StrictMode, useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "./firebase";
-import { clearSession } from "./firebaseAuth";
+import { clearSession, deleteAccountREST, deleteFirestoreREST } from "./firebaseAuth";
 import { registerUserProfile } from "./useFirestoreSync";
 import App from "./App.jsx";
 import AuthScreen from "./AuthScreen.jsx";
@@ -109,9 +109,38 @@ function Root() {
       isGuest={guestMode}
       onSignOut={async () => {
         clearSession();
-        // Don't wipe data — same user signing back in should get their data from localStorage.
-        // Different user is handled in useAppData (clears when storedUid !== uid).
         try { if (auth.currentUser) await signOut(auth); } catch(e) {}
+        setGuestMode(false);
+        setUser(null);
+      }}
+      onDeleteAccount={async () => {
+        // 1. Get idToken — prefer live SDK token, fall back to REST token
+        let idToken = null;
+        try {
+          if (auth.currentUser) {
+            idToken = await auth.currentUser.getIdToken();
+          } else {
+            idToken = localStorage.getItem("mc_token");
+          }
+        } catch(e) {}
+
+        const uid = user?.uid || localStorage.getItem("moneyCoachUID");
+
+        // 2. Delete Firestore data
+        if (uid && idToken) {
+          await deleteFirestoreREST(uid, idToken);
+        }
+
+        // 3. Delete Firebase Auth account
+        if (idToken) {
+          try { await deleteAccountREST(idToken); } catch(e) { console.warn("Auth delete:", e); }
+        }
+
+        // 4. Wipe all local storage
+        localStorage.clear();
+
+        // 5. Sign out SDK + reset UI
+        try { await signOut(auth); } catch(e) {}
         setGuestMode(false);
         setUser(null);
       }}

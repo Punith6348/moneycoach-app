@@ -322,9 +322,9 @@ function SetupChecklist({ totalIncome, fixedExpenses, savingsPlans, onNavigate }
 
 
 // ─── ONBOARDING — 5 step setup ───────────────────────────────────────────────
-function OnboardingScreen({onComplete}) {
+function OnboardingScreen({onComplete, defaultName=""}) {
   const [step, setStep] = useState(1);
-  const [name, setName] = useState("");
+  const [name, setName] = useState(defaultName || "");
 
   // Step 2 — Income
   const [sources, setSources] = useState([
@@ -1787,7 +1787,7 @@ function DashboardScreen(props) {
     addLoan, updateLoan, deleteLoan,
     creditCards, addCreditCard, updateCreditCard, deleteCreditCard,
     updateName,
-    firebaseUser, isGuest, onSignOut,
+    firebaseUser, isGuest, onSignOut, onDeleteAccount,
     syncError,
   } = props;
 
@@ -1916,6 +1916,7 @@ function DashboardScreen(props) {
           firebaseUser={firebaseUser}
           isGuest={isGuest}
           onSignOut={onSignOut}
+          onDeleteAccount={onDeleteAccount}
         />
       )}
 
@@ -2648,10 +2649,17 @@ function DashboardScreen(props) {
 }
 
 // ─── ROOT ─────────────────────────────────────────────────────────────────
-function AppInner({ firebaseUser = null, isGuest = false, onSignOut = null }) {
+function AppInner({ firebaseUser = null, isGuest = false, onSignOut = null, onDeleteAccount = null }) {
   const appData = useAppData(firebaseUser);
   if (appData.screen === "onboarding") {
-    return <OnboardingScreen onComplete={appData.completeOnboarding}/>;
+    // Pre-fill name from Sign in with Apple / Google so users don't have to
+    // re-enter information already provided by the identity provider.
+    return (
+      <OnboardingScreen
+        onComplete={appData.completeOnboarding}
+        defaultName={firebaseUser?.displayName || ""}
+      />
+    );
   }
   return (
     <DashboardScreen
@@ -2659,6 +2667,7 @@ function AppInner({ firebaseUser = null, isGuest = false, onSignOut = null }) {
       firebaseUser={firebaseUser}
       isGuest={isGuest}
       onSignOut={onSignOut}
+      onDeleteAccount={onDeleteAccount}
     />
   );
 }

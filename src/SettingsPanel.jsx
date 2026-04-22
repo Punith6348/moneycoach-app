@@ -10,9 +10,12 @@ export default function SettingsPanel({
   name, onClose, onResetAll, onNameChange,
   darkMode=false, onToggleDark,
   firebaseUser=null, isGuest=false, onSignOut=null,
-  onLoadTestData=null,
+  onLoadTestData=null, onDeleteAccount=null,
 }) {
-  const [showResetModal, setShowResetModal] = useState(false);
+  const [showResetModal,   setShowResetModal]   = useState(false);
+  const [showDeleteModal,  setShowDeleteModal]  = useState(false);
+  const [deleteConfirmText,setDeleteConfirmText]= useState("");
+  const [deleting,         setDeleting]         = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [draftName,   setDraftName]   = useState(name||"");
 
@@ -125,6 +128,17 @@ export default function SettingsPanel({
             onTap={() => setShowResetModal(true)}
           />
 
+          {/* ── Delete Account — only for signed-in users ── */}
+          {firebaseUser && onDeleteAccount && (
+            <Row
+              icon="⚠️"
+              label="Delete Account"
+              sublabel="Permanently delete your account and all data"
+              danger
+              onTap={() => { setDeleteConfirmText(""); setShowDeleteModal(true); }}
+            />
+          )}
+
           {/* ── Sign out — always at bottom ── */}
           <div style={{ marginTop:16, borderTop:`1px solid ${C.border}`, paddingTop:8 }}>
             {firebaseUser ? (
@@ -161,6 +175,67 @@ export default function SettingsPanel({
             <div style={{ display:"flex", gap:10 }}>
               <button onClick={()=>setEditingName(false)} style={{ flex:1, padding:"13px", borderRadius:12, border:`1px solid ${C.border}`, background:"#fff", cursor:"pointer", fontFamily:"inherit", fontSize:14, color:C.muted, fontWeight:600 }}>Cancel</button>
               <button onClick={saveNameEdit} style={{ flex:2, padding:"13px", borderRadius:12, border:"none", background:C.ink, cursor:"pointer", fontFamily:"inherit", fontSize:14, color:"#fff", fontWeight:700 }}>Save Nickname</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete Account confirmation modal ── */}
+      {showDeleteModal && (
+        <div onClick={()=>setShowDeleteModal(false)} style={{ position:"fixed", inset:0, zIndex:1100, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"flex-end" }}>
+          <div onClick={e=>e.stopPropagation()} style={{
+            background:"#fff", borderRadius:"20px 20px 0 0",
+            padding:"24px 20px", width:"100%",
+            paddingBottom:"calc(env(safe-area-inset-bottom,0px) + 24px)",
+          }}>
+            <p style={{ margin:"0 0 4px", fontSize:17, fontWeight:700, color:C.red }}>⚠️ Delete Account?</p>
+            <p style={{ margin:"0 0 6px", fontSize:13, color:C.ink, lineHeight:1.5 }}>
+              This will <strong>permanently delete</strong> your account and all your data — expenses, plans, loans, and settings.
+            </p>
+            <p style={{ margin:"0 0 16px", fontSize:12, color:C.muted }}>
+              This cannot be undone. Type <strong>DELETE</strong> below to confirm.
+            </p>
+            <input
+              autoFocus
+              value={deleteConfirmText}
+              onChange={e=>setDeleteConfirmText(e.target.value.toUpperCase())}
+              placeholder="Type DELETE to confirm"
+              style={{ width:"100%", padding:"12px 14px", borderRadius:10,
+                border:`1.5px solid ${C.red}`, outline:"none",
+                fontFamily:"inherit", fontSize:15, color:C.ink,
+                boxSizing:"border-box", marginBottom:16,
+                letterSpacing:"1px", fontWeight:600,
+              }}
+            />
+            <div style={{ display:"flex", gap:10 }}>
+              <button
+                onClick={()=>setShowDeleteModal(false)}
+                style={{ flex:1, padding:"13px", borderRadius:12, border:`1px solid ${C.border}`,
+                  background:"#fff", cursor:"pointer", fontFamily:"inherit",
+                  fontSize:14, color:C.muted, fontWeight:600 }}>
+                Cancel
+              </button>
+              <button
+                disabled={deleteConfirmText !== "DELETE" || deleting}
+                onClick={async () => {
+                  if (deleteConfirmText !== "DELETE") return;
+                  setDeleting(true);
+                  try {
+                    await onDeleteAccount();
+                  } catch(e) {
+                    console.error("Delete account failed:", e);
+                  }
+                  setDeleting(false);
+                  setShowDeleteModal(false);
+                  onClose();
+                }}
+                style={{ flex:2, padding:"13px", borderRadius:12, border:"none",
+                  background: deleteConfirmText === "DELETE" && !deleting ? C.red : "#D1D5DB",
+                  cursor: deleteConfirmText === "DELETE" && !deleting ? "pointer" : "not-allowed",
+                  fontFamily:"inherit", fontSize:14, color:"#fff", fontWeight:700,
+                  transition:"background 0.2s" }}>
+                {deleting ? "Deleting..." : "Yes, Delete My Account"}
+              </button>
             </div>
           </div>
         </div>

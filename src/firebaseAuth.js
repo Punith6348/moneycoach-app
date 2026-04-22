@@ -235,6 +235,28 @@ export async function saveFirestoreREST(uid, idToken, dataJson) {
   } catch(e) { console.warn("Firestore REST save failed:", e); }
 }
 
+// ── Delete Firebase Auth account via REST ─────────────────────────────────
+export async function deleteAccountREST(idToken) {
+  const res = await fetchWithTimeout(`${BASE}:delete?key=${API_KEY}`, {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify({ idToken }),
+  });
+  const data = await res.json();
+  if (data.error) throw { code: data.error.message, message: data.error.message };
+  return true;
+}
+
+// ── Delete Firestore user document via REST ────────────────────────────────
+export async function deleteFirestoreREST(uid, idToken) {
+  try {
+    await fetchWithTimeout(`${FIRESTORE}/users/${uid}`, {
+      method:  "DELETE",
+      headers: { "Authorization": `Bearer ${idToken}` },
+    });
+  } catch(e) { console.warn("Firestore REST delete failed:", e); }
+}
+
 // ── Format error codes ────────────────────────────────────────────────────────
 export function formatAuthError(code) {
   const map = {
