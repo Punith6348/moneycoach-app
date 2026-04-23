@@ -136,13 +136,19 @@ export default function AuthScreen({ onGuest, onAuthSuccess }) {
         if (!res?.response?.identityToken) throw new Error("No identity token");
         const data = await signInWithAppleREST(res.response.identityToken, rawNonce);
 
-        // Apple sends name only on the VERY FIRST sign-in, inside the native
-        // plugin response (res.response), NOT in the Firebase REST API reply.
-        // On repeat sign-ins givenName/familyName are null — that's expected.
-        const appleGiven  = res.response.givenName  || "";
-        const appleFamily = res.response.familyName || "";
+        // Apple sends name only on the VERY FIRST sign-in ever, in the native
+        // plugin response. On repeat sign-ins givenName/familyName are null.
+        // Some plugin versions nest name inside fullName object, others are flat.
+        const fullNameObj = res.response.fullName || {};
+        const appleGiven  = res.response.givenName  || fullNameObj.givenName  || "";
+        const appleFamily = res.response.familyName || fullNameObj.familyName || "";
         const appleName   = [appleGiven, appleFamily].filter(Boolean).join(" ")
                             || data.displayName || null;
+
+        // Pre-load cloud data BEFORE onAuthSuccess — same fix as email login.
+        // Returning Apple users would land on onboarding without this because
+        // onAuthStateChanged races with the StorageEvent on Capacitor WKWebView.
+        await loadFirestoreREST(data.localId, data.idToken);
 
         saveFirebaseSDKSession({ ...data, displayName: appleName });
         saveSession(data);
