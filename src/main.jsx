@@ -148,8 +148,10 @@ function Root() {
         // 4. Wipe all local storage
         localStorage.clear();
 
-        // 5. Sign out SDK + reset UI
-        try { await signOut(auth); } catch(e) {}
+        // 5. Reset UI — fire-and-forget signOut, don't await it.
+        // auth.signOut() can hang indefinitely in Capacitor WKWebView
+        // (same issue as signInWithCredential). UI resets via setUser(null).
+        signOut(auth).catch(() => {});
         setGuestMode(false);
         setUser(null);
       }}

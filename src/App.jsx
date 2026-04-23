@@ -2040,7 +2040,7 @@ function DashboardScreen(props) {
                   {new Date().toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"})}
                 </p>
                 <p style={{margin:0,fontSize:14,fontWeight:700,color:"#111827",fontFamily:"Georgia,serif",lineHeight:1.15}}>
-                  {tab==="budget" ? `${getGreeting(name)} 👋` : (TABS.find(t=>t.key===tab)?.label || "Money Coach")}
+                  {tab==="budget" ? `${getGreeting(name || firebaseUser?.displayName)} 👋` : (TABS.find(t=>t.key===tab)?.label || "Money Coach")}
                 </p>
                 {tab==="budget" && (() => {
                   try {
@@ -2091,7 +2091,7 @@ function DashboardScreen(props) {
                     : (TABS.find(t=>t.key===tab)?.label || "Money Coach")}
                 </p>
                 <h1 style={{fontSize:16,fontWeight:700,color:C.ink,fontFamily:"Georgia,serif",margin:0}}>
-                  {tab==="budget" ? `${getGreeting(name)} 👋` : new Date().toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"short"})}
+                  {tab==="budget" ? `${getGreeting(name || firebaseUser?.displayName)} 👋` : new Date().toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"short"})}
                 </h1>
               </div>
               <button onClick={() => setShowSettings(true)}
