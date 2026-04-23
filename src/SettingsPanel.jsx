@@ -46,16 +46,23 @@ export default function SettingsPanel({
   const closeDeleteModal = () => setShowDeleteModal(false);
 
   const openProfile = () => {
-    setProfileDraft({ ...loadProfile() });
+    // Best available name to pre-fill: app name > Apple ID name (from key) > Firebase displayName
+    const appleStoredName = firebaseUser?.uid
+      ? (localStorage.getItem(`mc_apple_name_${firebaseUser.uid}`) || "")
+      : "";
+    const bestName = name || firebaseUser?.displayName || appleStoredName || "";
+    const saved = loadProfile();
+    setProfileDraft({ ...saved, _bestName: bestName });
     setShowProfile(true);
   };
   const saveProfileEdit = () => {
-    const updated = { ...profile, ...profileDraft };
+    const { _bestName, ...rest } = profileDraft; // strip internal helper key
+    const updated = { ...profile, ...rest };
     saveProfile(updated);
     setProfile(updated);
-    if (profileDraft.displayName !== undefined && profileDraft.displayName.trim()) {
-      onNameChange(profileDraft.displayName.trim());
-    }
+    // Use edited displayName, or fall back to best available name
+    const nameToSave = (rest.displayName ?? _bestName ?? "").trim();
+    if (nameToSave) onNameChange(nameToSave);
     setShowProfile(false);
   };
 
@@ -157,7 +164,7 @@ export default function SettingsPanel({
             <p style={{ margin:"0 0 18px", fontSize:17, fontWeight:700, color:C.ink }}>Edit Profile</p>
 
             <ProfileField label="Display Name" placeholder="Name shown on dashboard"
-              value={profileDraft.displayName ?? (name || firebaseUser?.displayName || "")}
+              value={profileDraft.displayName ?? profileDraft._bestName ?? ""}
               onChange={v=>setProfileDraft(p=>({...p,displayName:v}))}/>
 
             <ProfileField label="Date of Birth" type="date"

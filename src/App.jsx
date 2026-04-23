@@ -494,17 +494,29 @@ function OnboardingScreen({onComplete, defaultName=""}) {
                 <p style={{ fontSize:20, fontWeight:700, color:C.ink, margin:"0 0 6px" }}>
                   {name ? `Welcome, ${name}!` : "Welcome!"}
                 </p>
-                {name ? (
-                  <p style={{ fontSize:13, color:C.muted, margin:0, lineHeight:1.5 }}>
-                    We'll use <strong>{name}</strong> for your dashboard greeting.
-                    <br/>You can update it anytime in Settings → Display Name.
-                  </p>
-                ) : (
-                  <p style={{ fontSize:13, color:C.muted, margin:0, lineHeight:1.5 }}>
-                    Let's set up your Money Coach in just a few steps.
-                  </p>
-                )}
               </div>
+              {name ? (
+                <p style={{ fontSize:13, color:C.muted, margin:"0 0 20px", lineHeight:1.5, textAlign:"center" }}>
+                  We'll use <strong>{name}</strong> for your dashboard greeting.
+                  You can update it anytime in Settings → Edit Profile.
+                </p>
+              ) : (
+                <>
+                  <p style={{ fontSize:13, color:C.muted, margin:"0 0 10px" }}>
+                    What should we call you? <span style={{ color:"#9CA3AF", fontSize:12 }}>(optional)</span>
+                  </p>
+                  <input
+                    value={name} onChange={e=>setName(e.target.value)}
+                    onKeyDown={e=>e.key==="Enter"&&setStep(2)}
+                    placeholder="e.g. Puni, Puneeth…"
+                    autoFocus
+                    style={{...inp, fontFamily:"inherit", fontSize:16, marginBottom:6, width:"100%"}}
+                  />
+                  <p style={{ fontSize:11, color:C.muted, margin:"0 0 16px" }}>
+                    Used for "Good morning, Puni 👋" — change anytime in Settings.
+                  </p>
+                </>
+              )}
               <button onClick={()=>setStep(2)} style={{ width:"100%", padding:13,
                 borderRadius:12, background:C.ink, color:"#fff", border:"none",
                 fontSize:15, fontFamily:"inherit", fontWeight:700, cursor:"pointer" }}>
