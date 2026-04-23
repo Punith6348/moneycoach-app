@@ -483,38 +483,29 @@ function OnboardingScreen({onComplete, defaultName=""}) {
         <div style={{ background:"#fff", borderRadius:20, padding:"20px",
           boxShadow:"0 20px 60px rgba(0,0,0,0.5)" }}>
 
-          {/* ── Step 1: Name ── */}
+          {/* ── Step 1: Welcome ── */}
           {step===1 && (
             <>
-              <p style={{ fontSize:17, fontWeight:700, color:C.ink, margin:"0 0 4px" }}>
-                👋 Set a Display Name
-              </p>
-              <p style={{ fontSize:13, color:C.muted, margin:"0 0 4px" }}>
-                Choose a nickname for your dashboard greeting
-              </p>
-              <p style={{ fontSize:11, color:C.blue, fontWeight:600, margin:"0 0 14px" }}>
-                Optional — you can set or change this anytime in Settings
-              </p>
-              <input value={name} onChange={e=>setName(e.target.value)}
-                onKeyDown={e=>e.key==="Enter"&&setStep(2)}
-                placeholder="e.g. Puni, Coach, Buddy…"
-                autoFocus
-                style={{...inp, fontFamily:"inherit", fontSize:16, marginBottom:8}}
-              />
-              <p style={{ fontSize:11, color:C.muted, margin:"0 0 14px" }}>
-                This is only used for the greeting "Good morning, <strong>Puni</strong> 👋" — nothing else.
-              </p>
+              <div style={{ textAlign:"center", marginBottom:20 }}>
+                <div style={{ fontSize:48, marginBottom:12 }}>👋</div>
+                <p style={{ fontSize:20, fontWeight:700, color:C.ink, margin:"0 0 6px" }}>
+                  {name ? `Welcome, ${name}!` : "Welcome!"}
+                </p>
+                {name ? (
+                  <p style={{ fontSize:13, color:C.muted, margin:0, lineHeight:1.5 }}>
+                    We'll use <strong>{name}</strong> for your dashboard greeting.
+                    <br/>You can update it anytime in Settings → Display Name.
+                  </p>
+                ) : (
+                  <p style={{ fontSize:13, color:C.muted, margin:0, lineHeight:1.5 }}>
+                    Let's set up your Money Coach in just a few steps.
+                  </p>
+                )}
+              </div>
               <button onClick={()=>setStep(2)} style={{ width:"100%", padding:13,
                 borderRadius:12, background:C.ink, color:"#fff", border:"none",
                 fontSize:15, fontFamily:"inherit", fontWeight:700, cursor:"pointer" }}>
-                Next → Income
-              </button>
-              <button onClick={()=>{ setName(""); setStep(2); }}
-                style={{ width:"100%", padding:"10px", marginTop:8,
-                  borderRadius:12, border:"none", background:"transparent",
-                  color:C.muted, fontSize:13, fontFamily:"inherit",
-                  cursor:"pointer", fontWeight:600 }}>
-                Skip for now
+                Get Started →
               </button>
             </>
           )}

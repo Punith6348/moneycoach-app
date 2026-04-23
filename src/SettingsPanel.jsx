@@ -6,6 +6,17 @@ const C = {
   bg:"#F8FAFC", red:"#DC2626", green:"#16A34A", blue:"#2563EB",
 };
 
+// z-indexes must be > 9999 (tab bar) so modals appear on top
+const Z_SHEET   = 10000;
+const Z_MODAL   = 10001;
+
+function loadProfile() {
+  try { return JSON.parse(localStorage.getItem("mc_profile") || "{}"); } catch { return {}; }
+}
+function saveProfile(p) {
+  localStorage.setItem("mc_profile", JSON.stringify(p));
+}
+
 export default function SettingsPanel({
   name, onClose, onResetAll, onNameChange,
   darkMode=false, onToggleDark,
@@ -14,15 +25,20 @@ export default function SettingsPanel({
 }) {
   const [showResetModal,  setShowResetModal]  = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deleteStep,      setDeleteStep]      = useState(1); // 1=confirm, 2=password/final
+  const [deleteStep,      setDeleteStep]      = useState(1);
   const [deletePassword,  setDeletePassword]  = useState("");
   const [deleteError,     setDeleteError]     = useState("");
   const [deleting,        setDeleting]        = useState(false);
+
   const [editingName, setEditingName] = useState(false);
   const [draftName,   setDraftName]   = useState(name||"");
 
-  // Email users have mc_token set by saveSession — Apple/Google users don't
-  const isEmailUser = !!localStorage.getItem("mc_token");
+  const [showProfile, setShowProfile] = useState(false);
+  const [profile, setProfile] = useState(loadProfile);
+  const [profileDraft, setProfileDraft] = useState({});
+
+  // Apple/Google users don't have "password" as providerId
+  const isEmailUser = firebaseUser?.providerData?.[0]?.providerId === "password";
 
   const openDeleteModal = () => {
     setDeleteStep(1);
@@ -38,17 +54,33 @@ export default function SettingsPanel({
     setEditingName(false);
   };
 
+  const openProfile = () => {
+    setProfileDraft({ ...loadProfile() });
+    setShowProfile(true);
+  };
+  const saveProfileEdit = () => {
+    const updated = { ...profile, ...profileDraft };
+    saveProfile(updated);
+    setProfile(updated);
+    // If display name changed, update dashboard greeting too
+    if (profileDraft.displayName !== undefined) {
+      const n = profileDraft.displayName.trim();
+      if (n) onNameChange(n);
+    }
+    setShowProfile(false);
+  };
+
   return (
     <>
       {/* Backdrop */}
       <div onClick={onClose} style={{
-        position:"fixed", inset:0, zIndex:1000,
+        position:"fixed", inset:0, zIndex:Z_SHEET - 1,
         background:"rgba(0,0,0,0.4)",
       }}/>
 
       {/* Bottom sheet */}
       <div style={{
-        position:"fixed", bottom:0, left:0, right:0, zIndex:1001,
+        position:"fixed", bottom:0, left:0, right:0, zIndex:Z_SHEET,
         background:"#fff", borderRadius:"20px 20px 0 0",
         boxShadow:"0 -8px 40px rgba(0,0,0,0.15)",
         maxHeight:"90vh", display:"flex", flexDirection:"column",
@@ -74,7 +106,6 @@ export default function SettingsPanel({
           {/* ── Profile card ── */}
           <div style={{ margin:"0 16px 4px", padding:"16px", borderRadius:14, background:C.bg, border:`1px solid ${C.border}` }}>
             <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-              {/* Avatar */}
               <div style={{
                 width:48, height:48, borderRadius:99, flexShrink:0,
                 background:"linear-gradient(135deg,#1E40AF,#06B6D4)",
@@ -85,16 +116,14 @@ export default function SettingsPanel({
                   ? <img src={firebaseUser.photoURL} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}/>
                   : "👤"}
               </div>
-              {/* Name + email */}
               <div style={{ flex:1, minWidth:0 }}>
                 <p style={{ margin:0, fontSize:15, fontWeight:700, color:C.ink, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                  {name || firebaseUser?.displayName || "Set your nickname"}
+                  {name || firebaseUser?.displayName || "Set your name"}
                 </p>
                 <p style={{ margin:"2px 0 0", fontSize:11, color:C.muted, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
                   {firebaseUser?.email || firebaseUser?.phoneNumber || "Guest"}
                 </p>
               </div>
-              {/* Sync badge */}
               <div style={{ padding:"3px 9px", borderRadius:99, flexShrink:0, background: firebaseUser?"#F0FDF4":"#FFFBEB", border:`1px solid ${firebaseUser?"#86EFAC":"#FCD34D"}` }}>
                 <p style={{ margin:0, fontSize:10, fontWeight:700, color: firebaseUser?C.green:"#D97706" }}>
                   {firebaseUser ? "☁ Synced" : "Local"}
@@ -103,9 +132,12 @@ export default function SettingsPanel({
             </div>
           </div>
 
-          {/* ── Nickname ── */}
-          <Row icon="😊" label="Nickname" sublabel="Shown on your dashboard" onTap={()=>{ setDraftName(name||""); setEditingName(true); }}>
-            <p style={{ margin:0, fontSize:12, color:C.muted, maxWidth:100, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{name||"Add nickname"}</p>
+          {/* ── Edit Profile ── */}
+          <Row icon="👤" label="Edit Profile" sublabel="Display name, date of birth, gender & more" onTap={openProfile}/>
+
+          {/* ── Nickname (display name on dashboard) ── */}
+          <Row icon="😊" label="Display Name" sublabel="Shown on your dashboard greeting" onTap={()=>{ setDraftName(name||""); setEditingName(true); }}>
+            <p style={{ margin:0, fontSize:12, color:C.muted, maxWidth:100, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{name||"Add name"}</p>
           </Row>
 
           {/* ── Dark mode ── */}
@@ -124,36 +156,18 @@ export default function SettingsPanel({
 
           {/* ── Load Test Data ── */}
           {onLoadTestData && (
-            <Row
-              icon="🧪"
-              label="Load Test Data"
-              sublabel="Fill app with realistic dummy data for testing"
-              highlight
-              onTap={()=>{ onLoadTestData(); onClose(); }}
-            />
+            <Row icon="🧪" label="Load Test Data" sublabel="Fill app with realistic dummy data for testing" highlight onTap={()=>{ onLoadTestData(); onClose(); }}/>
           )}
 
           {/* ── Reset ── */}
-          <Row
-            icon="🗑"
-            label="Reset All Data"
-            sublabel="Delete all your data permanently"
-            danger
-            onTap={() => setShowResetModal(true)}
-          />
+          <Row icon="🗑" label="Reset All Data" sublabel="Delete all your data permanently" danger onTap={() => setShowResetModal(true)}/>
 
           {/* ── Delete Account — only for signed-in users ── */}
           {firebaseUser && onDeleteAccount && (
-            <Row
-              icon="⚠️"
-              label="Delete Account"
-              sublabel="Permanently delete your account and all data"
-              danger
-              onTap={openDeleteModal}
-            />
+            <Row icon="⚠️" label="Delete Account" sublabel="Permanently delete your account and all data" danger onTap={openDeleteModal}/>
           )}
 
-          {/* ── Sign out — always at bottom ── */}
+          {/* ── Sign out ── */}
           <div style={{ marginTop:16, borderTop:`1px solid ${C.border}`, paddingTop:8 }}>
             {firebaseUser ? (
               <Row icon="🚪" label="Sign Out" sublabel={firebaseUser.email||firebaseUser.phoneNumber} danger onTap={async()=>{ onClose(); onSignOut&&await onSignOut(); }}/>
@@ -169,16 +183,16 @@ export default function SettingsPanel({
         </div>
       </div>
 
-      {/* ── Nickname edit modal ── */}
+      {/* ── Display Name edit modal ── */}
       {editingName && (
-        <div onClick={()=>setEditingName(false)} style={{ position:"fixed", inset:0, zIndex:1100, background:"rgba(0,0,0,0.5)", display:"flex", alignItems:"flex-end" }}>
+        <div onClick={()=>setEditingName(false)} style={{ position:"fixed", inset:0, zIndex:Z_MODAL, background:"rgba(0,0,0,0.5)", display:"flex", alignItems:"flex-end" }}>
           <div onClick={e=>e.stopPropagation()} style={{
             background:"#fff", borderRadius:"20px 20px 0 0",
             padding:"24px 20px", width:"100%",
             paddingBottom:"calc(env(safe-area-inset-bottom,0px) + 24px)",
           }}>
-            <p style={{ margin:"0 0 4px", fontSize:17, fontWeight:700, color:C.ink }}>Set Nickname</p>
-            <p style={{ margin:"0 0 16px", fontSize:12, color:C.muted }}>This name shows on your dashboard greeting</p>
+            <p style={{ margin:"0 0 4px", fontSize:17, fontWeight:700, color:C.ink }}>Display Name</p>
+            <p style={{ margin:"0 0 16px", fontSize:12, color:C.muted }}>Used for the greeting "Good morning, [name] 👋"</p>
             <input
               autoFocus value={draftName}
               onChange={e=>setDraftName(e.target.value)}
@@ -188,15 +202,58 @@ export default function SettingsPanel({
             />
             <div style={{ display:"flex", gap:10 }}>
               <button onClick={()=>setEditingName(false)} style={{ flex:1, padding:"13px", borderRadius:12, border:`1px solid ${C.border}`, background:"#fff", cursor:"pointer", fontFamily:"inherit", fontSize:14, color:C.muted, fontWeight:600 }}>Cancel</button>
-              <button onClick={saveNameEdit} style={{ flex:2, padding:"13px", borderRadius:12, border:"none", background:C.ink, cursor:"pointer", fontFamily:"inherit", fontSize:14, color:"#fff", fontWeight:700 }}>Save Nickname</button>
+              <button onClick={saveNameEdit} style={{ flex:2, padding:"13px", borderRadius:12, border:"none", background:C.ink, cursor:"pointer", fontFamily:"inherit", fontSize:14, color:"#fff", fontWeight:700 }}>Save</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── Delete Account modal — 2-step ── */}
+      {/* ── Edit Profile modal ── */}
+      {showProfile && (
+        <div onClick={()=>setShowProfile(false)} style={{ position:"fixed", inset:0, zIndex:Z_MODAL, background:"rgba(0,0,0,0.5)", display:"flex", alignItems:"flex-end" }}>
+          <div onClick={e=>e.stopPropagation()} style={{
+            background:"#fff", borderRadius:"20px 20px 0 0",
+            padding:"24px 20px", width:"100%",
+            paddingBottom:"calc(env(safe-area-inset-bottom,0px) + 24px)",
+            maxHeight:"80vh", overflowY:"auto",
+          }}>
+            <p style={{ margin:"0 0 4px", fontSize:17, fontWeight:700, color:C.ink }}>Edit Profile</p>
+            <p style={{ margin:"0 0 18px", fontSize:12, color:C.muted }}>All fields are optional</p>
+
+            <ProfileField label="Display Name" placeholder="Name shown on dashboard"
+              value={profileDraft.displayName ?? (name || firebaseUser?.displayName || "")}
+              onChange={v=>setProfileDraft(p=>({...p,displayName:v}))}/>
+
+            <ProfileField label="Date of Birth" type="date" placeholder=""
+              value={profileDraft.dob ?? profile.dob ?? ""}
+              onChange={v=>setProfileDraft(p=>({...p,dob:v}))}/>
+
+            <ProfileSelect label="Gender"
+              value={profileDraft.gender ?? profile.gender ?? ""}
+              onChange={v=>setProfileDraft(p=>({...p,gender:v}))}
+              options={["Male","Female","Non-binary","Prefer not to say"]}/>
+
+            <ProfileSelect label="Marital Status"
+              value={profileDraft.marital ?? profile.marital ?? ""}
+              onChange={v=>setProfileDraft(p=>({...p,marital:v}))}
+              options={["Single","Married","Divorced","Widowed","Prefer not to say"]}/>
+
+            <ProfileSelect label="Education"
+              value={profileDraft.education ?? profile.education ?? ""}
+              onChange={v=>setProfileDraft(p=>({...p,education:v}))}
+              options={["High School","Diploma","Bachelor's","Master's","PhD","Other","Prefer not to say"]}/>
+
+            <div style={{ display:"flex", gap:10, marginTop:20 }}>
+              <button onClick={()=>setShowProfile(false)} style={{ flex:1, padding:"13px", borderRadius:12, border:`1px solid ${C.border}`, background:"#fff", cursor:"pointer", fontFamily:"inherit", fontSize:14, color:C.muted, fontWeight:600 }}>Cancel</button>
+              <button onClick={saveProfileEdit} style={{ flex:2, padding:"13px", borderRadius:12, border:"none", background:C.ink, cursor:"pointer", fontFamily:"inherit", fontSize:14, color:"#fff", fontWeight:700 }}>Save Profile</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete Account modal — Step 1: Warning ── */}
       {showDeleteModal && deleteStep === 1 && (
-        <div onClick={closeDeleteModal} style={{ position:"fixed", inset:0, zIndex:1100, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"flex-end" }}>
+        <div onClick={closeDeleteModal} style={{ position:"fixed", inset:0, zIndex:Z_MODAL, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"flex-end" }}>
           <div onClick={e=>e.stopPropagation()} style={{
             background:"#fff", borderRadius:"20px 20px 0 0",
             padding:"24px 20px", width:"100%",
@@ -206,15 +263,18 @@ export default function SettingsPanel({
               <div style={{ width:56, height:56, borderRadius:99, background:"#FEF2F2", display:"flex", alignItems:"center", justifyContent:"center", fontSize:28 }}>⚠️</div>
             </div>
             <p style={{ margin:"0 0 8px", fontSize:18, fontWeight:700, color:C.red, textAlign:"center" }}>Delete Account?</p>
-            <p style={{ margin:"0 0 8px", fontSize:13, color:C.ink, lineHeight:1.6, textAlign:"center" }}>
+            <p style={{ margin:"0 0 12px", fontSize:13, color:C.ink, lineHeight:1.6, textAlign:"center" }}>
               This will <strong>permanently delete</strong> your account and all your data.
             </p>
             <div style={{ background:"#FEF2F2", borderRadius:12, padding:"12px 14px", marginBottom:20 }}>
-              <p style={{ margin:0, fontSize:12, color:C.red, lineHeight:1.6 }}>
-                ⚠️ <strong>All data will be lost and cannot be restored:</strong>
+              <p style={{ margin:0, fontSize:12, color:C.red, fontWeight:700, marginBottom:6 }}>
+                ⚠️ All data will be lost and cannot be restored:
               </p>
-              <p style={{ margin:"6px 0 0", fontSize:12, color:"#7F1D1D", lineHeight:1.6 }}>
-                • All expenses and transactions{"\n"}• Savings goals and plans{"\n"}• Loan records{"\n"}• Account settings
+              <p style={{ margin:0, fontSize:12, color:"#7F1D1D", lineHeight:1.8 }}>
+                • All expenses and transactions<br/>
+                • Savings goals and plans<br/>
+                • Loan records<br/>
+                • Account settings
               </p>
             </div>
             <div style={{ display:"flex", gap:10 }}>
@@ -229,20 +289,21 @@ export default function SettingsPanel({
         </div>
       )}
 
+      {/* ── Delete Account modal — Step 2: Confirm ── */}
       {showDeleteModal && deleteStep === 2 && (
-        <div onClick={closeDeleteModal} style={{ position:"fixed", inset:0, zIndex:1100, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"flex-end" }}>
+        <div onClick={closeDeleteModal} style={{ position:"fixed", inset:0, zIndex:Z_MODAL, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"flex-end" }}>
           <div onClick={e=>e.stopPropagation()} style={{
             background:"#fff", borderRadius:"20px 20px 0 0",
             padding:"24px 20px", width:"100%",
             paddingBottom:"calc(env(safe-area-inset-bottom,0px) + 24px)",
           }}>
-            <p style={{ margin:"0 0 4px", fontSize:17, fontWeight:700, color:C.red }}>
+            <p style={{ margin:"0 0 6px", fontSize:17, fontWeight:700, color:C.red }}>
               {isEmailUser ? "Confirm with Password" : "Final Confirmation"}
             </p>
             <p style={{ margin:"0 0 16px", fontSize:13, color:C.muted, lineHeight:1.5 }}>
               {isEmailUser
-                ? "Enter your password to permanently delete your account. This cannot be undone."
-                : "By tapping below, your account and all data will be permanently deleted. This cannot be undone."}
+                ? "Enter your password to confirm. This cannot be undone."
+                : "Your account and all data will be permanently deleted. This cannot be undone."}
             </p>
             {isEmailUser && (
               <>
@@ -295,7 +356,7 @@ export default function SettingsPanel({
 
       {/* ── Reset confirmation modal ── */}
       {showResetModal && (
-        <div onClick={()=>setShowResetModal(false)} style={{ position:"fixed", inset:0, zIndex:1100, background:"rgba(0,0,0,0.5)", display:"flex", alignItems:"flex-end" }}>
+        <div onClick={()=>setShowResetModal(false)} style={{ position:"fixed", inset:0, zIndex:Z_MODAL, background:"rgba(0,0,0,0.5)", display:"flex", alignItems:"flex-end" }}>
           <div onClick={e=>e.stopPropagation()} style={{
             background:"#fff", borderRadius:"20px 20px 0 0",
             padding:"24px 20px", width:"100%",
@@ -311,6 +372,44 @@ export default function SettingsPanel({
         </div>
       )}
     </>
+  );
+}
+
+function ProfileField({ label, value, onChange, type="text", placeholder }) {
+  return (
+    <div style={{ marginBottom:14 }}>
+      <p style={{ margin:"0 0 5px", fontSize:12, fontWeight:600, color:C.muted, textTransform:"uppercase", letterSpacing:"0.4px" }}>{label}</p>
+      <input
+        type={type}
+        value={value}
+        onChange={e=>onChange(e.target.value)}
+        placeholder={placeholder}
+        style={{ width:"100%", padding:"11px 13px", borderRadius:10, border:`1.5px solid ${C.border}`,
+          outline:"none", fontFamily:"inherit", fontSize:15, color:C.ink, boxSizing:"border-box",
+          background:"#fff" }}
+      />
+    </div>
+  );
+}
+
+function ProfileSelect({ label, value, onChange, options }) {
+  return (
+    <div style={{ marginBottom:14 }}>
+      <p style={{ margin:"0 0 5px", fontSize:12, fontWeight:600, color:C.muted, textTransform:"uppercase", letterSpacing:"0.4px" }}>{label}</p>
+      <select
+        value={value}
+        onChange={e=>onChange(e.target.value)}
+        style={{ width:"100%", padding:"11px 13px", borderRadius:10, border:`1.5px solid ${C.border}`,
+          outline:"none", fontFamily:"inherit", fontSize:15, color: value ? C.ink : C.muted,
+          boxSizing:"border-box", background:"#fff", appearance:"none",
+          backgroundImage:`url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236B7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`,
+          backgroundRepeat:"no-repeat", backgroundPosition:"right 13px center",
+        }}
+      >
+        <option value="">Select (optional)</option>
+        {options.map(o=><option key={o} value={o}>{o}</option>)}
+      </select>
+    </div>
   );
 }
 
