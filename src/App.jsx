@@ -377,7 +377,7 @@ function OnboardingScreen({onComplete, defaultName=""}) {
   const totalLoans   = loans.filter(l=>l.active).reduce((t,l)=>t+(parseFloat(l.emi)||0),0);
   const leftover     = totalIncome - totalBills - totalSavings - totalLoans;
 
-  const STEPS = ["👋 Name","💰 Income","🏠 Bills","📈 Savings","🏦 Loans"];
+  const STEPS = ["👋 Nickname","💰 Income","🏠 Bills","📈 Savings","🏦 Loans"];
 
   const inp = {
     padding:"9px 12px", borderRadius:9, border:`1.5px solid ${C.border}`,
@@ -487,21 +487,34 @@ function OnboardingScreen({onComplete, defaultName=""}) {
           {step===1 && (
             <>
               <p style={{ fontSize:17, fontWeight:700, color:C.ink, margin:"0 0 4px" }}>
-                👋 Hi! What's your name?
+                👋 Set a Display Name
               </p>
-              <p style={{ fontSize:13, color:C.muted, margin:"0 0 16px" }}>
-                Personalise your dashboard
+              <p style={{ fontSize:13, color:C.muted, margin:"0 0 4px" }}>
+                Choose a nickname for your dashboard greeting
+              </p>
+              <p style={{ fontSize:11, color:C.blue, fontWeight:600, margin:"0 0 14px" }}>
+                Optional — you can set or change this anytime in Settings
               </p>
               <input value={name} onChange={e=>setName(e.target.value)}
                 onKeyDown={e=>e.key==="Enter"&&setStep(2)}
-                placeholder="e.g. Puneeth"
+                placeholder="e.g. Puni, Coach, Buddy…"
                 autoFocus
-                style={{...inp, fontFamily:"inherit", fontSize:16, marginBottom:16}}
+                style={{...inp, fontFamily:"inherit", fontSize:16, marginBottom:8}}
               />
+              <p style={{ fontSize:11, color:C.muted, margin:"0 0 14px" }}>
+                This is only used for the greeting "Good morning, <strong>Puni</strong> 👋" — nothing else.
+              </p>
               <button onClick={()=>setStep(2)} style={{ width:"100%", padding:13,
                 borderRadius:12, background:C.ink, color:"#fff", border:"none",
                 fontSize:15, fontFamily:"inherit", fontWeight:700, cursor:"pointer" }}>
                 Next → Income
+              </button>
+              <button onClick={()=>{ setName(""); setStep(2); }}
+                style={{ width:"100%", padding:"10px", marginTop:8,
+                  borderRadius:12, border:"none", background:"transparent",
+                  color:C.muted, fontSize:13, fontFamily:"inherit",
+                  cursor:"pointer", fontWeight:600 }}>
+                Skip for now
               </button>
             </>
           )}
