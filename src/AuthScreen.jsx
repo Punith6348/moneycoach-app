@@ -142,8 +142,18 @@ export default function AuthScreen({ onGuest, onAuthSuccess }) {
         const fullNameObj = res.response.fullName || {};
         const appleGiven  = res.response.givenName  || fullNameObj.givenName  || "";
         const appleFamily = res.response.familyName || fullNameObj.familyName || "";
-        const appleName   = [appleGiven, appleFamily].filter(Boolean).join(" ")
-                            || data.displayName || null;
+        const appleNameFromPlugin = [appleGiven, appleFamily].filter(Boolean).join("")
+                                    ? [appleGiven, appleFamily].filter(Boolean).join(" ")
+                                    : null;
+
+        // Persist name under uid key so re-sign-ins (where Apple sends no name)
+        // can restore it. Per-uid so different accounts don't conflict.
+        const nameKey = `mc_apple_name_${data.localId}`;
+        if (appleNameFromPlugin) localStorage.setItem(nameKey, appleNameFromPlugin);
+        const appleName = appleNameFromPlugin
+                       || localStorage.getItem(nameKey)
+                       || data.displayName
+                       || null;
 
         // Pre-load cloud data BEFORE onAuthSuccess — same fix as email login.
         // Returning Apple users would land on onboarding without this because

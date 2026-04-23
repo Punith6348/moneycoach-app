@@ -108,11 +108,22 @@ export async function signInWithAppleREST(identityToken, rawNonce) {
 export function saveFirebaseSDKSession(data) {
   const expiresIn      = parseInt(data.expiresIn || "3600", 10);
   const expirationTime = Date.now() + expiresIn * 1000;
+
+  // Preserve existing displayName on re-sign-in — Apple doesn't resend it
+  let displayName = data.displayName || data.fullName || null;
+  if (!displayName) {
+    try {
+      const key = `firebase:authUser:${API_KEY}:[DEFAULT]`;
+      const prev = JSON.parse(localStorage.getItem(key) || "{}");
+      if (prev.uid === data.localId) displayName = prev.displayName || null;
+    } catch {}
+  }
+
   const sdkUser = {
     uid:           data.localId,
     email:         data.email         || null,
     emailVerified: data.emailVerified || false,
-    displayName:   data.displayName   || data.fullName || null,
+    displayName:   displayName,
     isAnonymous:   false,
     photoURL:      data.photoUrl      || null,
     phoneNumber:   null,
