@@ -135,13 +135,22 @@ export default function AuthScreen({ onGuest, onAuthSuccess }) {
         });
         if (!res?.response?.identityToken) throw new Error("No identity token");
         const data = await signInWithAppleREST(res.response.identityToken, rawNonce);
-        saveFirebaseSDKSession(data);
+
+        // Apple sends name only on the VERY FIRST sign-in, inside the native
+        // plugin response (res.response), NOT in the Firebase REST API reply.
+        // On repeat sign-ins givenName/familyName are null — that's expected.
+        const appleGiven  = res.response.givenName  || "";
+        const appleFamily = res.response.familyName || "";
+        const appleName   = [appleGiven, appleFamily].filter(Boolean).join(" ")
+                            || data.displayName || null;
+
+        saveFirebaseSDKSession({ ...data, displayName: appleName });
         saveSession(data);
         onAuthSuccess?.({
           uid:         data.localId,
-          email:       data.email       || null,
-          displayName: data.displayName || data.fullName || null,
-          photoURL:    data.photoUrl    || null,
+          email:       data.email    || res.response.email || null,
+          displayName: appleName,
+          photoURL:    data.photoUrl || null,
         });
       } else {
         // Web fallback — Firebase SDK popup
