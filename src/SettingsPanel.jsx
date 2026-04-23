@@ -7,8 +7,8 @@ const C = {
 };
 
 // z-indexes must be > 9999 (tab bar) so modals appear on top
-const Z_SHEET   = 10000;
-const Z_MODAL   = 10001;
+const Z_SHEET = 10000;
+const Z_MODAL = 10001;
 
 function loadProfile() {
   try { return JSON.parse(localStorage.getItem("mc_profile") || "{}"); } catch { return {}; }
@@ -19,7 +19,6 @@ function saveProfile(p) {
 
 export default function SettingsPanel({
   name, onClose, onResetAll, onNameChange,
-  darkMode=false, onToggleDark,
   firebaseUser=null, isGuest=false, onSignOut=null,
   onLoadTestData=null, onDeleteAccount=null,
 }) {
@@ -30,14 +29,11 @@ export default function SettingsPanel({
   const [deleteError,     setDeleteError]     = useState("");
   const [deleting,        setDeleting]        = useState(false);
 
-  const [editingName, setEditingName] = useState(false);
-  const [draftName,   setDraftName]   = useState(name||"");
-
   const [showProfile, setShowProfile] = useState(false);
   const [profile, setProfile] = useState(loadProfile);
   const [profileDraft, setProfileDraft] = useState({});
 
-  // Apple/Google users don't have "password" as providerId
+  // Apple/Google users have "apple.com" or "google.com" as providerId
   const isEmailUser = firebaseUser?.providerData?.[0]?.providerId === "password";
 
   const openDeleteModal = () => {
@@ -49,11 +45,6 @@ export default function SettingsPanel({
   };
   const closeDeleteModal = () => setShowDeleteModal(false);
 
-  const saveNameEdit = () => {
-    if (draftName.trim()) onNameChange(draftName.trim());
-    setEditingName(false);
-  };
-
   const openProfile = () => {
     setProfileDraft({ ...loadProfile() });
     setShowProfile(true);
@@ -62,10 +53,8 @@ export default function SettingsPanel({
     const updated = { ...profile, ...profileDraft };
     saveProfile(updated);
     setProfile(updated);
-    // If display name changed, update dashboard greeting too
-    if (profileDraft.displayName !== undefined) {
-      const n = profileDraft.displayName.trim();
-      if (n) onNameChange(n);
+    if (profileDraft.displayName !== undefined && profileDraft.displayName.trim()) {
+      onNameChange(profileDraft.displayName.trim());
     }
     setShowProfile(false);
   };
@@ -117,16 +106,8 @@ export default function SettingsPanel({
                   : "👤"}
               </div>
               <div style={{ flex:1, minWidth:0 }}>
-                <p style={{ margin:0, fontSize:15, fontWeight:700, color:C.ink, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                <p style={{ margin:0, fontSize:16, fontWeight:700, color:C.ink, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
                   {name || firebaseUser?.displayName || "Set your name"}
-                </p>
-                <p style={{ margin:"2px 0 0", fontSize:11, color:C.muted, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                  {firebaseUser?.email || firebaseUser?.phoneNumber || "Guest"}
-                </p>
-              </div>
-              <div style={{ padding:"3px 9px", borderRadius:99, flexShrink:0, background: firebaseUser?"#F0FDF4":"#FFFBEB", border:`1px solid ${firebaseUser?"#86EFAC":"#FCD34D"}` }}>
-                <p style={{ margin:0, fontSize:10, fontWeight:700, color: firebaseUser?C.green:"#D97706" }}>
-                  {firebaseUser ? "☁ Synced" : "Local"}
                 </p>
               </div>
             </div>
@@ -134,25 +115,6 @@ export default function SettingsPanel({
 
           {/* ── Edit Profile ── */}
           <Row icon="👤" label="Edit Profile" sublabel="Display name, date of birth, gender & more" onTap={openProfile}/>
-
-          {/* ── Nickname (display name on dashboard) ── */}
-          <Row icon="😊" label="Display Name" sublabel="Shown on your dashboard greeting" onTap={()=>{ setDraftName(name||""); setEditingName(true); }}>
-            <p style={{ margin:0, fontSize:12, color:C.muted, maxWidth:100, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{name||"Add name"}</p>
-          </Row>
-
-          {/* ── Dark mode ── */}
-          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"14px 20px", borderBottom:`1px solid ${C.bg}` }}>
-            <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-              <span style={{ fontSize:20 }}>🌙</span>
-              <p style={{ margin:0, fontSize:14, fontWeight:600, color:C.ink }}>Dark Mode</p>
-            </div>
-            <button onClick={()=>onToggleDark&&onToggleDark(!darkMode)} style={{
-              width:48, height:26, borderRadius:99, border:"none", cursor:"pointer",
-              background: darkMode?C.blue:"#D1D5DB", position:"relative", transition:"background 0.2s",
-            }}>
-              <div style={{ position:"absolute", top:3, left:darkMode?25:3, width:20, height:20, borderRadius:99, background:"#fff", transition:"left 0.2s", boxShadow:"0 1px 3px rgba(0,0,0,0.2)" }}/>
-            </button>
-          </div>
 
           {/* ── Load Test Data ── */}
           {onLoadTestData && (
@@ -170,7 +132,7 @@ export default function SettingsPanel({
           {/* ── Sign out ── */}
           <div style={{ marginTop:16, borderTop:`1px solid ${C.border}`, paddingTop:8 }}>
             {firebaseUser ? (
-              <Row icon="🚪" label="Sign Out" sublabel={firebaseUser.email||firebaseUser.phoneNumber} danger onTap={async()=>{ onClose(); onSignOut&&await onSignOut(); }}/>
+              <Row icon="🚪" label="Sign Out" sublabel={firebaseUser.email||firebaseUser.phoneNumber||""} danger onTap={async()=>{ onClose(); onSignOut&&await onSignOut(); }}/>
             ) : isGuest ? (
               <Row icon="🔑" label="Sign In to Sync Data" sublabel="Keep your data safe across devices" highlight onTap={()=>{ onClose(); onSignOut&&onSignOut(); }}/>
             ) : null}
@@ -183,31 +145,6 @@ export default function SettingsPanel({
         </div>
       </div>
 
-      {/* ── Display Name edit modal ── */}
-      {editingName && (
-        <div onClick={()=>setEditingName(false)} style={{ position:"fixed", inset:0, zIndex:Z_MODAL, background:"rgba(0,0,0,0.5)", display:"flex", alignItems:"flex-end" }}>
-          <div onClick={e=>e.stopPropagation()} style={{
-            background:"#fff", borderRadius:"20px 20px 0 0",
-            padding:"24px 20px", width:"100%",
-            paddingBottom:"calc(env(safe-area-inset-bottom,0px) + 24px)",
-          }}>
-            <p style={{ margin:"0 0 4px", fontSize:17, fontWeight:700, color:C.ink }}>Display Name</p>
-            <p style={{ margin:"0 0 16px", fontSize:12, color:C.muted }}>Used for the greeting "Good morning, [name] 👋"</p>
-            <input
-              autoFocus value={draftName}
-              onChange={e=>setDraftName(e.target.value)}
-              onKeyDown={e=>{ if(e.key==="Enter")saveNameEdit(); if(e.key==="Escape")setEditingName(false); }}
-              placeholder="e.g. Puneeth"
-              style={{ width:"100%", padding:"13px 14px", borderRadius:12, border:`1.5px solid ${C.blue}`, outline:"none", fontFamily:"inherit", fontSize:16, color:C.ink, boxSizing:"border-box", marginBottom:12 }}
-            />
-            <div style={{ display:"flex", gap:10 }}>
-              <button onClick={()=>setEditingName(false)} style={{ flex:1, padding:"13px", borderRadius:12, border:`1px solid ${C.border}`, background:"#fff", cursor:"pointer", fontFamily:"inherit", fontSize:14, color:C.muted, fontWeight:600 }}>Cancel</button>
-              <button onClick={saveNameEdit} style={{ flex:2, padding:"13px", borderRadius:12, border:"none", background:C.ink, cursor:"pointer", fontFamily:"inherit", fontSize:14, color:"#fff", fontWeight:700 }}>Save</button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ── Edit Profile modal ── */}
       {showProfile && (
         <div onClick={()=>setShowProfile(false)} style={{ position:"fixed", inset:0, zIndex:Z_MODAL, background:"rgba(0,0,0,0.5)", display:"flex", alignItems:"flex-end" }}>
@@ -217,14 +154,13 @@ export default function SettingsPanel({
             paddingBottom:"calc(env(safe-area-inset-bottom,0px) + 24px)",
             maxHeight:"80vh", overflowY:"auto",
           }}>
-            <p style={{ margin:"0 0 4px", fontSize:17, fontWeight:700, color:C.ink }}>Edit Profile</p>
-            <p style={{ margin:"0 0 18px", fontSize:12, color:C.muted }}>All fields are optional</p>
+            <p style={{ margin:"0 0 18px", fontSize:17, fontWeight:700, color:C.ink }}>Edit Profile</p>
 
             <ProfileField label="Display Name" placeholder="Name shown on dashboard"
               value={profileDraft.displayName ?? (name || firebaseUser?.displayName || "")}
               onChange={v=>setProfileDraft(p=>({...p,displayName:v}))}/>
 
-            <ProfileField label="Date of Birth" type="date" placeholder=""
+            <ProfileField label="Date of Birth" type="date"
               value={profileDraft.dob ?? profile.dob ?? ""}
               onChange={v=>setProfileDraft(p=>({...p,dob:v}))}/>
 
@@ -236,7 +172,7 @@ export default function SettingsPanel({
             <ProfileSelect label="Marital Status"
               value={profileDraft.marital ?? profile.marital ?? ""}
               onChange={v=>setProfileDraft(p=>({...p,marital:v}))}
-              options={["Single","Married","Divorced","Widowed","Prefer not to say"]}/>
+              options={["Single","Married","Prefer not to say"]}/>
 
             <ProfileSelect label="Education"
               value={profileDraft.education ?? profile.education ?? ""}
@@ -245,13 +181,13 @@ export default function SettingsPanel({
 
             <div style={{ display:"flex", gap:10, marginTop:20 }}>
               <button onClick={()=>setShowProfile(false)} style={{ flex:1, padding:"13px", borderRadius:12, border:`1px solid ${C.border}`, background:"#fff", cursor:"pointer", fontFamily:"inherit", fontSize:14, color:C.muted, fontWeight:600 }}>Cancel</button>
-              <button onClick={saveProfileEdit} style={{ flex:2, padding:"13px", borderRadius:12, border:"none", background:C.ink, cursor:"pointer", fontFamily:"inherit", fontSize:14, color:"#fff", fontWeight:700 }}>Save Profile</button>
+              <button onClick={saveProfileEdit} style={{ flex:2, padding:"13px", borderRadius:12, border:"none", background:C.ink, cursor:"pointer", fontFamily:"inherit", fontSize:14, color:"#fff", fontWeight:700 }}>Save</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── Delete Account modal — Step 1: Warning ── */}
+      {/* ── Delete Account — Step 1: Warning ── */}
       {showDeleteModal && deleteStep === 1 && (
         <div onClick={closeDeleteModal} style={{ position:"fixed", inset:0, zIndex:Z_MODAL, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"flex-end" }}>
           <div onClick={e=>e.stopPropagation()} style={{
@@ -289,7 +225,7 @@ export default function SettingsPanel({
         </div>
       )}
 
-      {/* ── Delete Account modal — Step 2: Confirm ── */}
+      {/* ── Delete Account — Step 2: Confirm ── */}
       {showDeleteModal && deleteStep === 2 && (
         <div onClick={closeDeleteModal} style={{ position:"fixed", inset:0, zIndex:Z_MODAL, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"flex-end" }}>
           <div onClick={e=>e.stopPropagation()} style={{
@@ -306,25 +242,23 @@ export default function SettingsPanel({
                 : "Your account and all data will be permanently deleted. This cannot be undone."}
             </p>
             {isEmailUser && (
-              <>
-                <input
-                  autoFocus
-                  type="password"
-                  value={deletePassword}
-                  onChange={e=>{ setDeletePassword(e.target.value); setDeleteError(""); }}
-                  placeholder="Enter your password"
-                  style={{ width:"100%", padding:"12px 14px", borderRadius:10,
-                    border:`1.5px solid ${deleteError ? C.red : C.border}`, outline:"none",
-                    fontFamily:"inherit", fontSize:15, color:C.ink,
-                    boxSizing:"border-box", marginBottom:deleteError?6:16,
-                  }}
-                />
-                {deleteError && (
-                  <p style={{ margin:"0 0 12px", fontSize:12, color:C.red }}>{deleteError}</p>
-                )}
-              </>
+              <input
+                autoFocus
+                type="password"
+                value={deletePassword}
+                onChange={e=>{ setDeletePassword(e.target.value); setDeleteError(""); }}
+                placeholder="Enter your password"
+                style={{ width:"100%", padding:"12px 14px", borderRadius:10,
+                  border:`1.5px solid ${deleteError ? C.red : C.border}`, outline:"none",
+                  fontFamily:"inherit", fontSize:15, color:C.ink,
+                  boxSizing:"border-box", marginBottom:8,
+                }}
+              />
             )}
-            <div style={{ display:"flex", gap:10 }}>
+            {deleteError && (
+              <p style={{ margin:"0 0 12px", fontSize:12, color:C.red }}>{deleteError}</p>
+            )}
+            <div style={{ display:"flex", gap:10, marginTop: isEmailUser ? 8 : 0 }}>
               <button onClick={()=>setDeleteStep(1)} style={{ flex:1, padding:"13px", borderRadius:12, border:`1px solid ${C.border}`, background:"#fff", cursor:"pointer", fontFamily:"inherit", fontSize:14, color:C.muted, fontWeight:600 }}>
                 Back
               </button>
@@ -375,7 +309,7 @@ export default function SettingsPanel({
   );
 }
 
-function ProfileField({ label, value, onChange, type="text", placeholder }) {
+function ProfileField({ label, value, onChange, type="text", placeholder="" }) {
   return (
     <div style={{ marginBottom:14 }}>
       <p style={{ margin:"0 0 5px", fontSize:12, fontWeight:600, color:C.muted, textTransform:"uppercase", letterSpacing:"0.4px" }}>{label}</p>
@@ -386,7 +320,8 @@ function ProfileField({ label, value, onChange, type="text", placeholder }) {
         placeholder={placeholder}
         style={{ width:"100%", padding:"11px 13px", borderRadius:10, border:`1.5px solid ${C.border}`,
           outline:"none", fontFamily:"inherit", fontSize:15, color:C.ink, boxSizing:"border-box",
-          background:"#fff" }}
+          background:"#fff", WebkitAppearance:"none",
+        }}
       />
     </div>
   );
@@ -396,19 +331,20 @@ function ProfileSelect({ label, value, onChange, options }) {
   return (
     <div style={{ marginBottom:14 }}>
       <p style={{ margin:"0 0 5px", fontSize:12, fontWeight:600, color:C.muted, textTransform:"uppercase", letterSpacing:"0.4px" }}>{label}</p>
-      <select
-        value={value}
-        onChange={e=>onChange(e.target.value)}
-        style={{ width:"100%", padding:"11px 13px", borderRadius:10, border:`1.5px solid ${C.border}`,
-          outline:"none", fontFamily:"inherit", fontSize:15, color: value ? C.ink : C.muted,
-          boxSizing:"border-box", background:"#fff", appearance:"none",
-          backgroundImage:`url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236B7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`,
-          backgroundRepeat:"no-repeat", backgroundPosition:"right 13px center",
-        }}
-      >
-        <option value="">Select (optional)</option>
-        {options.map(o=><option key={o} value={o}>{o}</option>)}
-      </select>
+      <div style={{ position:"relative" }}>
+        <select
+          value={value}
+          onChange={e=>onChange(e.target.value)}
+          style={{ width:"100%", padding:"11px 36px 11px 13px", borderRadius:10, border:`1.5px solid ${C.border}`,
+            outline:"none", fontFamily:"inherit", fontSize:15, color: value ? C.ink : C.muted,
+            boxSizing:"border-box", background:"#fff", appearance:"none", WebkitAppearance:"none",
+          }}
+        >
+          <option value="">Select</option>
+          {options.map(o=><option key={o} value={o}>{o}</option>)}
+        </select>
+        <span style={{ position:"absolute", right:13, top:"50%", transform:"translateY(-50%)", fontSize:12, color:C.muted, pointerEvents:"none" }}>▼</span>
+      </div>
     </div>
   );
 }

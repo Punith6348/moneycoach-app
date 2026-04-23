@@ -114,7 +114,10 @@ function Root() {
         setUser(null);
       }}
       onDeleteAccount={async (password = null) => {
-        // 1. Get idToken — if password provided, re-auth via REST (email users)
+        // 1. Get idToken
+        // For email users: re-auth via REST using password (fresh token)
+        // For Apple/Google: use stored mc_token — avoids SDK getIdToken() hanging
+        //   in Capacitor WKWebView (same issue as signInWithCredential)
         let idToken = null;
         try {
           if (password) {
@@ -122,14 +125,13 @@ function Root() {
             if (!email) throw { message: "Could not find account email." };
             const data = await signInWithEmail(email, password);
             idToken = data.idToken;
-          } else if (auth.currentUser) {
-            idToken = await auth.currentUser.getIdToken();
           } else {
             idToken = localStorage.getItem("mc_token");
           }
         } catch(e) {
           throw { message: e?.message || "Incorrect password. Please try again." };
         }
+        if (!idToken) throw { message: "Could not authenticate. Please sign out and sign in again." };
 
         const uid = user?.uid || localStorage.getItem("moneyCoachUID");
 

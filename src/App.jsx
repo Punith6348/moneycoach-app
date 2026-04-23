@@ -212,16 +212,19 @@ const APP_CSS = `
   [data-theme="dark"] input::placeholder { color:#475569 !important; }
 `;
 
-// Dark mode — persisted in localStorage, applied via data-theme on <html>
-const DM_KEY = "mc_dark_mode";
-function initDarkMode() {
-  const saved = localStorage.getItem(DM_KEY);
-  if (saved === "1") document.documentElement.setAttribute("data-theme","dark");
-  return saved === "1";
+// Dark mode — auto based on time: 7pm–7am = dark, 7am–7pm = light
+function isDarkHour() {
+  const h = new Date().getHours();
+  return h >= 19 || h < 7;
 }
 function applyDarkMode(on) {
-  if (on) { document.documentElement.setAttribute("data-theme","dark"); localStorage.setItem(DM_KEY,"1"); }
-  else     { document.documentElement.removeAttribute("data-theme");    localStorage.setItem(DM_KEY,"0"); }
+  if (on) document.documentElement.setAttribute("data-theme","dark");
+  else    document.documentElement.removeAttribute("data-theme");
+}
+function initDarkMode() {
+  const on = isDarkHour();
+  applyDarkMode(on);
+  return on;
 }
 
 // ─── SHARED UI ────────────────────────────────────────────────────────────
@@ -1851,7 +1854,12 @@ function DashboardScreen(props) {
   const [darkMode,     setDarkMode]     = useState(() => initDarkMode());
   const [salaryDismissed, setSalaryDismissed] = useState(false);
 
-  const toggleDark = (on) => { applyDarkMode(on); setDarkMode(on); };
+  // Auto dark mode — re-check every minute, switches at 7am / 7pm
+  useEffect(() => {
+    const tick = () => { const on = isDarkHour(); applyDarkMode(on); setDarkMode(on); };
+    const id = setInterval(tick, 60000);
+    return () => clearInterval(id);
+  }, []);
 
   // Inject APP_CSS into <head> once — guaranteed to work unlike JSX <style>
   useEffect(() => {
@@ -1915,8 +1923,6 @@ function DashboardScreen(props) {
           onClose={() => setShowSettings(false)}
           onResetAll={resetAll}
           onNameChange={n => { updateName(n); setShowSettings(false); showToast("Name updated ✓"); }}
-          darkMode={darkMode}
-          onToggleDark={toggleDark}
           firebaseUser={firebaseUser}
           isGuest={isGuest}
           onSignOut={onSignOut}
