@@ -3,7 +3,7 @@ import { StrictMode, useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "./firebase";
-import { clearSession, deleteAccountREST, deleteFirestoreREST } from "./firebaseAuth";
+import { clearSession, deleteAccountREST, deleteFirestoreREST, signInWithEmail } from "./firebaseAuth";
 import { registerUserProfile } from "./useFirestoreSync";
 import App from "./App.jsx";
 import AuthScreen from "./AuthScreen.jsx";
@@ -113,16 +113,23 @@ function Root() {
         setGuestMode(false);
         setUser(null);
       }}
-      onDeleteAccount={async () => {
-        // 1. Get idToken — prefer live SDK token, fall back to REST token
+      onDeleteAccount={async (password = null) => {
+        // 1. Get idToken — if password provided, re-auth via REST (email users)
         let idToken = null;
         try {
-          if (auth.currentUser) {
+          if (password) {
+            const email = localStorage.getItem("mc_email") || auth.currentUser?.email;
+            if (!email) throw { message: "Could not find account email." };
+            const data = await signInWithEmail(email, password);
+            idToken = data.idToken;
+          } else if (auth.currentUser) {
             idToken = await auth.currentUser.getIdToken();
           } else {
             idToken = localStorage.getItem("mc_token");
           }
-        } catch(e) {}
+        } catch(e) {
+          throw { message: e?.message || "Incorrect password. Please try again." };
+        }
 
         const uid = user?.uid || localStorage.getItem("moneyCoachUID");
 

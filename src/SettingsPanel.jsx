@@ -12,12 +12,26 @@ export default function SettingsPanel({
   firebaseUser=null, isGuest=false, onSignOut=null,
   onLoadTestData=null, onDeleteAccount=null,
 }) {
-  const [showResetModal,   setShowResetModal]   = useState(false);
-  const [showDeleteModal,  setShowDeleteModal]  = useState(false);
-  const [deleteConfirmText,setDeleteConfirmText]= useState("");
-  const [deleting,         setDeleting]         = useState(false);
+  const [showResetModal,  setShowResetModal]  = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteStep,      setDeleteStep]      = useState(1); // 1=confirm, 2=password/final
+  const [deletePassword,  setDeletePassword]  = useState("");
+  const [deleteError,     setDeleteError]     = useState("");
+  const [deleting,        setDeleting]        = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [draftName,   setDraftName]   = useState(name||"");
+
+  // Email users have mc_token set by saveSession — Apple/Google users don't
+  const isEmailUser = !!localStorage.getItem("mc_token");
+
+  const openDeleteModal = () => {
+    setDeleteStep(1);
+    setDeletePassword("");
+    setDeleteError("");
+    setDeleting(false);
+    setShowDeleteModal(true);
+  };
+  const closeDeleteModal = () => setShowDeleteModal(false);
 
   const saveNameEdit = () => {
     if (draftName.trim()) onNameChange(draftName.trim());
@@ -135,7 +149,7 @@ export default function SettingsPanel({
               label="Delete Account"
               sublabel="Permanently delete your account and all data"
               danger
-              onTap={() => { setDeleteConfirmText(""); setShowDeleteModal(true); }}
+              onTap={openDeleteModal}
             />
           )}
 
@@ -180,58 +194,96 @@ export default function SettingsPanel({
         </div>
       )}
 
-      {/* ── Delete Account confirmation modal ── */}
-      {showDeleteModal && (
-        <div onClick={()=>setShowDeleteModal(false)} style={{ position:"fixed", inset:0, zIndex:1100, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"flex-end" }}>
+      {/* ── Delete Account modal — 2-step ── */}
+      {showDeleteModal && deleteStep === 1 && (
+        <div onClick={closeDeleteModal} style={{ position:"fixed", inset:0, zIndex:1100, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"flex-end" }}>
           <div onClick={e=>e.stopPropagation()} style={{
             background:"#fff", borderRadius:"20px 20px 0 0",
             padding:"24px 20px", width:"100%",
             paddingBottom:"calc(env(safe-area-inset-bottom,0px) + 24px)",
           }}>
-            <p style={{ margin:"0 0 4px", fontSize:17, fontWeight:700, color:C.red }}>⚠️ Delete Account?</p>
-            <p style={{ margin:"0 0 6px", fontSize:13, color:C.ink, lineHeight:1.5 }}>
-              This will <strong>permanently delete</strong> your account and all your data — expenses, plans, loans, and settings.
+            <div style={{ display:"flex", justifyContent:"center", marginBottom:16 }}>
+              <div style={{ width:56, height:56, borderRadius:99, background:"#FEF2F2", display:"flex", alignItems:"center", justifyContent:"center", fontSize:28 }}>⚠️</div>
+            </div>
+            <p style={{ margin:"0 0 8px", fontSize:18, fontWeight:700, color:C.red, textAlign:"center" }}>Delete Account?</p>
+            <p style={{ margin:"0 0 8px", fontSize:13, color:C.ink, lineHeight:1.6, textAlign:"center" }}>
+              This will <strong>permanently delete</strong> your account and all your data.
             </p>
-            <p style={{ margin:"0 0 16px", fontSize:12, color:C.muted }}>
-              This cannot be undone. Type <strong>DELETE</strong> below to confirm.
-            </p>
-            <input
-              autoFocus
-              value={deleteConfirmText}
-              onChange={e=>setDeleteConfirmText(e.target.value.toUpperCase())}
-              placeholder="Type DELETE to confirm"
-              style={{ width:"100%", padding:"12px 14px", borderRadius:10,
-                border:`1.5px solid ${C.red}`, outline:"none",
-                fontFamily:"inherit", fontSize:15, color:C.ink,
-                boxSizing:"border-box", marginBottom:16,
-                letterSpacing:"1px", fontWeight:600,
-              }}
-            />
+            <div style={{ background:"#FEF2F2", borderRadius:12, padding:"12px 14px", marginBottom:20 }}>
+              <p style={{ margin:0, fontSize:12, color:C.red, lineHeight:1.6 }}>
+                ⚠️ <strong>All data will be lost and cannot be restored:</strong>
+              </p>
+              <p style={{ margin:"6px 0 0", fontSize:12, color:"#7F1D1D", lineHeight:1.6 }}>
+                • All expenses and transactions{"\n"}• Savings goals and plans{"\n"}• Loan records{"\n"}• Account settings
+              </p>
+            </div>
             <div style={{ display:"flex", gap:10 }}>
-              <button
-                onClick={()=>setShowDeleteModal(false)}
-                style={{ flex:1, padding:"13px", borderRadius:12, border:`1px solid ${C.border}`,
-                  background:"#fff", cursor:"pointer", fontFamily:"inherit",
-                  fontSize:14, color:C.muted, fontWeight:600 }}>
+              <button onClick={closeDeleteModal} style={{ flex:1, padding:"13px", borderRadius:12, border:`1px solid ${C.border}`, background:"#fff", cursor:"pointer", fontFamily:"inherit", fontSize:14, color:C.muted, fontWeight:600 }}>
                 Cancel
               </button>
+              <button onClick={()=>setDeleteStep(2)} style={{ flex:2, padding:"13px", borderRadius:12, border:"none", background:C.red, cursor:"pointer", fontFamily:"inherit", fontSize:14, color:"#fff", fontWeight:700 }}>
+                Continue →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDeleteModal && deleteStep === 2 && (
+        <div onClick={closeDeleteModal} style={{ position:"fixed", inset:0, zIndex:1100, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"flex-end" }}>
+          <div onClick={e=>e.stopPropagation()} style={{
+            background:"#fff", borderRadius:"20px 20px 0 0",
+            padding:"24px 20px", width:"100%",
+            paddingBottom:"calc(env(safe-area-inset-bottom,0px) + 24px)",
+          }}>
+            <p style={{ margin:"0 0 4px", fontSize:17, fontWeight:700, color:C.red }}>
+              {isEmailUser ? "Confirm with Password" : "Final Confirmation"}
+            </p>
+            <p style={{ margin:"0 0 16px", fontSize:13, color:C.muted, lineHeight:1.5 }}>
+              {isEmailUser
+                ? "Enter your password to permanently delete your account. This cannot be undone."
+                : "By tapping below, your account and all data will be permanently deleted. This cannot be undone."}
+            </p>
+            {isEmailUser && (
+              <>
+                <input
+                  autoFocus
+                  type="password"
+                  value={deletePassword}
+                  onChange={e=>{ setDeletePassword(e.target.value); setDeleteError(""); }}
+                  placeholder="Enter your password"
+                  style={{ width:"100%", padding:"12px 14px", borderRadius:10,
+                    border:`1.5px solid ${deleteError ? C.red : C.border}`, outline:"none",
+                    fontFamily:"inherit", fontSize:15, color:C.ink,
+                    boxSizing:"border-box", marginBottom:deleteError?6:16,
+                  }}
+                />
+                {deleteError && (
+                  <p style={{ margin:"0 0 12px", fontSize:12, color:C.red }}>{deleteError}</p>
+                )}
+              </>
+            )}
+            <div style={{ display:"flex", gap:10 }}>
+              <button onClick={()=>setDeleteStep(1)} style={{ flex:1, padding:"13px", borderRadius:12, border:`1px solid ${C.border}`, background:"#fff", cursor:"pointer", fontFamily:"inherit", fontSize:14, color:C.muted, fontWeight:600 }}>
+                Back
+              </button>
               <button
-                disabled={deleteConfirmText !== "DELETE" || deleting}
+                disabled={deleting || (isEmailUser && !deletePassword.trim())}
                 onClick={async () => {
-                  if (deleteConfirmText !== "DELETE") return;
                   setDeleting(true);
+                  setDeleteError("");
                   try {
-                    await onDeleteAccount();
+                    await onDeleteAccount(isEmailUser ? deletePassword : null);
+                    setShowDeleteModal(false);
+                    onClose();
                   } catch(e) {
-                    console.error("Delete account failed:", e);
+                    setDeleteError(e?.message || "Deletion failed. Please try again.");
+                    setDeleting(false);
                   }
-                  setDeleting(false);
-                  setShowDeleteModal(false);
-                  onClose();
                 }}
                 style={{ flex:2, padding:"13px", borderRadius:12, border:"none",
-                  background: deleteConfirmText === "DELETE" && !deleting ? C.red : "#D1D5DB",
-                  cursor: deleteConfirmText === "DELETE" && !deleting ? "pointer" : "not-allowed",
+                  background: deleting || (isEmailUser && !deletePassword.trim()) ? "#D1D5DB" : C.red,
+                  cursor: deleting || (isEmailUser && !deletePassword.trim()) ? "not-allowed" : "pointer",
                   fontFamily:"inherit", fontSize:14, color:"#fff", fontWeight:700,
                   transition:"background 0.2s" }}>
                 {deleting ? "Deleting..." : "Yes, Delete My Account"}
