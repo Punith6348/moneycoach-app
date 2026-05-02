@@ -1,7 +1,7 @@
 // ─── main.jsx ────────────────────────────────────────────────────────────────
 import { StrictMode, useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import { onAuthStateChanged, signOut, GoogleAuthProvider, reauthenticateWithPopup } from "firebase/auth";
 import { auth } from "./firebase";
 import { clearSession, deleteAccountREST, deleteFirestoreREST, signInWithEmail } from "./firebaseAuth";
 import { registerUserProfile } from "./useFirestoreSync";
@@ -114,27 +114,29 @@ function Root() {
         setUser(null);
       }}
       onDeleteAccount={async (password = null) => {
-        // 1. Get idToken
-        // For email users: re-auth via REST using password (fresh token)
-        // For Apple/Google: use stored mc_token — avoids SDK getIdToken() hanging
-        //   in Capacitor WKWebView (same issue as signInWithCredential)
+        // 1. Get idToken for Firestore + Auth deletion
         let idToken = null;
         try {
           if (password) {
+            // Email users: re-auth via REST with password
             const email = localStorage.getItem("mc_email") || auth.currentUser?.email;
             if (!email) throw { message: "Could not find account email." };
             const data = await signInWithEmail(email, password);
             idToken = data.idToken;
-          } else {
-            // For Google/Apple: try fresh SDK token first (works on web),
-            // fall back to cached mc_token (set by Apple REST sign-in)
-            if (auth.currentUser) {
+          } else if (auth.currentUser) {
+            const providerId = auth.currentUser.providerData?.[0]?.providerId;
+            if (providerId === "google.com") {
+              // Google users: reauthenticate via popup to get a guaranteed fresh token
+              const result = await reauthenticateWithPopup(auth.currentUser, new GoogleAuthProvider());
+              idToken = await result.user.getIdToken();
+            } else {
+              // Apple / other: try SDK token, fall back to cached mc_token
               try { idToken = await auth.currentUser.getIdToken(true); } catch(_) {}
+              if (!idToken) idToken = localStorage.getItem("mc_token");
             }
-            if (!idToken) idToken = localStorage.getItem("mc_token");
           }
         } catch(e) {
-          throw { message: e?.message || "Incorrect password. Please try again." };
+          throw { message: e?.message || "Authentication failed. Please try again." };
         }
         if (!idToken) throw { message: "Could not authenticate. Please sign out and sign in again." };
 
