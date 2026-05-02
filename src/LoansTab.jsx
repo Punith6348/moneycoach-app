@@ -225,10 +225,12 @@ function LoanForm({initial, onSave, onCancel}) {
                         background:+f.emiOverride>0?"#fff":C.bg})}/>
           {+f.emiOverride>0&&autoEmi>0&&(
             <p style={{margin:"3px 0 0",fontSize:10,
-                       color:+f.emiOverride!==autoEmi?C.amber:C.green}}>
-              {+f.emiOverride!==autoEmi
-                ? `⚠ Using your EMI: ${fmt(+f.emiOverride)}/mo`
-                : `✓ Same as calculated`}
+                       color:+f.emiOverride<autoEmi?C.red:+f.emiOverride!==autoEmi?C.amber:C.green}}>
+              {+f.emiOverride<autoEmi
+                ? `⚠ EMI too low — loan won't close in ${totalMonths} months. Needed: ${fmt(autoEmi)}/mo`
+                : +f.emiOverride!==autoEmi
+                  ? `⚠ Using your EMI: ${fmt(+f.emiOverride)}/mo`
+                  : `✓ Same as calculated`}
             </p>
           )}
         </div>
@@ -461,6 +463,17 @@ function LoanCard({loan, onEdit, onDelete}) {
       </div>
 
       <div style={{padding:"12px 14px"}}>
+
+        {/* EMI insufficient warning */}
+        {t.emiInsufficient && (
+          <div style={{background:"#FFF7ED",border:"1px solid #FED7AA",borderRadius:8,
+                       padding:"8px 10px",marginBottom:10}}>
+            <p style={{margin:0,fontSize:11,color:"#92400E",fontWeight:600}}>
+              ⚠ EMI {fmt(t.emi)}/mo is lower than required {fmt(t.minEmi)}/mo.
+              The loan may not be paid off in {loan.tenureMonths} months.
+            </p>
+          </div>
+        )}
 
         {/* 4 metric tiles */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7,marginBottom:12}}>

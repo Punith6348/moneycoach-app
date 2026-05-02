@@ -146,22 +146,47 @@ function outstandingAfter(principal, annualRate, emi, monthsElapsed) {
 }
 
 export function calcLoanTotals(loan) {
-  // Use manualEmi if set (from onboarding), else calculate from principal/rate
-  const emi           = loan.manualEmi || loan.emi || calcEMI(loan.principal, loan.rate, loan.tenureMonths);
-  const totalPayable  = emi * loan.tenureMonths;
-  const totalInterest = Math.max(0, totalPayable - loan.principal);
+  const emi = loan.manualEmi || loan.emi || calcEMI(loan.principal, loan.rate, loan.tenureMonths);
+
+  // Compute total interest via full amortization — handles override EMIs correctly.
+  // Simple formula (emi×months − principal) breaks when EMI < required EMI,
+  // yielding negative interest that gets clamped to ₹0.
+  let totalInterest = 0;
+  let totalPayable  = 0;
+  if (loan.principal > 0 && loan.rate > 0 && loan.tenureMonths > 0 && emi > 0) {
+    const r = loan.rate / 12 / 100;
+    let bal = loan.principal;
+    for (let i = 0; i < loan.tenureMonths && bal > 0.01; i++) {
+      const intPart = bal * r;
+      const prinPart = Math.min(emi - intPart, bal);
+      if (prinPart <= 0) {
+        // EMI too low — interest not even covered; accumulate what we can
+        totalInterest += intPart;
+        totalPayable  += emi;
+        break;
+      }
+      totalInterest += intPart;
+      totalPayable  += emi;
+      bal -= prinPart;
+    }
+    totalInterest = Math.round(totalInterest);
+    totalPayable  = Math.round(loan.principal + totalInterest);
+  } else {
+    totalPayable = emi * loan.tenureMonths;
+  }
+
+  // Flag when EMI is too low to pay off the loan in the given tenure
+  const minEmi = loan.principal > 0 && loan.rate > 0 && loan.tenureMonths > 0
+    ? calcEMI(loan.principal, loan.rate, loan.tenureMonths) : 0;
+  const emiInsufficient = minEmi > 0 && emi < minEmi;
 
   const start         = loan.startDate ? new Date(loan.startDate) : new Date();
   const now           = new Date();
   const monthsElapsed = Math.max(0, Math.floor((now - start) / (1000*60*60*24*30.44)));
   const monthsLeft    = Math.max(0, loan.tenureMonths - monthsElapsed);
 
-  // Actual outstanding balance via amortization walkthrough
   const outstanding   = outstandingAfter(loan.principal, loan.rate, emi, monthsElapsed);
-
-  // Amount paid = principal - remaining principal (true repaid principal)
   const principalPaid = Math.max(0, loan.principal - outstanding);
-  // paidPct relative to original principal (not total payable)
   const paidPct       = loan.principal > 0
     ? Math.min(100, Math.round((principalPaid / loan.principal) * 100))
     : 0;
@@ -170,9 +195,11 @@ export function calcLoanTotals(loan) {
     emi, totalPayable, totalInterest,
     monthsElapsed, monthsLeft,
     outstanding,
-    principalPaid,   // principal repaid so far
+    principalPaid,
     paidAmt: principalPaid,
     paidPct,
+    emiInsufficient,
+    minEmi,
   };
 }
 
