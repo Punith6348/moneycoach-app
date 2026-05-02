@@ -129,7 +129,12 @@ function LoanForm({initial, onSave, onCancel}) {
     startDate:   initial?.startDate || today,
   });
   const [tried, setTried] = useState(false);
-  const set = (k,v) => setF(p=>({...p,[k]:v}));
+  // Clear override EMI when core loan params change — old override no longer applies
+  const set = (k,v) => setF(p => {
+    const next = {...p, [k]: v};
+    if (["principal","rate","tenureYears","tenureMos"].includes(k)) next.emiOverride = "";
+    return next;
+  });
 
   const totalMonths = (parseInt(f.tenureYears)||0)*12 + (parseInt(f.tenureMos)||0);
   const autoEmi  = calcEMI(+f.principal, +f.rate, totalMonths);
@@ -137,7 +142,20 @@ function LoanForm({initial, onSave, onCancel}) {
   const words    = amountInWords(f.principal);
   const endDate  = completionStr(f.startDate, totalMonths);
   const valid    = f.name && +f.principal>0 && +f.rate>0 && totalMonths>0;
-  const totalInt = Math.max(0, useEmi*totalMonths - +f.principal);
+  // Compute interest via amortization (handles override EMI correctly)
+  const totalInt = (() => {
+    if (!valid || useEmi <= 0) return 0;
+    const r = +f.rate / 12 / 100;
+    let bal = +f.principal, interest = 0;
+    for (let i = 0; i < totalMonths && bal > 0.01; i++) {
+      const intPart = bal * r;
+      const prinPart = Math.min(useEmi - intPart, bal);
+      interest += intPart;
+      if (prinPart <= 0) break;
+      bal -= prinPart;
+    }
+    return Math.round(interest);
+  })();
 
   const save = () => {
     setTried(true);
