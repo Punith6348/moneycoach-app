@@ -268,6 +268,18 @@ export async function deleteFirestoreREST(uid, idToken) {
   } catch(e) { console.warn("Firestore REST delete failed:", e); }
 }
 
+// ── Send password reset email ─────────────────────────────────────────────────
+export async function sendPasswordReset(email) {
+  const res = await fetchWithTimeout(`${BASE}:sendOobCode?key=${API_KEY}`, {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify({ requestType: "PASSWORD_RESET", email }),
+  });
+  const data = await res.json();
+  if (data.error) throw { code: data.error.message, message: data.error.message };
+  return true;
+}
+
 // ── Format error codes ────────────────────────────────────────────────────────
 export function formatAuthError(code) {
   const map = {

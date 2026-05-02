@@ -2051,7 +2051,8 @@ function DashboardScreen(props) {
                            textTransform:"uppercase",letterSpacing:"0.8px"}}>
                   {new Date().toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"})}
                 </p>
-                <p style={{margin:0,fontSize:14,fontWeight:700,color:"#111827",fontFamily:"Georgia,serif",lineHeight:1.15}}>
+                <p style={{margin:0,fontSize:14,fontWeight:700,color:"#111827",fontFamily:"Georgia,serif",lineHeight:1.15,
+                           overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"60vw"}}>
                   {tab==="budget" ? `${getGreeting(name || firebaseUser?.displayName)} 👋` : (TABS.find(t=>t.key===tab)?.label || "Money Coach")}
                 </p>
                 {tab==="budget" && (() => {

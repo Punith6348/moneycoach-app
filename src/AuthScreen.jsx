@@ -5,7 +5,7 @@ import { OAuthProvider, GoogleAuthProvider, signInWithPopup, signInWithRedirect,
 import {
   signInWithAppleREST, saveFirebaseSDKSession, saveSession,
   signUpWithEmail, signInWithEmail, saveEmailSDKSession, formatAuthError,
-  loadFirestoreREST,
+  loadFirestoreREST, sendPasswordReset,
 } from "./firebaseAuth";
 
 function AppLogo({ size=80 }) {
@@ -86,8 +86,25 @@ export default function AuthScreen({ onGuest, onAuthSuccess }) {
     }).catch(() => {});
   }, []);
 
+  const [forgotEmail,   setForgotEmail]   = useState("");
+  const [forgotSent,    setForgotSent]    = useState(false);
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotError,   setForgotError]   = useState("");
+
   const startLoading = (msg) => { setError(""); setLoading(true); setLoadMsg(msg); };
   const stopLoading  = ()    => { setLoading(false); setLoadMsg(""); };
+
+  const handleForgotPassword = async () => {
+    if (!forgotEmail.trim()) { setForgotError("Enter your email address"); return; }
+    setForgotLoading(true); setForgotError("");
+    try {
+      await sendPasswordReset(forgotEmail.trim());
+      setForgotSent(true);
+    } catch(e) {
+      setForgotError(formatAuthError(e.code) || "Could not send reset email. Check the address.");
+    }
+    setForgotLoading(false);
+  };
 
   // ── Google Sign In — Android/web only ─────────────────────────────────────
   // Uses redirect (not popup) so it works correctly inside TWA on Android.
@@ -285,6 +302,88 @@ export default function AuthScreen({ onGuest, onAuthSuccess }) {
     );
   }
 
+  // ── Forgot Password Screen ────────────────────────────────────────────────
+  if (screen === "forgot") {
+    return (
+      <div style={{ position:"fixed", inset:0, overflowY:"auto", WebkitOverflowScrolling:"touch",
+        fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
+        background:"linear-gradient(160deg,#0F172A 0%,#1E293B 60%,#0F172A 100%)" }}>
+        <div style={{ minHeight:"100%", display:"flex", flexDirection:"column",
+          alignItems:"center", justifyContent:"center", padding:"20px 20px 40px", boxSizing:"border-box" }}>
+          <div style={{ width:"100%", maxWidth:400 }}>
+            <div style={{ background:"#fff", borderRadius:20, padding:"28px 24px" }}>
+              {forgotSent ? (
+                <>
+                  <div style={{ textAlign:"center", marginBottom:20 }}>
+                    <div style={{ fontSize:48, marginBottom:12 }}>📧</div>
+                    <p style={{ fontSize:18, fontWeight:700, color:"#111827", margin:"0 0 8px" }}>
+                      Check your email
+                    </p>
+                    <p style={{ fontSize:13, color:"#6B7280", margin:0, lineHeight:1.6 }}>
+                      We sent a password reset link to <strong>{forgotEmail}</strong>.
+                      Check your inbox and spam folder.
+                    </p>
+                  </div>
+                  <p style={{ fontSize:12, color:"#6B7280", textAlign:"center", margin:"0 0 16px", lineHeight:1.5 }}>
+                    After resetting, come back and sign in with your new password.
+                  </p>
+                  <button onClick={()=>setScreen("login")}
+                    style={{ width:"100%", padding:"13px", borderRadius:12, border:"none",
+                      background:"#111827", color:"#fff", fontFamily:"inherit",
+                      fontSize:14, fontWeight:700, cursor:"pointer" }}>
+                    Back to Sign In
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button onClick={()=>setScreen("login")}
+                    style={{ background:"none", border:"none", color:"#6B7280", fontSize:13,
+                      fontFamily:"inherit", cursor:"pointer", padding:"0 0 16px",
+                      display:"flex", alignItems:"center", gap:4 }}>
+                    ← Back
+                  </button>
+                  <p style={{ fontSize:18, fontWeight:700, color:"#111827", margin:"0 0 4px" }}>
+                    Forgot Password?
+                  </p>
+                  <p style={{ fontSize:13, color:"#6B7280", margin:"0 0 20px", lineHeight:1.5 }}>
+                    Enter your email and we'll send you a link to reset your password.
+                  </p>
+                  <p style={{ margin:"0 0 4px", fontSize:11, fontWeight:700,
+                    color:"#6B7280", textTransform:"uppercase" }}>Email Address</p>
+                  <input
+                    autoFocus
+                    type="email"
+                    value={forgotEmail}
+                    onChange={e=>{ setForgotEmail(e.target.value); setForgotError(""); }}
+                    onKeyDown={e=>e.key==="Enter"&&handleForgotPassword()}
+                    placeholder="you@example.com"
+                    style={{ width:"100%", padding:"11px 14px", borderRadius:10,
+                      border:`1.5px solid ${forgotError?"#DC2626":"#E5E7EB"}`,
+                      fontFamily:"inherit", fontSize:16, background:"#F8FAFC",
+                      outline:"none", marginBottom:6, boxSizing:"border-box" }}
+                  />
+                  {forgotError && (
+                    <p style={{ margin:"0 0 10px", fontSize:12, color:"#DC2626" }}>{forgotError}</p>
+                  )}
+                  <button
+                    disabled={forgotLoading}
+                    onClick={handleForgotPassword}
+                    style={{ width:"100%", padding:"13px", borderRadius:12, border:"none",
+                      background: forgotLoading ? "#D1D5DB" : "#2563EB",
+                      color:"#fff", fontFamily:"inherit", fontSize:14,
+                      fontWeight:700, cursor: forgotLoading ? "not-allowed" : "pointer",
+                      marginTop:8 }}>
+                    {forgotLoading ? "Sending…" : "Send Reset Link"}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // ── Login Screen ──────────────────────────────────────────────────────────
   return (
     <div style={{ position:"fixed", inset:0, overflowY:"auto",
@@ -434,6 +533,15 @@ export default function AuthScreen({ onGuest, onAuthSuccess }) {
                       onKeyDown={e=>e.key==="Enter"&&handleEmailSignup()}
                       style={{...inp, marginBottom:14}}/>
                   </>
+                )}
+
+                {emailMode==="login" && (
+                  <button onClick={()=>{ setForgotEmail(email); setForgotSent(false); setForgotError(""); setScreen("forgot"); }}
+                    style={{ background:"none", border:"none", color:"#2563EB", fontSize:12,
+                      fontFamily:"inherit", cursor:"pointer", padding:"0 0 10px",
+                      textAlign:"right", width:"100%", fontWeight:600 }}>
+                    Forgot Password?
+                  </button>
                 )}
 
                 <button onClick={emailMode==="login"?handleEmailLogin:handleEmailSignup}

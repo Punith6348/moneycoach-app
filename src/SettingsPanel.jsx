@@ -32,6 +32,7 @@ export default function SettingsPanel({
   const [showProfile, setShowProfile] = useState(false);
   const [profile, setProfile] = useState(loadProfile);
   const [profileDraft, setProfileDraft] = useState({});
+  const [nameError, setNameError] = useState("");
 
   // Apple/Google users have "apple.com" or "google.com" as providerId
   const isEmailUser = firebaseUser?.providerData?.[0]?.providerId === "password";
@@ -56,12 +57,16 @@ export default function SettingsPanel({
     setShowProfile(true);
   };
   const saveProfileEdit = () => {
-    const { _bestName, ...rest } = profileDraft; // strip internal helper key
+    const { _bestName, ...rest } = profileDraft;
+    const nameToSave = (rest.displayName ?? _bestName ?? "").trim();
+    if (nameToSave && nameToSave.length < 4) {
+      setNameError("Name must be at least 4 characters");
+      return;
+    }
+    setNameError("");
     const updated = { ...profile, ...rest };
     saveProfile(updated);
     setProfile(updated);
-    // Use edited displayName, or fall back to best available name
-    const nameToSave = (rest.displayName ?? _bestName ?? "").trim();
     if (nameToSave) onNameChange(nameToSave);
     setShowProfile(false);
   };
@@ -163,9 +168,10 @@ export default function SettingsPanel({
           }}>
             <p style={{ margin:"0 0 18px", fontSize:17, fontWeight:700, color:C.ink }}>Edit Profile</p>
 
-            <ProfileField label="Display Name" placeholder="Name shown on dashboard"
+            <ProfileField label="Display Name" placeholder="Min 4 characters"
               value={profileDraft.displayName ?? profileDraft._bestName ?? ""}
-              onChange={v=>setProfileDraft(p=>({...p,displayName:v}))}/>
+              onChange={v=>{ setNameError(""); setProfileDraft(p=>({...p,displayName:v})); }}
+              error={nameError}/>
 
             <ProfileField label="Date of Birth" type="date"
               value={profileDraft.dob ?? profile.dob ?? ""}
@@ -316,7 +322,7 @@ export default function SettingsPanel({
   );
 }
 
-function ProfileField({ label, value, onChange, type="text", placeholder="" }) {
+function ProfileField({ label, value, onChange, type="text", placeholder="", error="" }) {
   return (
     <div style={{ marginBottom:14 }}>
       <p style={{ margin:"0 0 5px", fontSize:12, fontWeight:600, color:C.muted, textTransform:"uppercase", letterSpacing:"0.4px" }}>{label}</p>
@@ -325,11 +331,13 @@ function ProfileField({ label, value, onChange, type="text", placeholder="" }) {
         value={value}
         onChange={e=>onChange(e.target.value)}
         placeholder={placeholder}
-        style={{ width:"100%", padding:"11px 13px", borderRadius:10, border:`1.5px solid ${C.border}`,
+        style={{ width:"100%", padding:"11px 13px", borderRadius:10,
+          border:`1.5px solid ${error ? C.red : C.border}`,
           outline:"none", fontFamily:"inherit", fontSize:15, color:C.ink, boxSizing:"border-box",
           background:"#fff", WebkitAppearance:"none",
         }}
       />
+      {error && <p style={{ margin:"4px 0 0", fontSize:12, color:C.red }}>{error}</p>}
     </div>
   );
 }
