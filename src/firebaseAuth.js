@@ -269,15 +269,33 @@ export async function deleteFirestoreREST(uid, idToken) {
 }
 
 // ── Send password reset email ─────────────────────────────────────────────────
+// continueUrl tells Firebase to redirect back to the app after reset so the
+// user lands on our custom reset handler (mode=resetPassword in URL params).
 export async function sendPasswordReset(email) {
   const res = await fetchWithTimeout(`${BASE}:sendOobCode?key=${API_KEY}`, {
     method:  "POST",
     headers: { "Content-Type": "application/json" },
-    body:    JSON.stringify({ requestType: "PASSWORD_RESET", email }),
+    body:    JSON.stringify({
+      requestType: "PASSWORD_RESET",
+      email,
+      continueUrl: "https://moneycoach-app.vercel.app",
+    }),
   });
   const data = await res.json();
   if (data.error) throw { code: data.error.message, message: data.error.message };
   return true;
+}
+
+// ── Confirm password reset with oobCode from email link ───────────────────────
+export async function confirmPasswordResetREST(oobCode, newPassword) {
+  const res = await fetchWithTimeout(`${BASE}:resetPassword?key=${API_KEY}`, {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify({ oobCode, newPassword }),
+  });
+  const data = await res.json();
+  if (data.error) throw { code: data.error.message, message: data.error.message };
+  return data; // { email, requestType }
 }
 
 // ── Format error codes ────────────────────────────────────────────────────────

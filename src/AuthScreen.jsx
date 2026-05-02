@@ -5,7 +5,7 @@ import { OAuthProvider, GoogleAuthProvider, signInWithPopup, signInWithRedirect,
 import {
   signInWithAppleREST, saveFirebaseSDKSession, saveSession,
   signUpWithEmail, signInWithEmail, saveEmailSDKSession, formatAuthError,
-  loadFirestoreREST, sendPasswordReset,
+  loadFirestoreREST, sendPasswordReset, confirmPasswordResetREST,
 } from "./firebaseAuth";
 
 function AppLogo({ size=80 }) {
@@ -99,8 +99,41 @@ export default function AuthScreen({ onGuest, onAuthSuccess }) {
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotError,   setForgotError]   = useState("");
 
+  // Reset password — oobCode from email link (mode=resetPassword in URL)
+  const [resetOobCode,   setResetOobCode]   = useState("");
+  const [resetNewPwd,    setResetNewPwd]    = useState("");
+  const [resetConfirm,   setResetConfirm]   = useState("");
+  const [resetLoading,   setResetLoading]   = useState(false);
+  const [resetError,     setResetError]     = useState("");
+  const [resetDone,      setResetDone]      = useState(false);
+  const [resetShowPwd,   setResetShowPwd]   = useState(false);
+
+  // Detect Firebase action URL params on mount (from password reset email link)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("mode") === "resetPassword" && params.get("oobCode")) {
+      setResetOobCode(params.get("oobCode"));
+      setScreen("resetPassword");
+      // Clean up URL so user doesn't re-trigger on refresh
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
+
   const startLoading = (msg) => { setError(""); setLoading(true); setLoadMsg(msg); };
   const stopLoading  = ()    => { setLoading(false); setLoadMsg(""); };
+
+  const handleResetPassword = async () => {
+    if (resetNewPwd.length < 6) { setResetError("Password must be at least 6 characters."); return; }
+    if (resetNewPwd !== resetConfirm) { setResetError("Passwords don't match."); return; }
+    setResetLoading(true); setResetError("");
+    try {
+      await confirmPasswordResetREST(resetOobCode, resetNewPwd);
+      setResetDone(true);
+    } catch(e) {
+      setResetError(e.message || "Could not reset password. The link may have expired.");
+    }
+    setResetLoading(false);
+  };
 
   const handleForgotPassword = async () => {
     if (!forgotEmail.trim()) { setForgotError("Enter your email address"); return; }
@@ -385,6 +418,102 @@ export default function AuthScreen({ onGuest, onAuthSuccess }) {
                       fontWeight:700, cursor: forgotLoading ? "not-allowed" : "pointer",
                       marginTop:8 }}>
                     {forgotLoading ? "Sending…" : "Send Reset Link"}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Reset Password Screen (from email link oobCode) ──────────────────────
+  if (screen === "resetPassword") {
+    return (
+      <div style={{ position:"fixed", inset:0, overflowY:"auto", WebkitOverflowScrolling:"touch",
+        fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
+        background:"linear-gradient(160deg,#0F172A 0%,#1E293B 60%,#0F172A 100%)" }}>
+        <div style={{ minHeight:"100%", display:"flex", flexDirection:"column",
+          alignItems:"center", justifyContent:"center", padding:"20px 20px 40px", boxSizing:"border-box" }}>
+          <div style={{ width:"100%", maxWidth:400 }}>
+            <div style={{ background:"#fff", borderRadius:20, padding:"28px 24px" }}>
+              {resetDone ? (
+                <>
+                  <div style={{ textAlign:"center", marginBottom:20 }}>
+                    <div style={{ fontSize:48, marginBottom:12 }}>✅</div>
+                    <p style={{ fontSize:18, fontWeight:700, color:"#111827", margin:"0 0 8px" }}>
+                      Password updated!
+                    </p>
+                    <p style={{ fontSize:13, color:"#6B7280", margin:0, lineHeight:1.6 }}>
+                      Your password has been reset. Sign in with your new password.
+                    </p>
+                  </div>
+                  <button onClick={() => setScreen("login")}
+                    style={{ width:"100%", padding:"13px", borderRadius:12, border:"none",
+                      background:"#2563EB", color:"#fff", fontFamily:"inherit",
+                      fontSize:14, fontWeight:700, cursor:"pointer" }}>
+                    Sign In
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p style={{ fontSize:18, fontWeight:700, color:"#111827", margin:"0 0 4px" }}>
+                    Set New Password
+                  </p>
+                  <p style={{ fontSize:13, color:"#6B7280", margin:"0 0 20px", lineHeight:1.5 }}>
+                    Choose a new password for your account.
+                  </p>
+                  {resetError && (
+                    <div style={{ background:"#FFF1F2", border:"1px solid #FECACA",
+                      borderRadius:10, padding:"10px 12px", marginBottom:14,
+                      fontSize:12, color:"#DC2626" }}>
+                      {resetError}
+                    </div>
+                  )}
+                  <p style={{ margin:"0 0 4px", fontSize:11, fontWeight:700, color:"#6B7280", textTransform:"uppercase" }}>
+                    New Password
+                  </p>
+                  <div style={{ position:"relative", marginBottom:12 }}>
+                    <input
+                      autoFocus
+                      type={resetShowPwd ? "text" : "password"}
+                      value={resetNewPwd}
+                      onChange={e => { setResetNewPwd(e.target.value); setResetError(""); }}
+                      placeholder="At least 6 characters"
+                      style={{ width:"100%", padding:"11px 40px 11px 14px", borderRadius:10,
+                        border:`1.5px solid ${resetError?"#DC2626":"#E5E7EB"}`,
+                        fontFamily:"inherit", fontSize:16, background:"#F8FAFC",
+                        outline:"none", boxSizing:"border-box" }}
+                    />
+                    <button onClick={() => setResetShowPwd(v => !v)}
+                      style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)",
+                        background:"none", border:"none", cursor:"pointer", color:"#9CA3AF", fontSize:18 }}>
+                      {resetShowPwd ? "🙈" : "👁"}
+                    </button>
+                  </div>
+                  <p style={{ margin:"0 0 4px", fontSize:11, fontWeight:700, color:"#6B7280", textTransform:"uppercase" }}>
+                    Confirm Password
+                  </p>
+                  <input
+                    type={resetShowPwd ? "text" : "password"}
+                    value={resetConfirm}
+                    onChange={e => { setResetConfirm(e.target.value); setResetError(""); }}
+                    onKeyDown={e => e.key === "Enter" && handleResetPassword()}
+                    placeholder="Repeat new password"
+                    style={{ width:"100%", padding:"11px 14px", borderRadius:10,
+                      border:`1.5px solid ${resetError?"#DC2626":"#E5E7EB"}`,
+                      fontFamily:"inherit", fontSize:16, background:"#F8FAFC",
+                      outline:"none", marginBottom:16, boxSizing:"border-box" }}
+                  />
+                  <button
+                    disabled={resetLoading}
+                    onClick={handleResetPassword}
+                    style={{ width:"100%", padding:"13px", borderRadius:12, border:"none",
+                      background: resetLoading ? "#D1D5DB" : "#2563EB",
+                      color:"#fff", fontFamily:"inherit", fontSize:14,
+                      fontWeight:700, cursor: resetLoading ? "not-allowed" : "pointer" }}>
+                    {resetLoading ? "Saving…" : "Save New Password"}
                   </button>
                 </>
               )}
