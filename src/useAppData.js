@@ -549,9 +549,43 @@ export function useAppData(firebaseUser = null) {
   });
 
   // Loans
-  const addLoan    = (l)      => commit(prev=>({...prev, loans:[...(prev.loans||[]), {...l, id:Date.now()}]}));
-  const updateLoan = (id,upd) => commit(prev=>({...prev, loans:(prev.loans||[]).map(x=>x.id===id?{...x,...upd}:x)}));
-  const deleteLoan = (id)     => commit(prev=>({...prev, loans:(prev.loans||[]).filter(x=>x.id!==id)}));
+  const addLoan = (l) => commit(prev=>({...prev, loans:[...(prev.loans||[]), {...l, id:Date.now()}]}));
+  const updateLoan = (id, upd) => commit(prev => {
+    const updatedLoans = (prev.loans||[]).map(x => x.id===id ? {...x, ...upd} : x);
+    const updatedLoan  = updatedLoans.find(l => l.id === id);
+    const mk = currentMonthKey();
+    // Re-log the auto loan-payment entry for this month with the new EMI
+    // so the recorded amount stays in sync after editing
+    let allExpenses = prev.allExpenses;
+    if (updatedLoan && !updatedLoan.needsDetails) {
+      const newEmi = updatedLoan.emi || calcEMI(updatedLoan.principal, updatedLoan.rate, updatedLoan.tenureMonths);
+      if (newEmi > 0) {
+        const monthExp = (allExpenses[mk] || []).filter(e => e.loanId !== id);
+        monthExp.push({
+          id: Date.now() + Math.random(),
+          amount: newEmi,
+          label: "EMI/Loan",
+          note: updatedLoan.name || "Loan EMI",
+          date: new Date(new Date().getFullYear(), new Date().getMonth(), 1, 9, 0, 0).toISOString(),
+          loanId: id,
+          isLoanPayment: true,
+          auto: true,
+        });
+        allExpenses = {...allExpenses, [mk]: monthExp};
+      }
+    }
+    return {...prev, loans: updatedLoans, allExpenses};
+  });
+  const deleteLoan = (id) => commit(prev => {
+    // Also remove any auto-logged loan payment entries for this loan
+    const mk = currentMonthKey();
+    const monthExp = (prev.allExpenses[mk] || []).filter(e => e.loanId !== id);
+    return {
+      ...prev,
+      loans: (prev.loans||[]).filter(x => x.id !== id),
+      allExpenses: {...prev.allExpenses, [mk]: monthExp},
+    };
+  });
 
   const addCreditCard    = (c)      => commit(prev=>({...prev, creditCards:[...(prev.creditCards||[]), {...c, id:Date.now()}]}));
   const updateCreditCard = (id,upd) => commit(prev=>({...prev, creditCards:(prev.creditCards||[]).map(x=>x.id===id?{...x,...upd}:x)}));
