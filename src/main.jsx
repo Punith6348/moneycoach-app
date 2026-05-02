@@ -126,7 +126,12 @@ function Root() {
             const data = await signInWithEmail(email, password);
             idToken = data.idToken;
           } else {
-            idToken = localStorage.getItem("mc_token");
+            // For Google/Apple: try fresh SDK token first (works on web),
+            // fall back to cached mc_token (set by Apple REST sign-in)
+            if (auth.currentUser) {
+              try { idToken = await auth.currentUser.getIdToken(true); } catch(_) {}
+            }
+            if (!idToken) idToken = localStorage.getItem("mc_token");
           }
         } catch(e) {
           throw { message: e?.message || "Incorrect password. Please try again." };
