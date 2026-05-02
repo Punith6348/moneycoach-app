@@ -40,11 +40,12 @@ function migrateLoanBills(state) {
       loans.push({
         id: bill.id || Date.now(),
         name,
-        principal: (bill.amount || 0) * 60,
-        rate: 9,
-        tenureMonths: 60,
+        principal: 0,
+        rate: 0,
+        tenureMonths: 0,
         startDate: new Date().toISOString().split("T")[0],
         manualEmi: bill.amount,
+        needsDetails: true,
       });
     }
   });
@@ -491,13 +492,12 @@ export function useAppData(firebaseUser = null) {
         return {
           id:           ts+300+i,
           name:         l.name||l.label||"Loan",
-          // Estimate principal from EMI (rough: EMI * 60 months)
-          principal:    emi * 60,
-          rate:         9,
-          tenureMonths: 60,
+          principal:    0,
+          rate:         0,
+          tenureMonths: 0,
           startDate:    new Date().toISOString().split("T")[0],
-          // Store actual EMI so it overrides calculation
           manualEmi:    emi,
+          needsDetails: true, // prompt user to fill in full loan details
         };
       }),
     }));

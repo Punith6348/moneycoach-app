@@ -143,7 +143,8 @@ function LoanForm({initial, onSave, onCancel}) {
     setTried(true);
     if (!valid) return;
     onSave({ name:f.name, principal:+f.principal, rate:+f.rate,
-             tenureMonths:totalMonths, emi:useEmi, startDate:f.startDate });
+             tenureMonths:totalMonths, emi:useEmi, startDate:f.startDate,
+             needsDetails: false }); // clear flag when full details are entered
   };
 
   return (
@@ -396,8 +397,43 @@ function InsightPanel({loan, baseTotals}) {
 // ═════════════════════════════════════════════════════════════════════════════
 function LoanCard({loan, onEdit, onDelete}) {
   const [showInsight, setShowInsight] = useState(false);
-  const t        = calcLoanTotals(loan);
   const icon     = LOAN_ICON[loan.name]||"🏦";
+
+  // EMI-only loan (from onboarding) — show simplified card with prompt to add details
+  if (loan.needsDetails) {
+    const emi = loan.manualEmi || loan.emi || 0;
+    return (
+      <div style={{background:"#fff",borderRadius:13,border:`1.5px dashed ${C.border}`,
+                   boxShadow:"0 1px 4px rgba(0,0,0,0.04)",overflow:"hidden"}}>
+        <div style={{padding:"12px 14px",display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+          <div style={{display:"flex",gap:10,alignItems:"center",flex:1,minWidth:0}}>
+            <div style={{width:40,height:40,borderRadius:10,background:`${C.blue}12`,
+                         display:"flex",alignItems:"center",justifyContent:"center",
+                         fontSize:20,flexShrink:0}}>{icon}</div>
+            <div style={{minWidth:0}}>
+              <p style={{margin:0,fontSize:13,fontWeight:700,color:C.ink}}>{loan.name}</p>
+              <p style={{margin:0,fontSize:10,color:C.muted}}>EMI added during setup</p>
+            </div>
+          </div>
+          <DotMenu onEdit={onEdit} onDelete={onDelete}/>
+        </div>
+        <div style={{padding:"0 14px 14px"}}>
+          <div style={{background:C.bg,borderRadius:8,padding:"10px 12px",marginBottom:10}}>
+            <p style={{margin:0,fontSize:9,color:C.muted,textTransform:"uppercase",letterSpacing:"0.7px",fontWeight:600}}>Monthly EMI</p>
+            <p style={{margin:"3px 0 0",fontSize:18,fontWeight:700,color:C.ink,fontFamily:"Georgia,serif"}}>{fmt(emi)}</p>
+          </div>
+          <button onClick={onEdit}
+            style={{width:"100%",padding:"9px",borderRadius:9,border:`1px solid ${C.blue}`,
+                    background:"#EFF6FF",color:C.blue,fontFamily:"inherit",
+                    fontSize:12,fontWeight:700,cursor:"pointer"}}>
+            ✏️ Add full loan details (amount, rate, tenure) for accurate tracking
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const t        = calcLoanTotals(loan);
   const barColor = t.paidPct<30?C.red:t.paidPct<70?C.amber:C.green;
   const endDate  = completionStr(loan.startDate, loan.tenureMonths);
 
@@ -496,15 +532,13 @@ function DebtPayoffPlanner({ loans }) {
   const [strategy, setStrategy] = useState("avalanche"); // "avalanche" | "snowball"
   const [open,     setOpen]     = useState(false);
 
-  // Compute totals per loan
-  const enriched = loans.map(l => {
+  // Compute totals per loan (skip EMI-only loans — no amortization data)
+  const enriched = loans.filter(l => !l.needsDetails).map(l => {
     const t = calcLoanTotals(l);
     return { ...l, ...t, icon: LOAN_ICON[l.name] || "🏦" };
   });
 
-  const totalOutstanding = enriched.reduce((s, l) => s + l.outstanding, 0);
-  const totalEmi         = enriched.reduce((s, l) => s + l.emi, 0);
-  const extraAmt         = Math.max(0, parseFloat(extra) || 0);
+  const extraAmt = Math.max(0, parseFloat(extra) || 0);
 
   // Strategy ordering
   const ordered = [...enriched].sort((a, b) =>
@@ -781,9 +815,11 @@ export default function LoansTab({loans, onAdd, onUpdate, onDelete}) {
   const [showForm, setShowForm] = useState(false);
   const [editId,   setEditId]   = useState(null);
 
-  const totalEmi         = loans.reduce((s,l)=>s+calcLoanTotals(l).emi,0);
-  const totalOutstanding = loans.reduce((s,l)=>s+calcLoanTotals(l).outstanding,0);
-  const totalInterest    = loans.reduce((s,l)=>s+calcLoanTotals(l).totalInterest,0);
+  // Only count loans with full details for calculated metrics
+  const detailedLoans    = loans.filter(l => !l.needsDetails);
+  const totalEmi         = loans.reduce((s,l)=>s+(l.manualEmi||l.emi||calcLoanTotals(l).emi),0);
+  const totalOutstanding = detailedLoans.reduce((s,l)=>s+calcLoanTotals(l).outstanding,0);
+  const totalInterest    = detailedLoans.reduce((s,l)=>s+calcLoanTotals(l).totalInterest,0);
 
   const handleSave = (data) => {
     if (editId!==null) { onUpdate(editId,data); setEditId(null); }
