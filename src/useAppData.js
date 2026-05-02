@@ -262,9 +262,29 @@ function checkAndCarryForward(data) {
     });
   });
 
-  // Income sources, fixed expenses, loans persist in data automatically
-  // No special carry needed — they are not month-scoped
-  // Daily expenses stay in their own monthKey — no carry
+  // Auto-log loan EMI payments for new month (stops when tenure ends)
+  // Tagged isLoanPayment so they are excluded from thisMonthSpent
+  // (loan already deducted from budgetForMonth via totalLoanEmi — no double-count)
+  (data.loans || []).forEach(loan => {
+    const emi = loan.manualEmi || loan.emi || calcEMI(loan.principal, loan.rate, loan.tenureMonths);
+    if (!emi || emi <= 0) return;
+    if (existing.some(e => e.loanId === loan.id)) return; // already logged
+    if (loan.tenureMonths && loan.startDate) {
+      const start = new Date(loan.startDate);
+      const monthsElapsed = Math.floor((now - start) / (1000 * 60 * 60 * 24 * 30.44));
+      if (monthsElapsed >= loan.tenureMonths) return; // loan tenure ended
+    }
+    toAdd.push({
+      id:            Date.now() + Math.random(),
+      amount:        emi,
+      label:         "EMI/Loan",
+      note:          loan.name || "Loan EMI",
+      date:          new Date(now.getFullYear(), now.getMonth(), 1, 9, 0, 0).toISOString(),
+      loanId:        loan.id,
+      isLoanPayment: true,
+      auto:          true,
+    });
+  });
 
   return {
     ...data,
@@ -555,7 +575,7 @@ export function useAppData(firebaseUser = null) {
   const addAsset    = (a)      => commit(prev=>({...prev, assets:[...(prev.assets||[]), {...a, id:Date.now()}]}));
   const updateAsset = (id,upd) => commit(prev=>({...prev, assets:(prev.assets||[]).map(a=>a.id===id?{...a,...upd}:a)}));
   const deleteAsset = (id)     => commit(prev=>({...prev, assets:(prev.assets||[]).filter(a=>a.id!==id)}));
-  // Called once on app load — checks each active recurring item
+  // Called once on app load — checks each active recurring item and loan EMI
   const autoLogRecurring = () => {
     const now   = new Date();
     const today = now.getDate();
@@ -580,6 +600,26 @@ export function useAppData(firebaseUser = null) {
           auto:        true,   // flag for UI display
         });
       });
+      // Auto-log loan EMI payments for current month
+      (prev.loans || []).forEach(loan => {
+        const emi = loan.manualEmi || loan.emi || calcEMI(loan.principal, loan.rate, loan.tenureMonths);
+        if (!emi || emi <= 0) return;
+        if (existing.some(e => e.loanId === loan.id)) return; // already logged
+        if (loan.tenureMonths && loan.startDate) {
+          const elapsed = Math.floor((now - new Date(loan.startDate)) / (1000*60*60*24*30.44));
+          if (elapsed >= loan.tenureMonths) return; // loan ended
+        }
+        toAdd.push({
+          id:            Date.now() + Math.random(),
+          amount:        emi,
+          label:         "EMI/Loan",
+          note:          loan.name || "Loan EMI",
+          date:          new Date(now.getFullYear(), now.getMonth(), 1, 9, 0, 0).toISOString(),
+          loanId:        loan.id,
+          isLoanPayment: true,
+          auto:          true,
+        });
+      });
       if (toAdd.length === 0) return prev;
       return { ...prev, allExpenses: { ...prev.allExpenses, [mk]: [...existing, ...toAdd] } };
     });
@@ -595,12 +635,20 @@ export function useAppData(firebaseUser = null) {
   const totalFixed    = calcTotalFixed(data.fixedExpenses);
   const totalSavings  = calcTotalSavings(data.savingsPlans);
   const totalReserve  = calcTotalReserve(data.futurePayments);
-  const totalLoanEmi  = (data.loans||[]).reduce((s,l) => s + (l.manualEmi || l.emi || calcEMI(l.principal, l.rate, l.tenureMonths) || 0), 0);
+  const totalLoanEmi  = (data.loans||[]).reduce((s,l) => {
+    // Stop deducting once loan tenure has ended
+    if (l.tenureMonths && l.startDate) {
+      const elapsed = Math.floor((Date.now() - new Date(l.startDate)) / (1000*60*60*24*30.44));
+      if (elapsed >= l.tenureMonths) return s;
+    }
+    return s + (l.manualEmi || l.emi || calcEMI(l.principal, l.rate, l.tenureMonths) || 0);
+  }, 0);
 
   // ── Current month expenses only ──────────────────────────────────────────
   const curMonthKey    = currentMonthKey();
   const thisMonthExp   = (data.allExpenses[curMonthKey] || []);
-  const thisMonthSpent = thisMonthExp.reduce((s, e) => s + (e.amount || 0), 0);
+  // Exclude auto-logged loan payments — already deducted via totalLoanEmi in budgetForMonth
+  const thisMonthSpent = thisMonthExp.filter(e => !e.isLoanPayment).reduce((s, e) => s + (e.amount || 0), 0);
 
   // ── Budget = Income − Fixed − Savings − Reserve − Loan EMIs ─────────────
   const budgetForMonth = calcRemainingBudget(totalIncome, totalFixed, totalSavings, totalReserve, totalLoanEmi);
