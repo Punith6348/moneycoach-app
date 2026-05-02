@@ -1,6 +1,6 @@
 // ─── AuthScreen.jsx ───────────────────────────────────────────────────────────
 import { useState, useEffect } from "react";
-import { auth } from "./firebase";
+import { auth, persistenceReady } from "./firebase";
 import { OAuthProvider, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from "firebase/auth";
 import {
   signInWithAppleREST, saveFirebaseSDKSession, saveSession,
@@ -70,20 +70,28 @@ export default function AuthScreen({ onGuest, onAuthSuccess }) {
     return () => window.visualViewport?.removeEventListener("resize", onResize);
   }, []);
 
-  // Pick up Google redirect result when the app loads after redirect
+  // Android TWA detection — redirect is only needed inside a TWA.
+  // On desktop/web, signInWithPopup works fine and avoids redirect issues.
+  const isAndroidTWA = /Android/i.test(navigator.userAgent);
+
+  // Pick up Google redirect result after Android TWA redirect returns
   useEffect(() => {
-    if (isCapacitorIOS) return; // iOS uses Apple, not Google redirect
-    getRedirectResult(auth).then(async result => {
-      if (!result?.user) return;
-      startLoading("Signing you in...");
-      try {
-        await loadFirestoreREST(result.user.uid, await result.user.getIdToken());
-        onAuthSuccess?.(result.user);
-      } catch(e) {
-        console.error("Google redirect result error:", e);
-      }
-      stopLoading();
-    }).catch(() => {});
+    if (isCapacitorIOS || !isAndroidTWA) return;
+    // Await persistence setup before checking redirect result — avoids
+    // getRedirectResult returning null because storage isn't ready yet
+    persistenceReady.then(() =>
+      getRedirectResult(auth).then(async result => {
+        if (!result?.user) return;
+        startLoading("Signing you in...");
+        try {
+          await loadFirestoreREST(result.user.uid, await result.user.getIdToken());
+          onAuthSuccess?.(result.user);
+        } catch(e) {
+          console.error("Google redirect result error:", e);
+        }
+        stopLoading();
+      }).catch(() => {})
+    );
   }, []);
 
   const [forgotEmail,   setForgotEmail]   = useState("");
@@ -106,23 +114,26 @@ export default function AuthScreen({ onGuest, onAuthSuccess }) {
     setForgotLoading(false);
   };
 
-  // ── Google Sign In — Android/web only ─────────────────────────────────────
-  // Uses redirect (not popup) so it works correctly inside TWA on Android.
-  // After redirect, getRedirectResult() picks up the result on return.
+  // ── Google Sign In — Android TWA uses redirect, Mac/PC web uses popup ────────
   const handleGoogle = async () => {
     startLoading("Signing in with Google...");
     try {
       const provider = new GoogleAuthProvider();
-      // On Android TWA, signInWithRedirect navigates within Chrome (no new tab).
-      // On web desktop, popup works fine but redirect is also safe there.
-      await signInWithRedirect(auth, provider);
-      // Execution continues after the user returns from the redirect.
-      const result = await getRedirectResult(auth);
-      if (result?.user) {
-        await loadFirestoreREST(result.user.uid, await result.user.getIdToken());
-        onAuthSuccess?.(result.user);
+      if (isAndroidTWA) {
+        // TWA doesn't support popups — redirect navigates within Chrome
+        await persistenceReady;
+        await signInWithRedirect(auth, provider);
+        // Page navigates away; result is picked up by useEffect on return
+      } else {
+        // Desktop/web browser — popup is instant and reliable (no redirect)
+        await persistenceReady;
+        const result = await signInWithPopup(auth, provider);
+        if (result?.user) {
+          await loadFirestoreREST(result.user.uid, await result.user.getIdToken());
+          onAuthSuccess?.(result.user);
+        }
+        stopLoading();
       }
-      stopLoading();
     } catch(e) {
       console.error("Google error:", e.code, e.message);
       if (e.code !== "auth/cancelled-popup-request" && e.code !== "auth/popup-closed-by-user") {
