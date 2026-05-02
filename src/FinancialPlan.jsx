@@ -233,9 +233,9 @@ export function IncomeSources({sources, totalIncome, onAdd, onUpdate, onDelete})
 
 // ── FIXED EXPENSES ────────────────────────────────────────────────────────────
 const FIXED_LABELS = [
-  "Rent","Home Loan EMI","Car Loan EMI","Electricity","Water Bill",
-  "Internet","Mobile","Insurance","School Fees","Maintenance",
-  "OTT/Streaming","Gym","Petrol","House Help","Groceries (estimate)","Other Fixed",
+  "Rent","Electricity","Water Bill","Internet","Mobile","Insurance",
+  "School Fees","Maintenance","OTT/Streaming","Gym","Petrol",
+  "House Help","Groceries (estimate)","Other Fixed",
 ];
 
 export function FixedExpensesSection({items, totalFixed, onAdd, onUpdate, onDelete}) {

@@ -339,11 +339,9 @@ function OnboardingScreen({onComplete, defaultName=""}) {
     {id:6,  label:"Pension",        amount:"", active:false, icon:"👴"},
   ]);
 
-  // Step 3 — Fixed Bills (common ones pre-listed with toggles)
+  // Step 3 — Fixed Bills (loan EMIs excluded — covered in step 5 Loans)
   const [bills, setBills] = useState([
     {id:1,  label:"Rent",           amount:"", active:false, icon:"🏠"},
-    {id:2,  label:"Home Loan EMI",  amount:"", active:false, icon:"🏦"},
-    {id:3,  label:"Car Loan EMI",   amount:"", active:false, icon:"🚗"},
     {id:4,  label:"Electricity",    amount:"", active:false, icon:"⚡"},
     {id:5,  label:"Internet",       amount:"", active:false, icon:"📶"},
     {id:6,  label:"Mobile",         amount:"", active:false, icon:"📱"},
