@@ -24,6 +24,33 @@ const DEFAULT_STATE = {
   checkIns:      [],
 };
 
+// ── Migrate loan-type fixed expenses to loans (one-time fix) ─────────────────
+// "Car Loan EMI" and "Home Loan EMI" in fixedExpenses were double-counted
+// alongside the loans array. This strips them from fixedExpenses and merges
+// them into loans (skipping if a matching loan already exists).
+const LOAN_BILL_LABELS = ["Home Loan EMI", "Car Loan EMI"];
+function migrateLoanBills(state) {
+  const loanBills = (state.fixedExpenses || []).filter(f => LOAN_BILL_LABELS.includes(f.label));
+  if (loanBills.length === 0) return state;
+  const cleanFixed = (state.fixedExpenses || []).filter(f => !LOAN_BILL_LABELS.includes(f.label));
+  const loans = [...(state.loans || [])];
+  loanBills.forEach(bill => {
+    const name = bill.label.replace(" EMI", "");
+    if (!loans.some(l => l.name.toLowerCase() === name.toLowerCase())) {
+      loans.push({
+        id: bill.id || Date.now(),
+        name,
+        principal: (bill.amount || 0) * 60,
+        rate: 9,
+        tenureMonths: 60,
+        startDate: new Date().toISOString().split("T")[0],
+        manualEmi: bill.amount,
+      });
+    }
+  });
+  return { ...state, fixedExpenses: cleanFixed, loans };
+}
+
 function load() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -255,7 +282,7 @@ export function useAppData(firebaseUser = null) {
     const storedUid = localStorage.getItem("moneyCoachUID");
     const saved = load();
     if (!storedUid || !saved) return {...DEFAULT_STATE};
-    const restored = {
+    const restored = migrateLoanBills({
       ...DEFAULT_STATE, ...saved,
       loans:             Array.isArray(saved.loans)             ? saved.loans             : [],
       creditCards:       Array.isArray(saved.creditCards)       ? saved.creditCards       : [],
@@ -268,7 +295,7 @@ export function useAppData(firebaseUser = null) {
       categoryBudgets:   (saved.categoryBudgets && typeof saved.categoryBudgets==="object") ? saved.categoryBudgets : {},
       recurringExpenses: Array.isArray(saved.recurringExpenses) ? saved.recurringExpenses : [],
       assets:            Array.isArray(saved.assets)            ? saved.assets            : [],
-    };
+    });
     // Check month carry-forward on every app load
     const carried = checkAndCarryForward(restored);
     // Sanitize: strip any expenses with missing/invalid dates to prevent crashes
@@ -318,7 +345,7 @@ export function useAppData(firebaseUser = null) {
             (Array.isArray(v)?v:[]).filter(e=>e&&e.date&&typeof e.date==="string"&&e.date.length>0)
           ])
         );
-        const merged = {
+        const merged = migrateLoanBills({
           ...DEFAULT_STATE, ...cloudData,
           loans:             Array.isArray(cloudData.loans)             ? cloudData.loans             : [],
           incomeSources:     Array.isArray(cloudData.incomeSources)     ? cloudData.incomeSources     : [],
@@ -330,7 +357,7 @@ export function useAppData(firebaseUser = null) {
           categoryBudgets:   (cloudData.categoryBudgets && typeof cloudData.categoryBudgets==="object") ? cloudData.categoryBudgets : {},
           recurringExpenses: Array.isArray(cloudData.recurringExpenses) ? cloudData.recurringExpenses : [],
           assets:            Array.isArray(cloudData.assets)            ? cloudData.assets            : [],
-        };
+        });
         setData(merged);
         persist(merged);
       } else {
@@ -397,6 +424,21 @@ export function useAppData(firebaseUser = null) {
   // Onboarding
   const completeOnboarding = ({name, incomeSources=[], fixedExpenses=[], savingsPlans=[], loanEmis=[]}) => {
     const ts = Date.now();
+
+    // Loan-type bills (e.g. "Car Loan EMI") must NOT go into fixedExpenses —
+    // they would be double-counted alongside the loans array in all totals.
+    // Route them into loans instead, deduplicating if the user also filled
+    // in the same loan in the dedicated Loans step.
+    const loanBills   = fixedExpenses.filter(b => LOAN_BILL_LABELS.includes(b.label));
+    const regularBills = fixedExpenses.filter(b => !LOAN_BILL_LABELS.includes(b.label));
+    const allLoanEmis  = [...loanEmis];
+    loanBills.forEach(bill => {
+      const loanName = bill.label.replace(" EMI", "");
+      if (!allLoanEmis.some(l => (l.name||"").toLowerCase() === loanName.toLowerCase())) {
+        allLoanEmis.push({ name: loanName, emi: bill.amount });
+      }
+    });
+
     commit(prev => ({
       ...prev,
       screen:        "dashboard",
@@ -409,7 +451,7 @@ export function useAppData(firebaseUser = null) {
         amount: parseFloat(s.amount)||0,
       })),
       // → Shows in Plan tab → Fixed Expenses + Recurring tab
-      fixedExpenses: fixedExpenses.map((b,i) => ({
+      fixedExpenses: regularBills.map((b,i) => ({
         ...b,
         id: ts+100+i,
         label: b.label||"Bill",
@@ -423,8 +465,8 @@ export function useAppData(firebaseUser = null) {
         label: s.label||"Savings",
         amount: parseFloat(s.amount)||0,
       })),
-      // → Shows in Loans tab
-      loans: loanEmis.map((l,i) => {
+      // → Shows in Loans tab (includes any loan-type bills from Bills step)
+      loans: allLoanEmis.map((l,i) => {
         const emi = parseFloat(l.emi)||0;
         return {
           id:           ts+300+i,
