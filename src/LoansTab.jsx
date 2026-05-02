@@ -144,7 +144,8 @@ function LoanForm({initial, onSave, onCancel}) {
     if (!valid) return;
     onSave({ name:f.name, principal:+f.principal, rate:+f.rate,
              tenureMonths:totalMonths, emi:useEmi, startDate:f.startDate,
-             needsDetails: false }); // clear flag when full details are entered
+             needsDetails: false,
+             manualEmi: null }); // clear onboarding EMI override so calculated EMI takes effect
   };
 
   return (
