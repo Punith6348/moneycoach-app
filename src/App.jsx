@@ -1916,7 +1916,7 @@ function RecurringTab({
 // ─── DASHBOARD ────────────────────────────────────────────────────────────
 function DashboardScreen(props) {
   const {
-    name, totalIncome, totalFixed, totalSavings, totalReserve, remaining, dailyLimit,
+    name, totalIncome, totalFixed, totalSavings, totalReserve, totalLoanEmi, remaining, dailyLimit,
     thisMonthSpent, budgetForMonth,
     lastMonthKey, lastMonthSpent, lastMonthSaved, lastMonthBudget,
     smartSuggestions,
