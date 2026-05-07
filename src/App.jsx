@@ -1231,129 +1231,70 @@ function LogExpenseForm({onAdd, disabled, currentExpenses=[], dailyLimit=0}) {
   );
 }
 
-// ─── FINANCIAL HEALTH SCORE ──────────────────────────────────────────────────
+// ─── FINANCIAL HEALTH SCORE (compact strip) ──────────────────────────────────
 function FinancialHealthScore({ totalIncome, thisMonthSpent, totalSavings, totalLoanEmi, totalFixed, allExpenses }) {
   if (!totalIncome || totalIncome === 0) return null;
 
-  const totalExpenses   = thisMonthSpent + totalFixed + totalLoanEmi;
   const savingsRate     = (totalSavings / totalIncome) * 100;
-  const expenseRatio    = Math.min((totalExpenses / totalIncome) * 100, 120);
   const debtRatio       = (totalLoanEmi / totalIncome) * 100;
-
-  // Estimate savings balance: monthly savings × active months tracked
   const activeMonths    = Math.max(1, Object.keys(allExpenses || {}).filter(k => (allExpenses[k]||[]).length > 0).length);
-  const savingsBalance  = totalSavings * activeMonths;
   const monthlyOut      = (totalFixed + totalLoanEmi + thisMonthSpent) || 1;
-  const emergencyMonths = savingsBalance / monthlyOut;
+  const emergencyMonths = (totalSavings * activeMonths) / monthlyOut;
+  const expenseRatio    = Math.min(((thisMonthSpent + totalFixed + totalLoanEmi) / totalIncome) * 100, 120);
 
-  // Scoring
-  const sScore = savingsRate >= 30 ? 30 : savingsRate >= 20 ? 20 : savingsRate >= 10 ? 10 : 0;
-  const eScore = expenseRatio < 50  ? 20 : expenseRatio <= 70 ? 10 : 0;
-  const emScore= emergencyMonths >= 6 ? 20 : emergencyMonths >= 3 ? 10 : 0;
-  const dScore = debtRatio < 20 ? 20 : debtRatio <= 40 ? 10 : 0;
-  const score  = sScore + eScore + emScore + dScore;
+  const sScore  = savingsRate >= 30 ? 30 : savingsRate >= 20 ? 20 : savingsRate >= 10 ? 10 : 0;
+  const eScore  = expenseRatio < 50 ? 20 : expenseRatio <= 70 ? 10 : 0;
+  const emScore = emergencyMonths >= 6 ? 20 : emergencyMonths >= 3 ? 10 : 0;
+  const dScore  = debtRatio < 20 ? 20 : debtRatio <= 40 ? 10 : 0;
+  const score   = sScore + eScore + emScore + dScore;
 
-  const label = score >= 80 ? "Excellent" : score >= 60 ? "Good" : score >= 40 ? "Risky" : "Critical";
+  const label = score >= 80 ? "Excellent" : score >= 60 ? "Good" : score >= 40 ? "Fair" : "Critical";
   const lc    = score >= 80 ? "#16A34A"   : score >= 60 ? "#2563EB" : score >= 40 ? "#D97706" : "#DC2626";
-  const lBg   = score >= 80 ? "#F0FDF4"   : score >= 60 ? "#EFF6FF" : score >= 40 ? "#FFF7ED" : "#FEF2F2";
-  const lBr   = score >= 80 ? "#86EFAC"   : score >= 60 ? "#BFDBFE" : score >= 40 ? "#FCD34D" : "#FECACA";
 
-  // Actionable reasons
-  const reasons = [];
-  if (savingsRate < 10)
-    reasons.push(totalSavings === 0 ? "No monthly savings — add a savings plan to boost your score" : `Savings rate is ${Math.round(savingsRate)}% — try reaching 20%+ of income`);
-  else if (savingsRate < 20)
-    reasons.push(`Savings rate ${Math.round(savingsRate)}% is decent — pushing to 20% will make a big difference`);
-  if (expenseRatio > 70)
-    reasons.push(`Expenses are ${Math.round(expenseRatio)}% of income — look for areas to reduce spending`);
-  if (emergencyMonths < 3)
-    reasons.push(`Emergency fund covers ${emergencyMonths.toFixed(1)} months — build a 3–6 month buffer for security`);
-  else if (emergencyMonths < 6)
-    reasons.push(`Emergency fund at ${emergencyMonths.toFixed(1)} months — good progress, target is 6 months`);
-  if (debtRatio > 40)
-    reasons.push(`EMIs take ${Math.round(debtRatio)}% of income — consider prepaying high-interest loans`);
-  if (reasons.length === 0)
-    reasons.push("Excellent financial discipline — you're saving well and managing debt wisely");
-
-  const breakdown = [
-    { label:"Savings Rate",   value:`${Math.round(savingsRate)}%`,        pts:sScore,  max:30 },
-    { label:"Expense Ratio",  value:`${Math.round(expenseRatio)}%`,       pts:eScore,  max:20 },
-    { label:"Emerg. Fund",    value:`${emergencyMonths.toFixed(1)} mo`,   pts:emScore, max:20 },
-    { label:"Debt Burden",    value:`${Math.round(debtRatio)}%`,          pts:dScore,  max:20 },
+  const chips = [
+    { key:"savings",   text:`Savings ${Math.round(savingsRate)}%`,          color: sScore===30?C.green:sScore>0?C.amber:C.red },
+    { key:"debt",      text:`Debt ${Math.round(debtRatio)}%`,               color: dScore===20?C.green:dScore>0?C.amber:C.red },
+    { key:"emergency", text:`Fund ${emergencyMonths.toFixed(1)} mo`,        color: emScore===20?C.green:emScore>0?C.amber:C.red },
+    { key:"expenses",  text:`Expenses ${Math.round(expenseRatio)}%`,        color: eScore===20?C.green:eScore>0?C.amber:C.red },
   ];
 
-  // Half-circle SVG gauge
-  const R = 44, GW = 120, GH = 68;
-  const arc    = Math.PI * R;
-  const filled = arc * (score / 100);
-
   return (
-    <div style={{ background:"#fff", borderRadius:14, border:`1px solid ${C.border}`,
-      padding:"14px 16px", marginBottom:14, boxShadow:"0 1px 3px rgba(0,0,0,0.05)" }}>
-
-      {/* Header */}
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
-        <div>
-          <p style={{ margin:0, fontSize:13, fontWeight:700, color:C.ink }}>Financial Health Score</p>
-          <p style={{ margin:"2px 0 0", fontSize:10, color:C.muted }}>Based on savings, expenses &amp; debt</p>
-        </div>
-        <span style={{ background:lBg, border:`1px solid ${lBr}`, borderRadius:99,
-          padding:"4px 12px", fontSize:11, fontWeight:700, color:lc }}>
+    <div style={{
+      background:"#fff", borderRadius:10, border:`1px solid ${C.border}`,
+      padding:"8px 12px", marginBottom:10,
+      display:"flex", alignItems:"center", gap:8, flexWrap:"wrap",
+    }}>
+      {/* Score + label */}
+      <div style={{ display:"flex", alignItems:"center", gap:5, flexShrink:0 }}>
+        <span style={{ fontSize:12 }}>⚡</span>
+        <span style={{ fontSize:12, fontWeight:700, color:C.ink }}>Health</span>
+        <span style={{ fontSize:13, fontWeight:800, color:lc, fontFamily:"Georgia,serif" }}>{score}</span>
+        <span style={{ fontSize:10, fontWeight:700, color:lc,
+          background: score>=80?"#F0FDF4":score>=60?"#EFF6FF":score>=40?"#FFF7ED":"#FEF2F2",
+          border:`1px solid ${score>=80?"#86EFAC":score>=60?"#BFDBFE":score>=40?"#FCD34D":"#FECACA"}`,
+          borderRadius:99, padding:"1px 7px" }}>
           {label}
         </span>
       </div>
 
-      {/* Gauge + breakdown */}
-      <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-        {/* Semi-circle gauge */}
-        <div style={{ flexShrink:0 }}>
-          <svg width={GW} height={GH} viewBox={`0 0 ${GW} ${GH}`}>
-            {/* Track */}
-            <path d={`M ${GW/2-R} ${GH} A ${R} ${R} 0 0 1 ${GW/2+R} ${GH}`}
-              fill="none" stroke="#F1F5F9" strokeWidth={10} strokeLinecap="round"/>
-            {/* Fill */}
-            <path d={`M ${GW/2-R} ${GH} A ${R} ${R} 0 0 1 ${GW/2+R} ${GH}`}
-              fill="none" stroke={lc} strokeWidth={10} strokeLinecap="round"
-              strokeDasharray={`${arc} ${arc}`}
-              strokeDashoffset={`${arc - filled}`}
-              style={{ transition:"stroke-dashoffset 1s ease" }}/>
-            <text x={GW/2} y={GH-10} textAnchor="middle" fontSize="22"
-              fontWeight="800" fill={lc} fontFamily="Georgia,serif">{score}</text>
-            <text x={GW/2} y={GH-1} textAnchor="middle" fontSize="8" fill="#9CA3AF">/ 100</text>
-          </svg>
-        </div>
+      {/* Divider */}
+      <span style={{ color:C.border, fontSize:14, flexShrink:0 }}>·</span>
 
-        {/* Breakdown bars */}
-        <div style={{ flex:1 }}>
-          {breakdown.map(item => {
-            const barColor = item.pts === item.max ? C.green : item.pts > 0 ? C.amber : C.red;
-            return (
-              <div key={item.label} style={{ marginBottom:5 }}>
-                <div style={{ display:"flex", justifyContent:"space-between", marginBottom:2 }}>
-                  <p style={{ margin:0, fontSize:9, color:C.muted, fontWeight:600 }}>{item.label}</p>
-                  <p style={{ margin:0, fontSize:9, fontWeight:700, color:C.ink }}>{item.value}</p>
-                </div>
-                <div style={{ height:4, borderRadius:99, background:"#F1F5F9" }}>
-                  <div style={{ height:"100%", borderRadius:99, transition:"width 0.6s ease",
-                    width:`${item.max > 0 ? (item.pts/item.max)*100 : 0}%`,
-                    background:barColor }} />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Reasons */}
-      <div style={{ marginTop:10, paddingTop:10, borderTop:`1px solid ${C.bg}` }}>
-        {reasons.slice(0, 3).map((r, i) => (
-          <div key={i} style={{ display:"flex", alignItems:"flex-start", gap:6,
-            marginBottom: i < Math.min(reasons.length, 3)-1 ? 5 : 0 }}>
-            <span style={{ fontSize:11, flexShrink:0, marginTop:1 }}>
-              {score >= 60 && i === 0 ? "✅" : "💡"}
+      {/* Metric chips — scroll horizontally on overflow */}
+      <div style={{
+        display:"flex", alignItems:"center", gap:5,
+        overflowX:"auto", WebkitOverflowScrolling:"touch",
+        scrollbarWidth:"none", flex:1, minWidth:0,
+      }}>
+        {chips.map((chip, i) => (
+          <span key={chip.key} style={{ display:"flex", alignItems:"center", gap:0, flexShrink:0 }}>
+            <span style={{ fontSize:11, fontWeight:600, color:chip.color, whiteSpace:"nowrap" }}>
+              {chip.text}
             </span>
-            <p style={{ margin:0, fontSize:11, color:C.muted, lineHeight:1.45 }}>{r}</p>
-          </div>
+            {i < chips.length - 1 && (
+              <span style={{ color:C.border, fontSize:12, margin:"0 5px" }}>·</span>
+            )}
+          </span>
         ))}
       </div>
     </div>
