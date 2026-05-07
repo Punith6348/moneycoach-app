@@ -1231,110 +1231,6 @@ function LogExpenseForm({onAdd, disabled, currentExpenses=[], dailyLimit=0}) {
   );
 }
 
-// ─── FINANCIAL HEALTH SCORE ───────────────────────────────────────────────────
-function FinancialHealthScore({ totalIncome, thisMonthSpent, totalSavings, totalLoanEmi, totalFixed, allExpenses }) {
-  if (!totalIncome || totalIncome === 0) return null;
-
-  const savingsRate     = (totalSavings / totalIncome) * 100;
-  const debtRatio       = (totalLoanEmi / totalIncome) * 100;
-  const expenseRatio    = Math.min(((thisMonthSpent + totalFixed + totalLoanEmi) / totalIncome) * 100, 120);
-  const activeMonths    = Math.max(1, Object.keys(allExpenses || {}).filter(k => (allExpenses[k]||[]).length > 0).length);
-  const monthlyOut      = (totalFixed + totalLoanEmi + thisMonthSpent) || 1;
-  const emergencyMonths = (totalSavings * activeMonths) / monthlyOut;
-
-  const sScore  = savingsRate >= 30 ? 30 : savingsRate >= 20 ? 20 : savingsRate >= 10 ? 10 : 0;
-  const eScore  = expenseRatio < 50  ? 20 : expenseRatio <= 70 ? 10 : 0;
-  const emScore = emergencyMonths >= 6 ? 20 : emergencyMonths >= 3 ? 10 : 0;
-  const dScore  = debtRatio < 20 ? 20 : debtRatio <= 40 ? 10 : 0;
-  const score   = sScore + eScore + emScore + dScore;
-
-  const label  = score >= 80 ? "Excellent" : score >= 60 ? "Good" : score >= 40 ? "Fair" : "Critical";
-  const lc     = score >= 80 ? "#16A34A"   : score >= 60 ? "#2563EB" : score >= 40 ? "#D97706" : "#DC2626";
-  const lBg    = score >= 80 ? "#F0FDF4"   : score >= 60 ? "#EFF6FF" : score >= 40 ? "#FFF7ED" : "#FEF2F2";
-  const lBorder= score >= 80 ? "#86EFAC"   : score >= 60 ? "#BFDBFE" : score >= 40 ? "#FCD34D" : "#FECACA";
-
-  // Primary issue — worst single problem, used for tag + interpretation
-  const issue = (() => {
-    if (emergencyMonths < 1)    return { tag:"No Emergency Fund",   icon:"🚨", color:C.red,   bg:"#FEF2F2", br:"#FECACA" };
-    if (debtRatio > 40)         return { tag:"High Debt Load",      icon:"⚠️",  color:C.red,   bg:"#FEF2F2", br:"#FECACA" };
-    if (emergencyMonths < 3)    return { tag:"Low Emergency Fund",  icon:"⚠️",  color:C.amber, bg:"#FFF7ED", br:"#FCD34D" };
-    if (savingsRate < 10)       return { tag:"Low Savings Rate",    icon:"💡",  color:C.amber, bg:"#FFF7ED", br:"#FCD34D" };
-    if (expenseRatio > 80)      return { tag:"Overspending Risk",   icon:"💡",  color:C.amber, bg:"#FFF7ED", br:"#FCD34D" };
-    if (debtRatio > 20)         return { tag:"Moderate Debt",       icon:"💡",  color:C.amber, bg:"#FFF7ED", br:"#FCD34D" };
-    return                             { tag:"Healthy Finances",    icon:"✅",  color:C.green, bg:"#F0FDF4", br:"#86EFAC" };
-  })();
-
-  // One-sentence plain-English interpretation
-  const interpretation = (() => {
-    const parts = [];
-    if (emergencyMonths < 1)
-      parts.push(`you have no emergency buffer — one unexpected expense could derail your finances`);
-    else if (emergencyMonths < 3)
-      parts.push(`your emergency fund covers only ${emergencyMonths.toFixed(1)} months of expenses`);
-    if (debtRatio > 40)
-      parts.push(`EMIs are consuming ${Math.round(debtRatio)}% of your income`);
-    else if (debtRatio > 20)
-      parts.push(`debt takes up ${Math.round(debtRatio)}% of your income`);
-    if (savingsRate < 10 && totalSavings === 0)
-      parts.push(`you have no monthly savings set up`);
-    else if (savingsRate < 10)
-      parts.push(`you're saving only ${Math.round(savingsRate)}% of income`);
-    if (expenseRatio > 80)
-      parts.push(`total expenses are ${Math.round(expenseRatio)}% of income, leaving little room`);
-
-    if (parts.length === 0) return "Your savings, debt and spending are all in a healthy range.";
-    const sentence = parts.slice(0, 2).join(" and ");
-    return sentence.charAt(0).toUpperCase() + sentence.slice(1) + ".";
-  })();
-
-  const metrics = [
-    { label:"Savings", value:`${Math.round(savingsRate)}%`, color: sScore===30?C.green:sScore>0?C.amber:C.red },
-    { label:"Debt",    value:`${Math.round(debtRatio)}%`,   color: dScore===20?C.green:dScore>0?C.amber:C.red },
-    { label:"Fund",    value:`${emergencyMonths.toFixed(1)} mo`, color: emScore===20?C.green:emScore>0?C.amber:C.red },
-    { label:"Expenses",value:`${Math.round(expenseRatio)}%`,color: eScore===20?C.green:eScore>0?C.amber:C.red },
-  ];
-
-  return (
-    <div style={{
-      background:"#fff", borderRadius:11, border:`1px solid ${C.border}`,
-      padding:"10px 12px", marginBottom:10,
-    }}>
-      {/* Row 1: score + label + issue tag */}
-      <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:6, flexWrap:"wrap" }}>
-        <span style={{ fontSize:12 }}>⚡</span>
-        <span style={{ fontSize:12, fontWeight:700, color:C.ink }}>Health Score</span>
-        <span style={{ fontSize:15, fontWeight:800, color:lc, fontFamily:"Georgia,serif", lineHeight:1 }}>{score}</span>
-        <span style={{ fontSize:10, fontWeight:700, color:lc,
-          background:lBg, border:`1px solid ${lBorder}`,
-          borderRadius:99, padding:"2px 8px", lineHeight:1.6 }}>
-          {label}
-        </span>
-        <span style={{ marginLeft:"auto",
-          fontSize:10, fontWeight:700, color:issue.color,
-          background:issue.bg, border:`1px solid ${issue.br}`,
-          borderRadius:99, padding:"2px 8px", lineHeight:1.6, whiteSpace:"nowrap" }}>
-          {issue.icon} {issue.tag}
-        </span>
-      </div>
-
-      {/* Row 2: plain-English interpretation */}
-      <p style={{ margin:"0 0 7px", fontSize:11, color:"#374151", lineHeight:1.5 }}>
-        {interpretation}
-      </p>
-
-      {/* Row 3: compact metrics */}
-      <div style={{ display:"flex", alignItems:"center", gap:0, flexWrap:"wrap" }}>
-        {metrics.map((m, i) => (
-          <span key={m.label} style={{ fontSize:10, color:C.muted, whiteSpace:"nowrap" }}>
-            <span style={{ fontWeight:600, color:m.color }}>{m.label} {m.value}</span>
-            {i < metrics.length - 1 && <span style={{ margin:"0 5px", color:C.border }}>·</span>}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 // ─── ANNUAL SUMMARY ───────────────────────────────────────────────────────────
 function AnnualSummary({ allExpenses, totalIncome, totalSavings }) {
   const now  = new Date();
@@ -1891,7 +1787,7 @@ function RecurringTab({
 // ─── DASHBOARD ────────────────────────────────────────────────────────────
 function DashboardScreen(props) {
   const {
-    name, totalIncome, totalFixed, totalSavings, totalReserve, totalLoanEmi, remaining, dailyLimit,
+    name, totalIncome, totalFixed, totalSavings, totalReserve, remaining, dailyLimit,
     thisMonthSpent, budgetForMonth,
     lastMonthKey, lastMonthSpent, lastMonthSaved, lastMonthBudget,
     smartSuggestions,
@@ -2287,14 +2183,6 @@ function DashboardScreen(props) {
                           if (el) { el.scrollIntoView({behavior:"smooth",block:"start"}); el.classList.add("mc-section-flash"); setTimeout(()=>el.classList.remove("mc-section-flash"),1200); }
                         }, 120);
                       }}
-                    />
-                    <FinancialHealthScore
-                      totalIncome={totalIncome}
-                      thisMonthSpent={thisMonthSpent}
-                      totalSavings={totalSavings}
-                      totalLoanEmi={totalLoanEmi}
-                      totalFixed={totalFixed}
-                      allExpenses={allExpenses}
                     />
                     <BudgetAlertWidget
                       categoryBudgets={categoryBudgets}
