@@ -7,7 +7,6 @@ import { useAppData, currentMonthKey, monthKeyToLabel, getActiveMonthKeys } from
 import BudgetDashboard, { MonthCloseReport } from "./BudgetDashboard";
 import { IncomeSources, FixedExpensesSection, SavingsSection, FuturePaymentsSection } from "./FinancialPlan";
 import LoansTab         from "./LoansTab";
-import CreditCardsTab   from "./CreditCardsTab";
 import CategoryBudgets, { BudgetAlertWidget } from "./CategoryBudgets";
 import SettingsPanel    from "./SettingsPanel";
 import { calcLoanTotals } from "./useAppData";
@@ -1802,7 +1801,6 @@ function DashboardScreen(props) {
     addFuturePayment, updateFuturePayment, deleteFuturePayment,
     addExpense, editExpense, deleteExpense, addCheckIn, resetAll,
     addLoan, updateLoan, deleteLoan,
-    creditCards, addCreditCard, updateCreditCard, deleteCreditCard,
     updateName,
     firebaseUser, isGuest, onSignOut, onDeleteAccount,
     syncError,
@@ -1834,7 +1832,6 @@ function DashboardScreen(props) {
     { key:"plan",      icon:"🗂",  label:"Plan"      },
     { key:"home",      icon:"🏠",  label:"Expenses"  },
     { key:"loans",     icon:"🏦",  label:"Loans"     },
-    { key:"cards",     icon:"💳",  label:"Cards"     },
     { key:"annual",    icon:"🗓",  label:"Annual"    },
     { key:"recurring", icon:"🔁",  label:"Recurring" },
     { key:"catbudget", icon:"🎯",  label:"Budgets"   },
@@ -2376,15 +2373,6 @@ function DashboardScreen(props) {
           </>
         )}
 
-        {/* ══ CREDIT CARDS ══ */}
-        {tab==="cards"&&(
-          <CreditCardsTab
-            cards={creditCards||[]}
-            onAdd={addCreditCard}
-            onUpdate={updateCreditCard}
-            onDelete={deleteCreditCard}
-          />
-        )}
 
 
         {/* ══ ANNUAL SUMMARY ══ */}
