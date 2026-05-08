@@ -1,6 +1,6 @@
 // ─── firebase.js ─────────────────────────────────────────────────────────────
 import { initializeApp } from "firebase/app";
-import { getAuth, setPersistence, browserLocalPersistence, indexedDBPersistence } from "firebase/auth";
+import { getAuth, setPersistence, browserLocalPersistence, indexedDBLocalPersistence } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -18,6 +18,6 @@ export const db   = getFirestore(app);
 
 // Set persistence at module load time — before any component mounts.
 // Try indexedDB first (works on iOS Capacitor), fall back to localStorage.
-export const persistenceReady = setPersistence(auth, indexedDBPersistence)
+export const persistenceReady = setPersistence(auth, indexedDBLocalPersistence)
   .catch(() => setPersistence(auth, browserLocalPersistence))
   .catch(() => {});
