@@ -472,7 +472,7 @@ function LoanCard({loan, onEdit, onDelete}) {
           <div style={{minWidth:0}}>
             <p style={{margin:0,fontSize:13,fontWeight:700,color:C.ink}}>{loan.name}</p>
             <p style={{margin:0,fontSize:10,color:C.muted}}>
-              {loan.rate}% p.a. · {tenureLabel(loan.tenureMonths)}
+              {loan.rate}% p.a. · {tenureLabel(t.monthsLeft)} left
               {endDate&&<span style={{color:C.purple}}> · finishes {endDate}</span>}
             </p>
           </div>
@@ -493,17 +493,18 @@ function LoanCard({loan, onEdit, onDelete}) {
           </div>
         )}
 
-        {/* 4 metric tiles */}
+        {/* 4 metric tiles — all figures reflect current remaining state (reducing-balance) */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7,marginBottom:12}}>
           {[
-            {label:"Outstanding",   value:fmt(t.outstanding),   color:C.red},
-            {label:"Monthly EMI",   value:fmt(t.emi),           color:C.ink},
-            {label:"Total Interest",value:fmt(t.totalInterest), color:C.amber},
-            {label:"Total Payment", value:fmt(t.totalPayable),  color:C.purple},
+            {label:"Outstanding",      value:fmt(t.outstanding),        color:C.red,    sub: t.monthsElapsed>0 ? `After ${t.monthsElapsed} EMI${t.monthsElapsed>1?"s":""}` : null},
+            {label:"Monthly EMI",      value:fmt(t.emi),                color:C.ink,    sub: null},
+            {label:"Interest Remaining",value:fmt(t.remainingInterest), color:C.amber,  sub: t.monthsElapsed>0 ? `Paid: ${fmt(t.interestPaid)}` : null},
+            {label:"Total Left to Pay", value:fmt(t.remainingPayable),  color:C.purple, sub: `${t.monthsLeft} EMI${t.monthsLeft!==1?"s":""} × ${fmt(t.emi)}`},
           ].map(m=>(
             <div key={m.label} style={{background:C.bg,borderRadius:8,padding:"8px 10px"}}>
               <p style={{margin:0,fontSize:9,color:C.muted,textTransform:"uppercase",letterSpacing:"0.7px",fontWeight:600}}>{m.label}</p>
               <p style={{margin:"3px 0 0",fontSize:13,fontWeight:700,color:m.color,fontFamily:"Georgia,serif"}}>{m.value}</p>
+              {m.sub&&<p style={{margin:"2px 0 0",fontSize:9,color:C.muted}}>{m.sub}</p>}
             </div>
           ))}
         </div>
@@ -534,7 +535,9 @@ function LoanCard({loan, onEdit, onDelete}) {
             </div>
           </div>
           <p style={{margin:"5px 0 0",fontSize:9,color:C.muted,textAlign:"center"}}>
-            {moSfx(t.monthsLeft)} left · Original loan: {fmt(loan.principal)}
+            {moSfx(t.monthsLeft)} left
+            {t.monthsElapsed>0&&<span> · {moSfx(t.monthsElapsed)} elapsed</span>}
+            {" · "}Original loan: {fmt(loan.principal)}
           </p>
         </div>
 
