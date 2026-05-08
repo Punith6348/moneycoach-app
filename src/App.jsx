@@ -2508,8 +2508,8 @@ function AppInner({ firebaseUser = null, isGuest = false, onSignOut = null, onDe
   const appData = useAppData(firebaseUser);
 
   // Push notifications — registers token and handles taps
-  usePushNotifications((action) => {
-    // Notification tapped → user lands on home/expense log tab
+  // userId must be passed so the token is saved under the correct Firestore doc.
+  usePushNotifications(firebaseUser?.uid || null, (action) => {
     console.log("Notification tapped:", action);
   });
   if (appData.screen === "onboarding") {
