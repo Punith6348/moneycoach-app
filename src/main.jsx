@@ -50,11 +50,15 @@ function Root() {
   const [guestMode, setGuestMode] = useState(false);
 
   useEffect(() => {
-    // Wait for persistence to be ready before subscribing to auth changes
-    persistenceReady.then(() => {
-      const timeout = setTimeout(() => setUser(null), 2000);
+    let unsub = () => {};
+    let timeout = null;
 
-      const unsub = onAuthStateChanged(auth, u => {
+    // persistenceReady resolves immediately on web; on Capacitor iOS it just
+    // confirms browserLocalPersistence is active before we subscribe.
+    persistenceReady.then(() => {
+      timeout = setTimeout(() => setUser(null), 3000);
+
+      unsub = onAuthStateChanged(auth, u => {
         clearTimeout(timeout);
         if (u) {
           const storedUid = localStorage.getItem("moneyCoachUID");
@@ -71,9 +75,10 @@ function Root() {
           setUser(null);
         }
       });
-
-      return () => { clearTimeout(timeout); unsub(); };
     });
+
+    // Cleanup is in the outer scope so React actually calls it on unmount
+    return () => { clearTimeout(timeout); unsub(); };
   }, []);
 
   if (user === undefined && !guestMode) return <LoadingScreen/>;
