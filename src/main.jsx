@@ -2,7 +2,7 @@
 import { StrictMode, useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { onAuthStateChanged, signOut, GoogleAuthProvider, reauthenticateWithPopup } from "firebase/auth";
-import { auth } from "./firebase";
+import { auth, persistenceReady } from "./firebase";
 import { clearSession, deleteAccountREST, deleteFirestoreREST, signInWithEmail } from "./firebaseAuth";
 import { registerUserProfile } from "./useFirestoreSync";
 import App from "./App.jsx";
@@ -50,29 +50,30 @@ function Root() {
   const [guestMode, setGuestMode] = useState(false);
 
   useEffect(() => {
-    // Persistence is already set in firebase.js at module load time.
-    // Just subscribe to auth state with a 1.5s safety timeout.
-    const timeout = setTimeout(() => setUser(null), 1500);
+    // Wait for persistence to be ready before subscribing to auth changes
+    persistenceReady.then(() => {
+      const timeout = setTimeout(() => setUser(null), 2000);
 
-    const unsub = onAuthStateChanged(auth, u => {
-      clearTimeout(timeout);
-      if (u) {
-        const storedUid = localStorage.getItem("moneyCoachUID");
-        if (storedUid && storedUid !== u.uid) {
-          localStorage.removeItem("moneyCoachData_v3");
-          localStorage.removeItem("moneyCoachData_v2");
-          localStorage.removeItem("moneyCoachData");
+      const unsub = onAuthStateChanged(auth, u => {
+        clearTimeout(timeout);
+        if (u) {
+          const storedUid = localStorage.getItem("moneyCoachUID");
+          if (storedUid && storedUid !== u.uid) {
+            localStorage.removeItem("moneyCoachData_v3");
+            localStorage.removeItem("moneyCoachData_v2");
+            localStorage.removeItem("moneyCoachData");
+          }
+          localStorage.setItem("moneyCoachUID", u.uid);
+          setGuestMode(false);
+          registerUserProfile(u).catch(() => {});
+          setUser(u);
+        } else {
+          setUser(null);
         }
-        localStorage.setItem("moneyCoachUID", u.uid);
-        setGuestMode(false);
-        registerUserProfile(u).catch(() => {});
-        setUser(u);
-      } else {
-        setUser(null);
-      }
-    });
+      });
 
-    return () => { clearTimeout(timeout); unsub(); };
+      return () => { clearTimeout(timeout); unsub(); };
+    });
   }, []);
 
   if (user === undefined && !guestMode) return <LoadingScreen/>;
