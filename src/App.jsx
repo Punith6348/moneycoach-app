@@ -10,6 +10,7 @@ import LoansTab         from "./LoansTab";
 import CategoryBudgets, { BudgetAlertWidget } from "./CategoryBudgets";
 import SettingsPanel    from "./SettingsPanel";
 import { calcLoanTotals } from "./useAppData";
+import { usePushNotifications } from "./hooks/usePushNotifications";
 
 // ─── Error Boundary ───────────────────────────────────────────────────────────
 class ErrorBoundary extends Component {
@@ -484,43 +485,51 @@ function OnboardingScreen({onComplete, defaultName=""}) {
           boxShadow:"0 20px 60px rgba(0,0,0,0.5)" }}>
 
           {/* ── Step 1: Welcome ── */}
-          {step===1 && (
+          {step===1 && (()=>{
+            const trimmed    = name.trim();
+            const nameValid  = trimmed.length === 0 || trimmed.length >= 3;
+            const nameTooShort = trimmed.length > 0 && trimmed.length < 3;
+            const handleNext = () => { if (nameValid) setStep(2); };
+            return (
             <>
               <div style={{ textAlign:"center", marginBottom:20 }}>
                 <div style={{ fontSize:48, marginBottom:12 }}>👋</div>
                 <p style={{ fontSize:20, fontWeight:700, color:C.ink, margin:"0 0 6px" }}>
-                  {name ? `Welcome, ${name}!` : "Welcome!"}
+                  {trimmed.length >= 3 ? `Welcome, ${trimmed}!` : "Welcome!"}
                 </p>
               </div>
-              {name ? (
-                <p style={{ fontSize:13, color:C.muted, margin:"0 0 20px", lineHeight:1.5, textAlign:"center" }}>
-                  We'll use <strong>{name}</strong> for your dashboard greeting.
-                  You can update it anytime in Settings → Edit Profile.
+              <p style={{ fontSize:13, color:C.muted, margin:"0 0 10px" }}>
+                What should we call you? <span style={{ color:"#9CA3AF", fontSize:12 }}>(optional — skip to continue)</span>
+              </p>
+              <input
+                value={name} onChange={e=>setName(e.target.value)}
+                onKeyDown={e=>e.key==="Enter"&&handleNext()}
+                placeholder="e.g. Puneeth, Priya…"
+                autoFocus
+                style={{...inp, fontFamily:"inherit", fontSize:16, marginBottom:4, width:"100%",
+                        borderColor: nameTooShort ? C.red : C.border}}
+              />
+              {nameTooShort ? (
+                <p style={{ fontSize:11, color:C.red, fontWeight:600, margin:"0 0 14px" }}>
+                  ⚠ Name must be at least 3 characters
                 </p>
               ) : (
-                <>
-                  <p style={{ fontSize:13, color:C.muted, margin:"0 0 10px" }}>
-                    What should we call you? <span style={{ color:"#9CA3AF", fontSize:12 }}>(optional)</span>
-                  </p>
-                  <input
-                    value={name} onChange={e=>setName(e.target.value)}
-                    onKeyDown={e=>e.key==="Enter"&&setStep(2)}
-                    placeholder="e.g. Puni, Puneeth…"
-                    autoFocus
-                    style={{...inp, fontFamily:"inherit", fontSize:16, marginBottom:6, width:"100%"}}
-                  />
-                  <p style={{ fontSize:11, color:C.muted, margin:"0 0 16px" }}>
-                    Used for "Good morning, Puni 👋" — change anytime in Settings.
-                  </p>
-                </>
+                <p style={{ fontSize:11, color:C.muted, margin:"0 0 16px" }}>
+                  Used for "Good morning, {trimmed||"Puneeth"} 👋" — change anytime in Settings.
+                </p>
               )}
-              <button onClick={()=>setStep(2)} style={{ width:"100%", padding:13,
-                borderRadius:12, background:C.ink, color:"#fff", border:"none",
-                fontSize:15, fontFamily:"inherit", fontWeight:700, cursor:"pointer" }}>
+              <button onClick={handleNext}
+                disabled={nameTooShort}
+                style={{ width:"100%", padding:13,
+                  borderRadius:12, border:"none", fontSize:15,
+                  fontFamily:"inherit", fontWeight:700,
+                  background: nameTooShort ? "#9CA3AF" : C.ink,
+                  color:"#fff", cursor: nameTooShort ? "not-allowed" : "pointer" }}>
                 Get Started →
               </button>
             </>
-          )}
+            );
+          })()}
 
           {/* ── Step 2: Income ── */}
           {step===2 && (
@@ -2497,6 +2506,12 @@ function DashboardScreen(props) {
 // ─── ROOT ─────────────────────────────────────────────────────────────────
 function AppInner({ firebaseUser = null, isGuest = false, onSignOut = null, onDeleteAccount = null }) {
   const appData = useAppData(firebaseUser);
+
+  // Push notifications — registers token and handles taps
+  usePushNotifications((action) => {
+    // Notification tapped → user lands on home/expense log tab
+    console.log("Notification tapped:", action);
+  });
   if (appData.screen === "onboarding") {
     // Pre-fill name from Sign in with Apple / Google so users don't have to
     // re-enter information already provided by the identity provider.
