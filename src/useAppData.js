@@ -289,7 +289,7 @@ function checkAndCarryForward(data) {
       amount:      r.amount,
       label:       r.category,
       note:        r.note || r.label,
-      date:        new Date(now.getFullYear(), now.getMonth(), r.dayOfMonth, 9, 0, 0).toISOString(),
+      date:        new Date(now.getFullYear(), now.getMonth(), Math.min(r.dayOfMonth, new Date(now.getFullYear(), now.getMonth()+1, 0).getDate()), 9, 0, 0).toISOString(),
       recurringId: r.id,
       auto:        true,
     });
@@ -590,7 +590,7 @@ export function useAppData(firebaseUser = null) {
     // so the recorded amount stays in sync after editing
     let allExpenses = prev.allExpenses;
     if (updatedLoan && !updatedLoan.needsDetails) {
-      const newEmi = updatedLoan.emi || calcEMI(updatedLoan.principal, updatedLoan.rate, updatedLoan.tenureMonths);
+      const newEmi = updatedLoan.manualEmi || updatedLoan.emi || calcEMI(updatedLoan.principal, updatedLoan.rate, updatedLoan.tenureMonths);
       if (newEmi > 0) {
         const monthExp = (allExpenses[mk] || []).filter(e => e.loanId !== id);
         monthExp.push({
@@ -661,7 +661,7 @@ export function useAppData(firebaseUser = null) {
           amount:      r.amount,
           label:       r.category,
           note:        r.note || r.label,
-          date:        new Date(now.getFullYear(), now.getMonth(), r.dayOfMonth, 9, 0, 0).toISOString(),
+          date:        new Date(now.getFullYear(), now.getMonth(), Math.min(r.dayOfMonth, new Date(now.getFullYear(), now.getMonth()+1, 0).getDate()), 9, 0, 0).toISOString(),
           recurringId: r.id,   // mark so we don't log twice
           auto:        true,   // flag for UI display
         });
@@ -736,20 +736,20 @@ export function useAppData(firebaseUser = null) {
   // ── Smart suggestions based on remaining balance ──────────────────────────
   const smartSuggestions = (() => {
     const suggestions = [];
-    const loanTotals  = calcLoanTotals(data.loans || []);
 
     if (remaining > 0) {
       // Has money left — suggest good uses
-      if ((data.loans||[]).length > 0) {
-        const highestLoan = (data.loans||[]).reduce((max, l) =>
-          (calcLoanTotals([l]).outstanding > calcLoanTotals([max]).outstanding ? l : max),
-          data.loans[0]
+      const activeLoans = (data.loans||[]).filter(l => !l.needsDetails && l.principal > 0);
+      if (activeLoans.length > 0) {
+        const highestLoan = activeLoans.reduce((max, l) =>
+          (calcLoanTotals(l).outstanding > calcLoanTotals(max).outstanding ? l : max),
+          activeLoans[0]
         );
         suggestions.push({
           type: "loan",
           icon: "🏦",
           title: "Close Loan Faster",
-          desc: `Pay ₹${Math.min(remaining, Math.round(calcLoanTotals([highestLoan]).outstanding)).toLocaleString("en-IN")} extra on ${highestLoan.name} to save interest`,
+          desc: `Pay ₹${Math.min(remaining, Math.round(calcLoanTotals(highestLoan).outstanding)).toLocaleString("en-IN")} extra on ${highestLoan.name} to save interest`,
           action: "View Loans",
           tab: "loans",
         });

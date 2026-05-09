@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Capacitor } from "@capacitor/core";
 import { PushNotifications } from "@capacitor/push-notifications";
 import { doc, setDoc } from "firebase/firestore";
@@ -9,6 +9,10 @@ import { db } from "../firebase";
 // onAction is called when the user taps a notification while the app is backgrounded.
 // No-ops on web or when userId is null (guest / not logged in).
 export function usePushNotifications(userId, onAction) {
+  // Ref keeps the latest onAction without re-running the registration effect
+  const onActionRef = useRef(onAction);
+  useEffect(() => { onActionRef.current = onAction; });
+
   useEffect(() => {
     if (!Capacitor.isNativePlatform() || !userId) return;
 
@@ -65,9 +69,9 @@ export function usePushNotifications(userId, onAction) {
           console.log("Notification received (foreground):", notification.title);
         }),
 
-        // User tapped a notification → call the action handler
+        // User tapped a notification → call the action handler (via ref, always fresh)
         await PushNotifications.addListener("pushNotificationActionPerformed", action => {
-          if (onAction) onAction(action);
+          if (onActionRef.current) onActionRef.current(action);
         }),
       );
     }
