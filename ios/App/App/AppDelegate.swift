@@ -1,6 +1,5 @@
 import UIKit
 import Capacitor
-import FirebaseCore
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -8,10 +7,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Firebase must be configured before any other Firebase call.
-        // This also initialises FirebaseMessaging so that the APNs device token
-        // is automatically swapped for an FCM token — required for push notifications.
-        FirebaseApp.configure()
         return true
     }
 

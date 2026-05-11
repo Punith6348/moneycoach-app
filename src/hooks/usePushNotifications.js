@@ -19,10 +19,18 @@ export function usePushNotifications(userId, onAction) {
     let listeners = [];
 
     async function saveToken(tokenData) {
+      // On iOS without the native Firebase SDK, registration returns a raw APNs
+      // device token (hex string), not an FCM token. FCM tokens are 152-char
+      // strings; APNs tokens are 64-char hex. Skip saving APNs-only tokens.
+      const platform = Capacitor.getPlatform();
+      if (platform === "ios" && tokenData.value.length < 100) {
+        console.log("iOS APNs token received (not an FCM token) — skipping save");
+        return;
+      }
       try {
         await setDoc(doc(db, "fcmTokens", userId), {
           token:     tokenData.value,
-          platform:  Capacitor.getPlatform(), // "ios" | "android"
+          platform,
           updatedAt: Date.now(),
         });
         console.log("FCM token saved for", userId);
