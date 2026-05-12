@@ -2,7 +2,7 @@
 import { StrictMode, useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { onAuthStateChanged, signOut, GoogleAuthProvider, reauthenticateWithPopup } from "firebase/auth";
-import { auth, persistenceReady } from "./firebase";
+import { auth, initPersistence } from "./firebase";
 import { clearSession, deleteAccountREST, deleteFirestoreREST, signInWithEmail } from "./firebaseAuth";
 import { registerUserProfile } from "./useFirestoreSync";
 import App from "./App.jsx";
@@ -53,32 +53,42 @@ function Root() {
     let unsub = () => {};
     let timeout = null;
 
-    // persistenceReady resolves immediately on web; on Capacitor iOS it just
-    // confirms browserLocalPersistence is active before we subscribe.
-    persistenceReady.then(() => {
-      timeout = setTimeout(() => setUser(null), 3000);
+    // Hard fallback: if setPersistence or onAuthStateChanged never resolves
+    // (e.g. iOS 26 WebPrivacy delays localStorage until after WebContent launch),
+    // force the app past the loading screen after 8 seconds.
+    const hardFallback = setTimeout(() => {
+      setUser(prev => prev === undefined ? null : prev);
+    }, 8000);
 
-      unsub = onAuthStateChanged(auth, u => {
-        clearTimeout(timeout);
-        if (u) {
-          const storedUid = localStorage.getItem("moneyCoachUID");
-          if (storedUid && storedUid !== u.uid) {
-            localStorage.removeItem("moneyCoachData_v3");
-            localStorage.removeItem("moneyCoachData_v2");
-            localStorage.removeItem("moneyCoachData");
+    // Call setPersistence here (inside useEffect / after DOM ready) rather than
+    // at module load time. On iOS 26, localStorage is unavailable for ~5s after
+    // launch; calling it at module load caused the promise to hang indefinitely.
+    initPersistence().then(() => {
+        timeout = setTimeout(() => setUser(null), 3000);
+
+        unsub = onAuthStateChanged(auth, u => {
+          clearTimeout(timeout);
+          clearTimeout(hardFallback);
+          if (u) {
+            try {
+              const storedUid = localStorage.getItem("moneyCoachUID");
+              if (storedUid && storedUid !== u.uid) {
+                localStorage.removeItem("moneyCoachData_v3");
+                localStorage.removeItem("moneyCoachData_v2");
+                localStorage.removeItem("moneyCoachData");
+              }
+              localStorage.setItem("moneyCoachUID", u.uid);
+            } catch(_) {}
+            setGuestMode(false);
+            registerUserProfile(u).catch(() => {});
+            setUser(u);
+          } else {
+            setUser(null);
           }
-          localStorage.setItem("moneyCoachUID", u.uid);
-          setGuestMode(false);
-          registerUserProfile(u).catch(() => {});
-          setUser(u);
-        } else {
-          setUser(null);
-        }
+        });
       });
-    });
 
-    // Cleanup is in the outer scope so React actually calls it on unmount
-    return () => { clearTimeout(timeout); unsub(); };
+    return () => { clearTimeout(timeout); clearTimeout(hardFallback); unsub(); };
   }, []);
 
   if (user === undefined && !guestMode) return <LoadingScreen/>;
