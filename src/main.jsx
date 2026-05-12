@@ -51,44 +51,38 @@ function Root() {
 
   useEffect(() => {
     let unsub = () => {};
-    let timeout = null;
 
-    // Hard fallback: if setPersistence or onAuthStateChanged never resolves
-    // (e.g. iOS 26 WebPrivacy delays localStorage until after WebContent launch),
-    // force the app past the loading screen after 8 seconds.
-    const hardFallback = setTimeout(() => {
-      setUser(prev => prev === undefined ? null : prev);
-    }, 8000);
+    // initPersistence runs in parallel — don't await it before subscribing.
+    // Firebase's default is already browserLocalPersistence on web/Capacitor,
+    // so onAuthStateChanged reads cached state correctly without waiting.
+    // This removes the ~5s iOS 26 localStorage delay from the critical path.
+    initPersistence();
 
-    // Call setPersistence here (inside useEffect / after DOM ready) rather than
-    // at module load time. On iOS 26, localStorage is unavailable for ~5s after
-    // launch; calling it at module load caused the promise to hang indefinitely.
-    initPersistence().then(() => {
-        timeout = setTimeout(() => setUser(null), 3000);
+    // Fallback: if onAuthStateChanged never fires (no network, cold start),
+    // move past loading after 4 seconds so the app is never permanently stuck.
+    const fallback = setTimeout(() => setUser(prev => prev === undefined ? null : prev), 4000);
 
-        unsub = onAuthStateChanged(auth, u => {
-          clearTimeout(timeout);
-          clearTimeout(hardFallback);
-          if (u) {
-            try {
-              const storedUid = localStorage.getItem("moneyCoachUID");
-              if (storedUid && storedUid !== u.uid) {
-                localStorage.removeItem("moneyCoachData_v3");
-                localStorage.removeItem("moneyCoachData_v2");
-                localStorage.removeItem("moneyCoachData");
-              }
-              localStorage.setItem("moneyCoachUID", u.uid);
-            } catch(_) {}
-            setGuestMode(false);
-            registerUserProfile(u).catch(() => {});
-            setUser(u);
-          } else {
-            setUser(null);
+    unsub = onAuthStateChanged(auth, u => {
+      clearTimeout(fallback);
+      if (u) {
+        try {
+          const storedUid = localStorage.getItem("moneyCoachUID");
+          if (storedUid && storedUid !== u.uid) {
+            localStorage.removeItem("moneyCoachData_v3");
+            localStorage.removeItem("moneyCoachData_v2");
+            localStorage.removeItem("moneyCoachData");
           }
-        });
-      });
+          localStorage.setItem("moneyCoachUID", u.uid);
+        } catch(_) {}
+        setGuestMode(false);
+        registerUserProfile(u).catch(() => {});
+        setUser(u);
+      } else {
+        setUser(null);
+      }
+    });
 
-    return () => { clearTimeout(timeout); clearTimeout(hardFallback); unsub(); };
+    return () => { clearTimeout(fallback); unsub(); };
   }, []);
 
   if (user === undefined && !guestMode) return <LoadingScreen/>;
