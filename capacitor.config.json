@@ -1,5 +1,5 @@
 {
-  "appId": "com.turings.moneycoach",
+  "appId": "app.vercel.moneycoach_app.twa",
   "appName": "Money Coach",
   "webDir": "dist",
   "server": {
@@ -11,6 +11,13 @@
       "*.firebasestorage.app",
       "moneycoach-app.vercel.app"
     ]
+  },
+  "plugins": {
+    "GoogleAuth": {
+      "scopes": ["profile", "email"],
+      "serverClientId": "39662562896-1i4u083pnmt7tjgqled1posgmpmp269f.apps.googleusercontent.com",
+      "forceCodeForRefreshToken": true
+    }
   },
   "ios": {
     "allowsLinkPreview": false,

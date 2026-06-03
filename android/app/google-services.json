@@ -7,12 +7,88 @@
   "client": [
     {
       "client_info": {
+        "mobilesdk_app_id": "1:39662562896:android:fba1af1c980558ae11eb55",
+        "android_client_info": {
+          "package_name": "app.vercel.moneycoach_app.twa"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "39662562896-ard70nt7nphb4clg3dg6im5vrugqkund.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "app.vercel.moneycoach_app.twa",
+            "certificate_hash": "c17e949dd1cfbae0cb5f5b3e8c5094d43f6873a4"
+          }
+        },
+        {
+          "client_id": "39662562896-uvt3cn1qrvd29e5qle8jds4p7h67db7t.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "app.vercel.moneycoach_app.twa",
+            "certificate_hash": "4c1f7f91e153d19a39782989ac4dc43ab176865e"
+          }
+        },
+        {
+          "client_id": "39662562896-1i4u083pnmt7tjgqled1posgmpmp269f.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyACfEt3H-lHWZsQf3XFqmkVHZV4imLYAOw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "39662562896-1i4u083pnmt7tjgqled1posgmpmp269f.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "39662562896-ue81tnkev26fq001ghjre3tiuoh3nb8o.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.turings.moneycoach"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:39662562896:android:a6242290085be03011eb55",
         "android_client_info": {
           "package_name": "com.turings.moneycoach"
         }
       },
       "oauth_client": [
+        {
+          "client_id": "39662562896-h7h0kb4mb26qptn87it37sm57njpf93i.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.turings.moneycoach",
+            "certificate_hash": "4c1f7f91e153d19a39782989ac4dc43ab176865e"
+          }
+        },
+        {
+          "client_id": "39662562896-qed8of6iscvttj46rvljgp4g7hbpgotn.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.turings.moneycoach",
+            "certificate_hash": "d8824f18dbf0f92cb4f322255ceebdd397eb33c3"
+          }
+        },
+        {
+          "client_id": "39662562896-sr7kpdcc2luqeqdrd27hg6qacqpgiabt.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.turings.moneycoach",
+            "certificate_hash": "c17e949dd1cfbae0cb5f5b3e8c5094d43f6873a4"
+          }
+        },
         {
           "client_id": "39662562896-1i4u083pnmt7tjgqled1posgmpmp269f.apps.googleusercontent.com",
           "client_type": 3

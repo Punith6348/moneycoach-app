@@ -1,13 +1,25 @@
 // ─── main.jsx ────────────────────────────────────────────────────────────────
-import { StrictMode, useState, useEffect } from "react";
+import { StrictMode, useState, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
-import { onAuthStateChanged, signOut, GoogleAuthProvider, reauthenticateWithPopup } from "firebase/auth";
+import { onAuthStateChanged, signOut, GoogleAuthProvider, reauthenticateWithPopup, reauthenticateWithCredential } from "firebase/auth";
 import { auth, initPersistence } from "./firebase";
 import { clearSession, deleteAccountREST, deleteFirestoreREST, signInWithEmail } from "./firebaseAuth";
 import { registerUserProfile } from "./useFirestoreSync";
 import App from "./App.jsx";
 import AuthScreen from "./AuthScreen.jsx";
 import "./App.css";
+
+// Read cached Firebase user synchronously from localStorage.
+// Firebase serialises the user under "firebase:authUser:<apiKey>:[DEFAULT]".
+// Returns the plain data object (has .uid, .email, .displayName, etc.) or null.
+function readCachedUser() {
+  try {
+    const key = Object.keys(localStorage).find(k => k.startsWith("firebase:authUser:"));
+    if (!key) return null;
+    const d = JSON.parse(localStorage.getItem(key) || "{}");
+    return d?.uid ? d : null;
+  } catch { return null; }
+}
 
 const globalStyle = document.createElement("style");
 globalStyle.textContent = `
@@ -46,25 +58,29 @@ function LoadingScreen() {
 }
 
 function Root() {
-  const [user,      setUser]      = useState(undefined); // undefined = still checking
+  // Fix 1: initialise with cached user immediately — returning users skip the
+  // loading screen entirely instead of waiting 12 s for Firebase to hydrate.
+  const [user,      setUser]      = useState(() => readCachedUser() || undefined);
   const [guestMode, setGuestMode] = useState(false);
+  // Fix 2: ref for the grace-period timer used to absorb transient null signals
+  const nullTimerRef = useRef(null);
 
   useEffect(() => {
-    let unsub = () => {};
+    initPersistence(); // fire-and-forget — runs in parallel with onAuthStateChanged
 
-    // initPersistence runs in parallel — don't await it before subscribing.
-    // Firebase's default is already browserLocalPersistence on web/Capacitor,
-    // so onAuthStateChanged reads cached state correctly without waiting.
-    // This removes the ~5s iOS 26 localStorage delay from the critical path.
-    initPersistence();
+    // Only use a cold-start fallback for genuinely new sessions (no cached data).
+    // Returning users already have a non-undefined initial state, so no spinner needed.
+    const isNewSession = !readCachedUser();
+    const fallback = isNewSession
+      ? setTimeout(() => setUser(prev => prev === undefined ? null : prev), 4000)
+      : null;
 
-    // Fallback: if onAuthStateChanged never fires (no network, cold start),
-    // move past loading after 4 seconds so the app is never permanently stuck.
-    const fallback = setTimeout(() => setUser(prev => prev === undefined ? null : prev), 4000);
+    const unsub = onAuthStateChanged(auth, u => {
+      if (fallback) clearTimeout(fallback);
 
-    unsub = onAuthStateChanged(auth, u => {
-      clearTimeout(fallback);
       if (u) {
+        // Cancel any pending grace-period logout — token refresh succeeded
+        if (nullTimerRef.current) { clearTimeout(nullTimerRef.current); nullTimerRef.current = null; }
         try {
           const storedUid = localStorage.getItem("moneyCoachUID");
           if (storedUid && storedUid !== u.uid) {
@@ -78,11 +94,25 @@ function Root() {
         registerUserProfile(u).catch(() => {});
         setUser(u);
       } else {
-        setUser(null);
+        // Fix 2: Firebase fires null briefly on app resume during token refresh.
+        // If the localStorage cache is still present the session is just refreshing —
+        // wait 5 s before treating this as a real sign-out.
+        if (readCachedUser()) {
+          nullTimerRef.current = setTimeout(() => {
+            nullTimerRef.current = null;
+            if (!readCachedUser()) setUser(null); // cache gone → genuine sign-out
+          }, 5000);
+        } else {
+          setUser(null); // no cache → genuine sign-out
+        }
       }
     });
 
-    return () => { clearTimeout(fallback); unsub(); };
+    return () => {
+      if (fallback) clearTimeout(fallback);
+      if (nullTimerRef.current) clearTimeout(nullTimerRef.current);
+      unsub();
+    };
   }, []);
 
   if (user === undefined && !guestMode) return <LoadingScreen/>;
@@ -136,9 +166,18 @@ function Root() {
           } else if (auth.currentUser) {
             const providerId = auth.currentUser.providerData?.[0]?.providerId;
             if (providerId === "google.com") {
-              // Google users: reauthenticate via popup to get a guaranteed fresh token
-              const result = await reauthenticateWithPopup(auth.currentUser, new GoogleAuthProvider());
-              idToken = await result.user.getIdToken();
+              // Google users: use native plugin on Capacitor Android, popup on web
+              if (window.Capacitor?.getPlatform?.() === "android") {
+                const { GoogleAuth } = await import("@codetrix-studio/capacitor-google-auth");
+                await GoogleAuth.initialize({ clientId: "39662562896-1i4u083pnmt7tjgqled1posgmpmp269f.apps.googleusercontent.com", scopes: ["profile","email"] });
+                const g = await GoogleAuth.signIn();
+                const cred = GoogleAuthProvider.credential(g.authentication.idToken);
+                const result = await reauthenticateWithCredential(auth.currentUser, cred);
+                idToken = await result.user.getIdToken();
+              } else {
+                const result = await reauthenticateWithPopup(auth.currentUser, new GoogleAuthProvider());
+                idToken = await result.user.getIdToken();
+              }
             } else {
               // Apple / other: try SDK token, fall back to cached mc_token
               try { idToken = await auth.currentUser.getIdToken(true); } catch(_) {}

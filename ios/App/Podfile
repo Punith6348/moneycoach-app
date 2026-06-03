@@ -13,14 +13,66 @@ def capacitor_pods
   pod 'CapacitorCordova', :path => '../../node_modules/@capacitor/ios'
   pod 'CapacitorCommunityAppleSignIn', :path => '../../node_modules/@capacitor-community/apple-sign-in'
   pod 'CapacitorPushNotifications', :path => '../../node_modules/@capacitor/push-notifications'
-  pod 'FirebaseMessaging'
+  pod 'CodetrixStudioCapacitorGoogleAuth', :path => '../../node_modules/@codetrix-studio/capacitor-google-auth'
 end
 
 target 'App' do
   capacitor_pods
-  # Add your Pods here
+  pod 'FirebaseMessaging'
 end
 
 post_install do |installer|
   assertDeploymentTarget(installer)
+
+  # Inject PrivacyInfo.xcprivacy into pods that lack one (GTMAppAuth, GTMSessionFetcher, GoogleSignIn).
+  # These SDKs are on Apple's "required manifest" list but the versions pulled by
+  # @codetrix-studio/capacitor-google-auth pre-date the manifest requirement.
+  privacy_manifest = <<~PLIST
+    <?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+    <plist version="1.0">
+    <dict>
+      <key>NSPrivacyTracking</key>
+      <false/>
+      <key>NSPrivacyTrackingDomains</key>
+      <array/>
+      <key>NSPrivacyCollectedDataTypes</key>
+      <array/>
+      <key>NSPrivacyAccessedAPITypes</key>
+      <array>
+        <dict>
+          <key>NSPrivacyAccessedAPIType</key>
+          <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+          <key>NSPrivacyAccessedAPITypeReasons</key>
+          <array>
+            <string>CA92.1</string>
+          </array>
+        </dict>
+        <dict>
+          <key>NSPrivacyAccessedAPIType</key>
+          <string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+          <key>NSPrivacyAccessedAPITypeReasons</key>
+          <array>
+            <string>C617.1</string>
+          </array>
+        </dict>
+      </array>
+    </dict>
+    </plist>
+  PLIST
+
+  %w[GTMAppAuth GTMSessionFetcher GoogleSignIn].each do |pod_name|
+    pod_dir = installer.sandbox.pod_dir(pod_name)
+    next unless pod_dir.exist?
+
+    manifest_path = pod_dir + 'PrivacyInfo.xcprivacy'
+    File.write(manifest_path, privacy_manifest) unless manifest_path.exist?
+
+    installer.pods_project.targets.each do |target|
+      next unless target.name == pod_name
+      group = installer.pods_project.main_group.find_subpath(pod_name, true)
+      file_ref = group.new_file(manifest_path.to_s)
+      target.resources_build_phase.add_file_reference(file_ref)
+    end
+  end
 end

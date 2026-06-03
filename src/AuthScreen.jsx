@@ -1,7 +1,8 @@
 // ─── AuthScreen.jsx ───────────────────────────────────────────────────────────
 import { useState, useEffect } from "react";
 import { auth, persistenceReady } from "./firebase";
-import { OAuthProvider, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from "firebase/auth";
+import { OAuthProvider, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signInWithCredential } from "firebase/auth";
+import { GoogleAuth } from "@codetrix-studio/capacitor-google-auth";
 import {
   signInWithAppleREST, saveFirebaseSDKSession, saveSession,
   signUpWithEmail, signInWithEmail, saveEmailSDKSession, formatAuthError,
@@ -70,9 +71,10 @@ export default function AuthScreen({ onGuest, onAuthSuccess }) {
     return () => window.visualViewport?.removeEventListener("resize", onResize);
   }, []);
 
-  // Android TWA detection — redirect is only needed inside a TWA.
-  // On desktop/web, signInWithPopup works fine and avoids redirect issues.
-  const isAndroidTWA = /Android/i.test(navigator.userAgent);
+  // Android TWA detection — redirect is only needed inside a TWA (Chrome browser).
+  // Capacitor native Android uses signInWithPopup (Chrome Custom Tab) instead.
+  const isCapacitorAndroid = window.Capacitor?.getPlatform?.() === "android";
+  const isAndroidTWA = !isCapacitorAndroid && /Android/i.test(navigator.userAgent);
 
   // Pick up Google redirect result after Android TWA redirect returns
   useEffect(() => {
@@ -147,20 +149,33 @@ export default function AuthScreen({ onGuest, onAuthSuccess }) {
     setForgotLoading(false);
   };
 
-  // ── Google Sign In — Android TWA uses redirect, Mac/PC web uses popup ────────
+  // ── Google Sign In ────────────────────────────────────────────────────────────
   const handleGoogle = async () => {
     startLoading("Signing in with Google...");
     try {
-      const provider = new GoogleAuthProvider();
-      if (isAndroidTWA) {
-        // TWA doesn't support popups — redirect navigates within Chrome
+      if (isCapacitorAndroid) {
+        // Native Google Sign-In via Capacitor plugin — avoids WebView popup/redirect issues
+        await GoogleAuth.initialize({
+          clientId: "39662562896-1i4u083pnmt7tjgqled1posgmpmp269f.apps.googleusercontent.com",
+          scopes: ["profile", "email"],
+        });
+        const googleUser = await GoogleAuth.signIn();
+        const idToken = googleUser.authentication.idToken;
+        const credential = GoogleAuthProvider.credential(idToken);
+        const result = await signInWithCredential(auth, credential);
+        if (result?.user) {
+          await loadFirestoreREST(result.user.uid, await result.user.getIdToken());
+          onAuthSuccess?.(result.user);
+        }
+        stopLoading();
+      } else if (isAndroidTWA) {
+        // TWA browser — redirect navigates within Chrome
         await persistenceReady;
-        await signInWithRedirect(auth, provider);
-        // Page navigates away; result is picked up by useEffect on return
+        await signInWithRedirect(auth, new GoogleAuthProvider());
       } else {
-        // Desktop/web browser — popup is instant and reliable (no redirect)
+        // Desktop/web — popup is instant and reliable
         await persistenceReady;
-        const result = await signInWithPopup(auth, provider);
+        const result = await signInWithPopup(auth, new GoogleAuthProvider());
         if (result?.user) {
           await loadFirestoreREST(result.user.uid, await result.user.getIdToken());
           onAuthSuccess?.(result.user);
@@ -306,8 +321,9 @@ export default function AuthScreen({ onGuest, onAuthSuccess }) {
       <div style={{ position:"fixed", inset:0, overflowY:"scroll",
         WebkitOverflowScrolling:"touch", touchAction:"pan-y",
         fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
-        background:"linear-gradient(160deg,#0F172A 0%,#1E293B 60%,#0F172A 100%)" }}>
-        <div style={{ maxWidth:420, margin:"0 auto", padding:"40px 24px", boxSizing:"border-box" }}>
+        background:"linear-gradient(160deg,#0F172A 0%,#1E293B 60%,#0F172A 100%)",
+        display:"flex", alignItems:"center", justifyContent:"center" }}>
+        <div style={{ width:"100%", maxWidth:420, margin:"0 auto", padding:"40px 24px", boxSizing:"border-box" }}>
           <div style={{ textAlign:"center", marginBottom:28 }}>
             <AppLogo size={88}/>
             <h1 style={{ margin:"16px 0 6px", fontSize:28, fontWeight:800,

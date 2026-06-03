@@ -4,89 +4,110 @@ import { PushNotifications } from "@capacitor/push-notifications";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "../firebase";
 
+function getOrCreateDeviceId() {
+  // On iOS, AppDelegate injects window._nativeDeviceId so native and JS share the same doc ID
+  if (window._nativeDeviceId) return window._nativeDeviceId;
+  let id = localStorage.getItem("mcDeviceId");
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem("mcDeviceId", id);
+  }
+  return id;
+}
+
 // Registers for push notifications on Capacitor (iOS/Android).
-// Saves the FCM/APNS token to Firestore so the Cloud Function can send messages.
-// onAction is called when the user taps a notification while the app is backgrounded.
-// No-ops on web or when userId is null (guest / not logged in).
+// On Android: uses Capacitor registration event (returns FCM token directly).
+// On iOS: AppDelegate saves token natively via REST; also dispatches 'fcmTokenReady'
+//         so JS can update the doc with userId when the user logs in.
+// Works for both logged-in users and guests (uses a stable device ID for guests).
 export function usePushNotifications(userId, onAction) {
-  // Ref keeps the latest onAction without re-running the registration effect
   const onActionRef = useRef(onAction);
   useEffect(() => { onActionRef.current = onAction; });
 
   useEffect(() => {
-    if (!Capacitor.isNativePlatform() || !userId) return;
+    if (!Capacitor.isNativePlatform()) return;
 
     let listeners = [];
+    let cancelled = false;
+    let fcmTokenListener = null;
 
-    async function saveToken(tokenData) {
-      // On iOS without the native Firebase SDK, registration returns a raw APNs
-      // device token (hex string), not an FCM token. FCM tokens are 152-char
-      // strings; APNs tokens are 64-char hex. Skip saving APNs-only tokens.
+    async function saveToken(token) {
+      if (cancelled) return;
       const platform = Capacitor.getPlatform();
-      if (platform === "ios" && tokenData.value.length < 100) {
-        console.log("iOS APNs token received (not an FCM token) — skipping save");
-        return;
-      }
+      const docId = userId || getOrCreateDeviceId();
       try {
-        await setDoc(doc(db, "fcmTokens", userId), {
-          token:     tokenData.value,
+        await setDoc(doc(db, "fcmTokens", docId), {
+          token,
           platform,
           updatedAt: Date.now(),
+          userId:    userId || null,
         });
-        console.log("FCM token saved for", userId);
       } catch (e) {
-        console.warn("FCM token save failed:", e);
+        console.error("[Push] token save failed:", e.code, e.message);
       }
     }
 
     async function init() {
-      // Android 8+ requires a channel to exist before notifications can be shown.
-      // Must match the channelId in the Cloud Function.
       if (Capacitor.getPlatform() === "android") {
         await PushNotifications.createChannel({
           id:          "expense_reminders",
           name:        "Expense Reminders",
           description: "Daily reminders to log your expenses",
-          importance:  4,    // IMPORTANCE_HIGH
-          visibility:  1,    // VISIBILITY_PUBLIC
+          importance:  4,
+          visibility:  1,
           sound:       "default",
           vibration:   true,
           lights:      true,
         });
       }
 
-      // Request permission if not yet decided
       let perm = await PushNotifications.checkPermissions();
       if (perm.receive === "prompt" || perm.receive === "prompt-with-rationale") {
         perm = await PushNotifications.requestPermissions();
       }
       if (perm.receive !== "granted") return;
 
-      await PushNotifications.register();
+      if (Capacitor.getPlatform() === "ios") {
+        // AppDelegate already saved the token natively.
+        // This JS path updates the doc with the correct userId when the user logs in,
+        // and provides a fallback if the native save somehow missed.
+        if (window._fcmToken) {
+          await saveToken(window._fcmToken);
+        } else {
+          fcmTokenListener = (e) => {
+            if (!cancelled) saveToken(e.detail.token);
+          };
+          window.addEventListener("fcmTokenReady", fcmTokenListener);
+        }
+      }
 
       listeners.push(
-        // Registration success → save token to Firestore
-        await PushNotifications.addListener("registration", saveToken),
-
+        await PushNotifications.addListener("registration", (tokenData) => {
+          // Android: FCM token comes directly here
+          if (Capacitor.getPlatform() === "android") {
+            saveToken(tokenData.value);
+          }
+        }),
         await PushNotifications.addListener("registrationError", err => {
-          console.warn("Push registration error:", err.error);
+          console.warn("[Push] registration error:", err.error);
         }),
-
-        // Foreground notification — show a console log; extend here for in-app banner
-        await PushNotifications.addListener("pushNotificationReceived", notification => {
-          console.log("Notification received (foreground):", notification.title);
-        }),
-
-        // User tapped a notification → call the action handler (via ref, always fresh)
+        await PushNotifications.addListener("pushNotificationReceived", () => {}),
         await PushNotifications.addListener("pushNotificationActionPerformed", action => {
           if (onActionRef.current) onActionRef.current(action);
         }),
       );
+
+      await PushNotifications.register();
     }
 
-    init().catch(e => console.warn("Push init failed:", e));
+    init().catch(e => console.warn("[Push] init failed:", e));
 
-    return () => { listeners.forEach(l => l.remove()); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      cancelled = true;
+      listeners.forEach(l => l?.remove());
+      if (fcmTokenListener) {
+        window.removeEventListener("fcmTokenReady", fcmTokenListener);
+      }
+    };
   }, [userId]);
 }
