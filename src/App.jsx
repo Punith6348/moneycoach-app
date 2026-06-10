@@ -7,7 +7,7 @@ import { useAppData, currentMonthKey, monthKeyToLabel, getActiveMonthKeys } from
 import BudgetDashboard, { MonthCloseReport, RemainingBalanceHero } from "./BudgetDashboard";
 import { IncomeSources, FixedExpensesSection, SavingsSection, FuturePaymentsSection } from "./FinancialPlan";
 import LoansTab         from "./LoansTab";
-import CategoryBudgets, { BudgetAlertWidget } from "./CategoryBudgets";
+import CategoryBudgets from "./CategoryBudgets";
 import SettingsPanel    from "./SettingsPanel";
 import { calcLoanTotals } from "./useAppData";
 import { usePushNotifications } from "./hooks/usePushNotifications";
@@ -1630,378 +1630,131 @@ function RecurringTab({
     </div>
   );
 }
-// ─── TOP PRIORITY CARD (compact white) ───────────────────────────────────
-function TopPriorityCard({ totalIncome, totalSavings, loans, onNavigate }) {
+// ─── SMART ALERT STRIP ───────────────────────────────────────────────────
+// Shows exactly one alert — highest-priority issue or positive reinforcement.
+function SmartAlertStrip({ totalIncome, totalSavings, totalLoanEMI, remaining, dailyLimit, currentExpenses, futurePayments, onNavigate }) {
   const fmtN = (n) => `₹${Math.abs(Math.round(n)).toLocaleString("en-IN")}`;
-  const activeLoans = (loans || []).filter(l => l.active !== false && (l.principal > 0 || l.emi > 0));
+  const now         = new Date();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+  const daysPassed  = now.getDate();
+  const daysLeft    = Math.max(1, daysInMonth - daysPassed + 1);
+  const todayStr    = now.toISOString().split("T")[0];
+  const monthSpent  = currentExpenses.reduce((s,e) => s+e.amount, 0);
+  const todaySpent  = currentExpenses.filter(e => e.date?.startsWith(todayStr)).reduce((s,e) => s+e.amount, 0);
+  const savingsRate = totalIncome > 0 ? Math.round((totalSavings/totalIncome)*100) : -1;
+  const debtRatio   = totalIncome > 0 ? Math.round((totalLoanEMI/totalIncome)*100) : 0;
+  const idealSpent  = totalIncome > 0 ? Math.round((daysPassed/daysInMonth)*totalIncome) : 0;
 
-  if (activeLoans.length > 0) {
-    const totals           = activeLoans.map(l => calcLoanTotals(l));
-    const totalOutstanding = totals.reduce((s, t) => s + (t.outstanding || 0), 0);
-    const totalPrincipal   = activeLoans.reduce((s, l) => s + (l.principal || 0), 0);
-    const totalEMI         = totals.reduce((s, t) => s + (t.emi || 0), 0);
-    const paidPct = totalPrincipal > 0
-      ? Math.min(100, Math.round(((totalPrincipal - totalOutstanding) / totalPrincipal) * 100))
-      : 0;
-    const maxMonthsLeft = Math.max(...totals.map(t => t.monthsLeft || 0));
-    let completionLabel = "";
-    if (maxMonthsLeft > 0) {
-      const d = new Date();
-      d.setMonth(d.getMonth() + maxMonthsLeft);
-      completionLabel = d.toLocaleDateString("en-IN", { month:"short", year:"numeric" });
+  let a = null;
+
+  if (remaining < 0 && totalIncome > 0) {
+    a = { t:"bad",  e:"🔴", msg:`Budget deficit — over by ${fmtN(Math.abs(remaining))}`,              action:"Review Plan", tab:"plan"      };
+  } else if (dailyLimit > 0 && todaySpent > dailyLimit) {
+    a = { t:"warn", e:"⚠️", msg:`Today's spending ${fmtN(todaySpent)} over ${fmtN(dailyLimit)} limit`, action:"Log Expenses", tab:"home"     };
+  } else if (remaining < totalIncome * 0.1 && remaining >= 0 && daysLeft > 7 && totalIncome > 0) {
+    a = { t:"warn", e:"⚠️", msg:`Only ${fmtN(remaining)} left with ${daysLeft} days remaining`,        action:"Cut Spending",  tab:"catbudget" };
+  } else {
+    const urgent = (futurePayments || [])
+      .map(p => ({ ...p, days: Math.max(0, Math.round((new Date(p.nextDate+"T00:00:00") - now)/(1000*60*60*24))) }))
+      .filter(p => p.days <= 7)
+      .sort((a,b) => a.days - b.days)[0];
+    if (urgent) {
+      a = { t: urgent.days <= 2 ? "bad" : "warn", e:"🎯",
+        msg: urgent.days === 0 ? `${urgent.label} (${fmtN(urgent.totalAmount)}) is due today`
+           : urgent.days === 1 ? `${urgent.label} (${fmtN(urgent.totalAmount)}) due tomorrow`
+           : `${urgent.label} due in ${urgent.days} days`,
+        action:"Check Reserve", tab:"plan" };
+    } else if (monthSpent > idealSpent * 1.2 && idealSpent > 0 && daysLeft > 5) {
+      const over = Math.round(((monthSpent - idealSpent) / idealSpent) * 100);
+      a = { t:"warn", e:"📉", msg:`Spending ${over}% ahead of monthly pace`,             action:"Budgets",      tab:"catbudget" };
+    } else if (debtRatio >= 40 && totalLoanEMI > 0) {
+      a = { t:"warn", e:"⚠️", msg:`EMIs at ${debtRatio}% of income — above healthy 30%`, action:"View Loans",   tab:"loans"     };
+    } else if (savingsRate >= 0 && savingsRate < 5 && totalIncome > 0) {
+      a = { t:"warn", e:"⚠️", msg:`Savings rate is ${savingsRate}% — below the 20% target`, action:"Set Up Plan", tab:"plan"   };
+    } else if (daysPassed >= 7 && monthSpent > 0 && monthSpent <= idealSpent * 1.05 && idealSpent > 0) {
+      a = { t:"good", e:"🔥", msg:"Spending on track for the month — well managed" };
+    } else if (savingsRate >= 20 && totalIncome > 0) {
+      a = { t:"good", e:"✅", msg:`Saving ${savingsRate}% of income — above the 20% target` };
     }
-    const barColor = paidPct >= 75 ? "#16A34A" : paidPct >= 40 ? "#2563EB" : "#D97706";
-    return (
-      <div style={{background:"#fff", borderRadius:12, padding:"12px 14px", marginBottom:14,
-        border:"1px solid #E5E7EB", boxShadow:"0 1px 3px rgba(0,0,0,0.05)"}}>
-        <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8}}>
-          <div>
-            <p style={{margin:0, fontSize:9, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.8px", fontWeight:700}}>Top Priority</p>
-            <p style={{margin:"2px 0 0", fontSize:13, fontWeight:700, color:"#111827"}}>Become Debt Free 🎯</p>
-          </div>
-          <div style={{textAlign:"right"}}>
-            <p style={{margin:0, fontSize:9, color:"#6B7280"}}>Outstanding</p>
-            <p style={{margin:0, fontSize:14, fontWeight:700, color:"#DC2626", fontFamily:"Georgia,serif"}}>{fmtN(totalOutstanding)}</p>
-          </div>
-        </div>
-        <div style={{background:"#F1F5F9", borderRadius:99, height:5, marginBottom:6, overflow:"hidden"}}>
-          <div style={{height:"100%", width:`${paidPct}%`, borderRadius:99, background:barColor, transition:"width 0.6s"}}/>
-        </div>
-        <div style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-          <p style={{margin:0, fontSize:11, color:"#6B7280"}}>
-            <span style={{color:barColor, fontWeight:700}}>{paidPct}% repaid</span>
-            {totalEMI > 0 && <span> · {fmtN(totalEMI)}/mo</span>}
-          </p>
-          <div style={{display:"flex", alignItems:"center", gap:10}}>
-            {completionLabel && (
-              <p style={{margin:0, fontSize:11, color:"#6B7280"}}>
-                Free by <span style={{color:"#2563EB", fontWeight:700}}>{completionLabel}</span>
-              </p>
-            )}
-            <button onClick={() => onNavigate("loans")}
-              style={{padding:"4px 10px", borderRadius:7, border:"1px solid #E5E7EB",
-                background:"#F8FAFC", color:"#374151", fontFamily:"inherit", fontSize:11, fontWeight:600, cursor:"pointer"}}>
-              View Loans →
-            </button>
-          </div>
-        </div>
-      </div>
-    );
   }
 
-  const savingsRate = totalIncome > 0 ? (totalSavings / totalIncome) * 100 : 0;
-  const targetRate  = 20;
-  const pct         = Math.min(100, Math.round((savingsRate / targetRate) * 100));
-  const gapAmount   = Math.round((Math.max(0, targetRate - savingsRate) / 100) * totalIncome);
-  const barColor    = pct >= 100 ? "#16A34A" : pct >= 60 ? "#2563EB" : "#D97706";
-  const isOnTrack   = savingsRate >= targetRate;
-  return (
-    <div style={{background:"#fff", borderRadius:12, padding:"12px 14px", marginBottom:14,
-      border:"1px solid #E5E7EB", boxShadow:"0 1px 3px rgba(0,0,0,0.05)"}}>
-      <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8}}>
-        <div>
-          <p style={{margin:0, fontSize:9, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.8px", fontWeight:700}}>Top Priority</p>
-          <p style={{margin:"2px 0 0", fontSize:13, fontWeight:700, color:"#111827"}}>
-            {isOnTrack ? "Grow Your Wealth 📈" : "Reach 20% Savings Rate 💰"}
-          </p>
-        </div>
-        <div style={{textAlign:"right"}}>
-          <p style={{margin:0, fontSize:9, color:"#6B7280"}}>Monthly Savings</p>
-          <p style={{margin:0, fontSize:14, fontWeight:700, color:"#16A34A", fontFamily:"Georgia,serif"}}>{fmtN(totalSavings)}</p>
-        </div>
-      </div>
-      <div style={{background:"#F1F5F9", borderRadius:99, height:5, marginBottom:6, overflow:"hidden"}}>
-        <div style={{height:"100%", width:`${pct}%`, borderRadius:99, background:barColor, transition:"width 0.6s"}}/>
-      </div>
-      <div style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-        <p style={{margin:0, fontSize:11, color:"#6B7280"}}>
-          <span style={{color:barColor, fontWeight:700}}>{Math.round(savingsRate)}% of income</span> saved
-        </p>
-        <div style={{display:"flex", alignItems:"center", gap:10}}>
-          {!isOnTrack && gapAmount > 0 && (
-            <p style={{margin:0, fontSize:11, color:"#6B7280"}}>
-              +<span style={{color:"#2563EB", fontWeight:700}}>{fmtN(gapAmount)}</span> to hit 20%
-            </p>
-          )}
-          <button onClick={() => onNavigate("plan")}
-            style={{padding:"4px 10px", borderRadius:7, border:"1px solid #E5E7EB",
-              background:"#F8FAFC", color:"#374151", fontFamily:"inherit", fontSize:11, fontWeight:600, cursor:"pointer"}}>
-            Review Plan →
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
+  if (!a) return null;
 
-// ─── PRIMARY GOAL CARD ────────────────────────────────────────────────────
-function PrimaryGoalCard({ totalIncome, totalFixed, totalSavings, loans, onNavigate }) {
-  const fmtN = (n) => `₹${Math.abs(Math.round(n)).toLocaleString("en-IN")}`;
-
-  // ── Derive goal from existing data, no new inputs needed ─────────────────
-  const activeLoans = (loans || []).filter(l => l.active !== false && (l.principal > 0 || l.emi > 0));
-
-  if (activeLoans.length > 0) {
-    // DEBT FREE GOAL — use all active loans
-    const totals = activeLoans.map(l => calcLoanTotals(l));
-    const totalOutstanding = totals.reduce((s, t) => s + (t.outstanding || 0), 0);
-    const totalPrincipal   = activeLoans.reduce((s, l) => s + (l.principal || 0), 0);
-    const totalEMI         = totals.reduce((s, t) => s + (t.emi || 0), 0);
-    const paidPct = totalPrincipal > 0
-      ? Math.min(100, Math.round(((totalPrincipal - totalOutstanding) / totalPrincipal) * 100))
-      : 0;
-    // Longest remaining loan drives the completion date
-    const maxMonthsLeft = Math.max(...totals.map(t => t.monthsLeft || 0));
-    let completionLabel = "";
-    if (maxMonthsLeft > 0) {
-      const d = new Date();
-      d.setMonth(d.getMonth() + maxMonthsLeft);
-      completionLabel = d.toLocaleDateString("en-IN", { month: "short", year: "numeric" });
-    }
-    const barColor = paidPct >= 75 ? "#16A34A" : paidPct >= 40 ? "#2563EB" : "#D97706";
-
-    return (
-      <div style={{
-        background: "linear-gradient(135deg,#0F172A,#1E293B)",
-        borderRadius: 16, padding: "16px", marginBottom: 14,
-        border: "1px solid rgba(255,255,255,0.08)",
-        boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
-      }}>
-        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
-          <div>
-            <p style={{ margin:0, fontSize:10, color:"#64748B", textTransform:"uppercase", letterSpacing:"1px", fontWeight:700 }}>Primary Goal</p>
-            <p style={{ margin:"3px 0 0", fontSize:16, fontWeight:800, color:"#F8FAFC" }}>Become Debt Free 🎯</p>
-          </div>
-          <div style={{ textAlign:"right" }}>
-            <p style={{ margin:0, fontSize:10, color:"#64748B" }}>Outstanding</p>
-            <p style={{ margin:"2px 0 0", fontSize:16, fontWeight:800, color:"#F87171", fontFamily:"Georgia,serif" }}>{fmtN(totalOutstanding)}</p>
-          </div>
-        </div>
-
-        {/* Progress bar */}
-        <div style={{ background:"rgba(255,255,255,0.08)", borderRadius:99, height:8, marginBottom:8, overflow:"hidden" }}>
-          <div style={{
-            height:"100%", width:`${paidPct}%`, borderRadius:99,
-            background:`linear-gradient(90deg,${barColor},${barColor}cc)`,
-            transition:"width 0.6s ease",
-          }}/>
-        </div>
-
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-          <p style={{ margin:0, fontSize:12, color:"#94A3B8" }}>
-            <span style={{ color:"#86EFAC", fontWeight:700 }}>{paidPct}% repaid</span>
-            {totalEMI > 0 && <span> · {fmtN(totalEMI)}/mo EMI</span>}
-          </p>
-          {completionLabel && (
-            <p style={{ margin:0, fontSize:11, color:"#64748B" }}>
-              Free by <span style={{ color:"#93C5FD", fontWeight:700 }}>{completionLabel}</span>
-            </p>
-          )}
-        </div>
-
-        <button
-          onClick={() => onNavigate("loans")}
-          style={{
-            marginTop:12, width:"100%", padding:"8px",
-            borderRadius:10, border:"1px solid rgba(255,255,255,0.12)",
-            background:"rgba(255,255,255,0.06)", color:"#CBD5E1",
-            fontFamily:"inherit", fontSize:12, fontWeight:600, cursor:"pointer",
-          }}
-        >
-          View Loans & EMI Details →
-        </button>
-      </div>
-    );
-  }
-
-  // SAVINGS GOAL — no loans, show savings rate progress toward 20% target
-  const savingsRate   = totalIncome > 0 ? (totalSavings / totalIncome) * 100 : 0;
-  const targetRate    = 20;
-  const pct           = Math.min(100, Math.round((savingsRate / targetRate) * 100));
-  const gap           = Math.max(0, targetRate - savingsRate);
-  const gapAmount     = Math.round((gap / 100) * totalIncome);
-  const barColor      = pct >= 100 ? "#16A34A" : pct >= 60 ? "#2563EB" : "#D97706";
-  const isOnTrack     = savingsRate >= targetRate;
+  const C = {
+    bad:  { bg:"#FEF2F2", bd:"#FECACA", tx:"#111827", ac:"#DC2626", btnBg:"#DC262612" },
+    warn: { bg:"#FFFBEB", bd:"#FDE68A", tx:"#111827", ac:"#D97706", btnBg:"#D9770612" },
+    good: { bg:"#F0FDF4", bd:"#BBF7D0", tx:"#111827", ac:"#16A34A", btnBg:"#16A34A12" },
+  }[a.t];
 
   return (
     <div style={{
-      background: "linear-gradient(135deg,#0F172A,#1E293B)",
-      borderRadius: 16, padding: "16px", marginBottom: 14,
-      border: "1px solid rgba(255,255,255,0.08)",
-      boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
+      background:C.bg, borderRadius:10, padding:"9px 12px", marginBottom:10,
+      border:`1px solid ${C.bd}`,
+      display:"flex", alignItems:"center", gap:8,
     }}>
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
-        <div>
-          <p style={{ margin:0, fontSize:10, color:"#64748B", textTransform:"uppercase", letterSpacing:"1px", fontWeight:700 }}>Primary Goal</p>
-          <p style={{ margin:"3px 0 0", fontSize:16, fontWeight:800, color:"#F8FAFC" }}>
-            {isOnTrack ? "Grow Your Wealth 📈" : "Reach 20% Savings Rate 💰"}
-          </p>
-        </div>
-        <div style={{ textAlign:"right" }}>
-          <p style={{ margin:0, fontSize:10, color:"#64748B" }}>Monthly Savings</p>
-          <p style={{ margin:"2px 0 0", fontSize:16, fontWeight:800, color:"#86EFAC", fontFamily:"Georgia,serif" }}>{fmtN(totalSavings)}</p>
-        </div>
-      </div>
-
-      <div style={{ background:"rgba(255,255,255,0.08)", borderRadius:99, height:8, marginBottom:8, overflow:"hidden" }}>
-        <div style={{
-          height:"100%", width:`${pct}%`, borderRadius:99,
-          background:`linear-gradient(90deg,${barColor},${barColor}cc)`,
-          transition:"width 0.6s ease",
-        }}/>
-      </div>
-
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-        <p style={{ margin:0, fontSize:12, color:"#94A3B8" }}>
-          <span style={{ color:"#86EFAC", fontWeight:700 }}>{Math.round(savingsRate)}% of income</span>
-          {" "}saved each month
-        </p>
-        {!isOnTrack && gapAmount > 0 ? (
-          <p style={{ margin:0, fontSize:11, color:"#64748B" }}>
-            Save <span style={{ color:"#93C5FD", fontWeight:700 }}>{fmtN(gapAmount)} more</span> to hit 20%
-          </p>
-        ) : (
-          <p style={{ margin:0, fontSize:11, color:"#86EFAC", fontWeight:600 }}>✓ On track</p>
-        )}
-      </div>
-
-      <button
-        onClick={() => onNavigate("plan")}
-        style={{
-          marginTop:12, width:"100%", padding:"8px",
-          borderRadius:10, border:"1px solid rgba(255,255,255,0.12)",
-          background:"rgba(255,255,255,0.06)", color:"#CBD5E1",
-          fontFamily:"inherit", fontSize:12, fontWeight:600, cursor:"pointer",
-        }}
-      >
-        Review Savings Plan →
-      </button>
-    </div>
-  );
-}
-
-// ─── HEALTH SCORE COMPACT ─────────────────────────────────────────────────
-function HealthScoreCompact({ totalIncome, totalExpenses, totalSavings, savingsBalance, totalLoanEMI, onExpand }) {
-  const result = calcHealthScore({ totalIncome, totalExpenses, totalSavings, savingsBalance, totalLoanEMI });
-  if (!result) return null;
-  const { score, label, color, bgColor, emoji, reasons } = result;
-  const topIssue = reasons[0] || null;
-
-  return (
-    <div
-      onClick={onExpand}
-      style={{
-        background:"#fff", borderRadius:14, padding:"12px 16px", marginBottom:14,
-        border:"1px solid #E5E7EB", boxShadow:"0 1px 4px rgba(0,0,0,0.05)",
-        cursor: onExpand ? "pointer" : "default",
-        display:"flex", alignItems:"center", gap:14,
-      }}
-    >
-      {/* Arc gauge — mini */}
-      <div style={{ position:"relative", width:70, height:40, flexShrink:0 }}>
-        <svg width="70" height="40" viewBox="0 0 70 40">
-          <path d="M 6 36 A 30 30 0 0 1 64 36" fill="none" stroke="#F1F5F9" strokeWidth="7" strokeLinecap="round"/>
-          <path d="M 6 36 A 30 30 0 0 1 64 36" fill="none" stroke={color} strokeWidth="7" strokeLinecap="round"
-            strokeDasharray={`${(score / 100) * 94} 94`}
-            style={{ transition:"stroke-dasharray 0.8s ease" }}/>
-          <text x="35" y="34" textAnchor="middle" fontSize="13" fontWeight="800" fill="#111827" fontFamily="-apple-system,sans-serif">{score}</text>
-        </svg>
-      </div>
-
-      {/* Label + top issue */}
-      <div style={{ flex:1, minWidth:0 }}>
-        <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:3 }}>
-          <p style={{ margin:0, fontSize:13, fontWeight:700, color:"#111827" }}>Financial Health</p>
-          <span style={{ padding:"2px 8px", borderRadius:99, background:bgColor, border:`1px solid ${color}22`, fontSize:11, fontWeight:700, color }}>{emoji} {label}</span>
-        </div>
-        {topIssue ? (
-          <p style={{ margin:0, fontSize:11, color:"#6B7280", lineHeight:1.3,
-            overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-            💡 {topIssue}
-          </p>
-        ) : (
-          <p style={{ margin:0, fontSize:11, color:"#16A34A", fontWeight:600 }}>🎉 All pillars look healthy</p>
-        )}
-      </div>
-
-      {onExpand && (
-        <span style={{ fontSize:16, color:"#94A3B8", flexShrink:0 }}>›</span>
+      <span style={{fontSize:14, flexShrink:0, lineHeight:1}}>{a.e}</span>
+      <p style={{margin:0, fontSize:12, color:C.tx, flex:1, lineHeight:1.4}}>{a.msg}</p>
+      {a.action && onNavigate && (
+        <button
+          onClick={() => onNavigate(a.tab)}
+          style={{
+            flexShrink:0, padding:"3px 9px", borderRadius:6,
+            border:`1px solid ${C.bd}`, background:C.btnBg,
+            color:C.ac, fontFamily:"inherit", fontSize:11, fontWeight:700,
+            cursor:"pointer", whiteSpace:"nowrap",
+          }}
+        >
+          {a.action} →
+        </button>
       )}
     </div>
   );
 }
 
-
-function TodaysCoachingCardUI({ totalIncome, totalExpenses, totalSavings, totalLoanEMI, currentExpenses, remaining, dailyLimit, loans, onNavigate }) {
-  const fmtN = (n) => `₹${Math.abs(Math.round(n)).toLocaleString("en-IN")}`;
-  const savingsRate  = totalIncome > 0 ? (totalSavings / totalIncome) * 100 : 0;
-  const debtRatio    = totalIncome > 0 ? (totalLoanEMI / totalIncome) * 100 : 0;
-  const expenseRatio = totalIncome > 0 ? (totalExpenses / totalIncome) * 100 : 0;
-  const monthSpent   = (currentExpenses || []).reduce((s, e) => s + e.amount, 0);
-  const today        = new Date().getDate();
-  const daysInMonth  = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
-  const dayPct       = (today / daysInMonth) * 100;
-  const spendPct     = totalIncome > 0 ? (monthSpent / totalIncome) * 100 : 0;
-
-  let icon = "👍", accent = "#16A34A", bg = "#F0FDF4", title = "Finances Look Healthy";
-  let body = `Savings rate ${Math.round(savingsRate)}% · Debt ratio ${Math.round(debtRatio)}% · Daily limit ${fmtN(dailyLimit)}. Stay consistent.`;
-  let actionLabel = null, actionTab = null;
-
-  if (remaining < 0) {
-    icon="⚠️"; accent="#DC2626"; bg="#FFF1F2"; title="Over Budget Alert";
-    body=`You've exceeded your budget by ${fmtN(Math.abs(remaining))}. Review your biggest spending categories.`;
-    actionLabel="View Insights"; actionTab="insight";
-  } else if (spendPct > dayPct + 15 && monthSpent > 0) {
-    icon="🔴"; accent="#D97706"; bg="#FFFBEB"; title="Spending Ahead of Pace";
-    body=`${Math.round(spendPct - dayPct)}% ahead of monthly pace. Daily limit remaining: ${fmtN(dailyLimit)}.`;
-    actionLabel="Budget Breakdown"; actionTab="catbudget";
-  } else if (remaining > 0 && dayPct > 70 && spendPct < dayPct - 15) {
-    const surplus = Math.round(remaining * 0.5);
-    icon="✨"; accent="#16A34A"; bg="#F0FDF4"; title="Savings Opportunity";
-    body=`You're ${fmtN(remaining)} under budget with ${daysInMonth - today} days left. Consider redirecting ${fmtN(surplus)} to your savings plan.`;
-    actionLabel="Update Savings"; actionTab="plan";
-  } else if (savingsRate < 10 && totalIncome > 0) {
-    icon="🎯"; accent="#2563EB"; bg="#EFF6FF"; title="Boost Your Savings Rate";
-    body=`You're saving ${Math.round(savingsRate)}% of income. A 20% target means ${fmtN(Math.round(totalIncome * 0.2))}/month — increase by ${fmtN(1000)} to start.`;
-    actionLabel="Update Plan"; actionTab="plan";
-  } else if (debtRatio > 40 && loans?.length > 0) {
-    const biggestLoan = [...loans].sort((a, b) => (b.principal || 0) - (a.principal || 0))[0];
-    icon="🏦"; accent="#7C3AED"; bg="#F5F3FF"; title="Reduce Debt Burden";
-    body=`EMIs are ${Math.round(debtRatio)}% of income — above the 40% threshold. A small prepayment on ${biggestLoan?.name || "your top loan"} saves significant interest.`;
-    actionLabel="View Loans"; actionTab="loans";
-  } else if (expenseRatio > 60 && totalIncome > 0) {
-    icon="💡"; accent="#D97706"; bg="#FFFBEB"; title="Fixed Costs High";
-    body=`Fixed bills are ${Math.round(expenseRatio)}% of income, limiting savings headroom. Check if any recurring cost can be reduced.`;
-    actionLabel="Review Plan"; actionTab="plan";
-  }
+// ─── HEALTH SCORE SLIM ROW ────────────────────────────────────────────────
+// Single-row compact variant — replaces the full arc gauge card on the dashboard.
+function HealthScoreSlim({ totalIncome, totalExpenses, totalSavings, savingsBalance, totalLoanEMI, onExpand }) {
+  const result = calcHealthScore({ totalIncome, totalExpenses, totalSavings, savingsBalance, totalLoanEMI });
+  if (!result) return null;
+  const { score, label, color, bgColor, emoji, reasons } = result;
 
   return (
-    <div style={{
-      background: bg, borderRadius:14, padding:"12px 16px", marginBottom:14,
-      border:`1px solid ${accent}22`,
-    }}>
-      <div style={{ display:"flex", alignItems:"flex-start", gap:10 }}>
-        <span style={{ fontSize:20, lineHeight:1.3, flexShrink:0 }}>{icon}</span>
-        <div style={{ flex:1, minWidth:0 }}>
-          <p style={{ margin:"0 0 3px", fontSize:12, fontWeight:700, color:"#374151",
-            textTransform:"uppercase", letterSpacing:"0.6px" }}>Today's Coaching</p>
-          <p style={{ margin:"0 0 6px", fontSize:13, fontWeight:700, color:"#111827" }}>{title}</p>
-          <p style={{ margin:0, fontSize:12, color:"#4B5563", lineHeight:1.5 }}>{body}</p>
-          {actionLabel && actionTab && (
-            <button
-              onClick={() => onNavigate(actionTab)}
-              style={{
-                marginTop:10, padding:"6px 14px", borderRadius:8,
-                border:`1px solid ${accent}44`, background:`${accent}11`,
-                color:accent, fontFamily:"inherit", fontSize:12, fontWeight:700,
-                cursor:"pointer",
-              }}
-            >
-              {actionLabel} →
-            </button>
-          )}
-        </div>
+    <div
+      onClick={onExpand}
+      style={{
+        background:"#fff", borderRadius:10, padding:"8px 12px", marginBottom:10,
+        border:"1px solid #E5E7EB", boxShadow:"0 1px 2px rgba(0,0,0,0.04)",
+        display:"flex", alignItems:"center", gap:10,
+        cursor: onExpand ? "pointer" : "default",
+      }}
+    >
+      {/* Score circle */}
+      <div style={{
+        width:34, height:34, borderRadius:"50%", flexShrink:0,
+        background:bgColor, border:`2px solid ${color}`,
+        display:"flex", alignItems:"center", justifyContent:"center",
+      }}>
+        <span style={{fontSize:12, fontWeight:800, color, fontFamily:"-apple-system,sans-serif", lineHeight:1}}>{score}</span>
       </div>
+
+      {/* Label + insight */}
+      <div style={{flex:1, minWidth:0}}>
+        <div style={{display:"flex", alignItems:"center", gap:6, flexWrap:"wrap"}}>
+          <span style={{fontSize:12, fontWeight:700, color:"#111827"}}>Financial Health</span>
+          <span style={{
+            padding:"1px 7px", borderRadius:99, fontSize:10, fontWeight:700,
+            background:bgColor, border:`1px solid ${color}22`, color,
+          }}>{emoji} {label}</span>
+        </div>
+        {reasons[0] && (
+          <p style={{margin:"1px 0 0", fontSize:10, color:"#6B7280",
+            overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>
+            {reasons[0]}
+          </p>
+        )}
+      </div>
+
+      {onExpand && <span style={{fontSize:14, color:"#CBD5E1", flexShrink:0}}>›</span>}
     </div>
   );
 }
@@ -2357,9 +2110,21 @@ function DashboardScreen(props) {
                       />
                     )}
 
-                    {/* ── 2. FINANCIAL HEALTH SCORE (compact, single) ── */}
+                    {/* ── 2. SMART ALERT STRIP — single highest-priority alert ── */}
+                    <SmartAlertStrip
+                      totalIncome={totalIncome}
+                      totalSavings={totalSavings}
+                      totalLoanEMI={loans.reduce((s,l)=>s+(l.emi||0),0)}
+                      remaining={remaining}
+                      dailyLimit={dailyLimit}
+                      currentExpenses={currentExpenses}
+                      futurePayments={futurePayments}
+                      onNavigate={setTab}
+                    />
+
+                    {/* ── 3. FINANCIAL HEALTH (slim single row) ── */}
                     {totalIncome > 0 && (
-                      <HealthScoreCompact
+                      <HealthScoreSlim
                         totalIncome={totalIncome}
                         totalExpenses={totalFixed}
                         totalSavings={totalSavings}
@@ -2369,32 +2134,7 @@ function DashboardScreen(props) {
                       />
                     )}
 
-                    {/* ── 3. TODAY'S COACHING ── */}
-                    {totalIncome > 0 && (
-                      <TodaysCoachingCardUI
-                        totalIncome={totalIncome}
-                        totalExpenses={totalFixed}
-                        totalSavings={totalSavings}
-                        totalLoanEMI={loans.reduce((s,l)=>s+(l.emi||0),0)}
-                        currentExpenses={currentExpenses}
-                        remaining={remaining}
-                        dailyLimit={dailyLimit}
-                        loans={loans}
-                        onNavigate={setTab}
-                      />
-                    )}
-
-                    {/* ── 4. TOP PRIORITY (compact white card) ── */}
-                    {totalIncome > 0 && (
-                      <TopPriorityCard
-                        totalIncome={totalIncome}
-                        totalSavings={totalSavings}
-                        loans={loans}
-                        onNavigate={setTab}
-                      />
-                    )}
-
-                    {/* ── 5. BUDGET & EXPENSES ── */}
+                    {/* ── 4. BUDGET & EXPENSES ── */}
 
                     {/* ── SALARY DAY MODE ── */}
                     {(() => {
@@ -2453,11 +2193,6 @@ function DashboardScreen(props) {
                           if (el) { el.scrollIntoView({behavior:"smooth",block:"start"}); el.classList.add("mc-section-flash"); setTimeout(()=>el.classList.remove("mc-section-flash"),1200); }
                         }, 120);
                       }}
-                    />
-                    <BudgetAlertWidget
-                      categoryBudgets={categoryBudgets}
-                      currentExpenses={currentExpenses}
-                      onNavigate={setTab}
                     />
                     <MonthCloseReport
                       allExpenses={allExpenses}
