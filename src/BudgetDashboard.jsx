@@ -66,10 +66,134 @@ const CAT_ICONS = {
   Rent:"🏠",Electricity:"⚡",Water:"💧",Internet:"📶","EMI/Loan":"🏦",Insurance:"🛡",Maintenance:"🔧","School Fees":"🎓",
 };
 
+export function RemainingBalanceHero({ remaining, dailyLimit, totalIncome, thisMonthSpent = 0, currentExpenses = [] }) {
+  const now         = new Date();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+  const daysPassed  = now.getDate();
+  const daysLeft    = Math.max(1, daysInMonth - daysPassed + 1);
+  const monthSpent  = currentExpenses.reduce((s,e) => s+e.amount, 0);
+  const todayStr    = now.toISOString().split("T")[0];
+  const todaySpent  = currentExpenses
+    .filter(e => e.date?.startsWith(todayStr))
+    .reduce((s,e) => s+e.amount, 0);
+
+  const dayPct        = Math.round((daysPassed / daysInMonth) * 100);
+  const spendPct2     = remaining > 0 ? Math.min(Math.round((monthSpent / (monthSpent + remaining)) * 100), 100) : 100;
+  const progressColor = spendPct2 > dayPct + 15 ? "#F87171" : spendPct2 > dayPct + 5 ? "#FCD34D" : "#86EFAC";
+
+  return (
+    <div style={{
+      background:"linear-gradient(135deg, #1E293B 0%, #334155 100%)", borderRadius:12, padding:"12px 14px",
+      marginBottom:10,
+    }}>
+      {/* Top row: balance + today */}
+      <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:12, marginBottom:10}}>
+        <div style={{flex:1, minWidth:0}}>
+          <p style={{margin:0, fontSize:8, color:"#64748B", textTransform:"uppercase", letterSpacing:"1.3px", fontWeight:700}}>
+            Remaining Balance
+          </p>
+          <p style={{
+            margin:"2px 0 0", lineHeight:1, fontWeight:700, fontFamily:"Georgia,serif",
+            fontSize: remaining >= 1000000 ? 28 : remaining >= 100000 ? 32 : 34,
+            color: remaining >= 0 ? "#fff" : "#F87171",
+          }}>
+            {remaining >= 0 ? fmt(remaining) : `−${fmt(Math.abs(remaining))}`}
+          </p>
+          <p style={{margin:"3px 0 0", fontSize:9, color:"#64748B"}}>
+            {fmt(totalIncome)} income − {fmt(thisMonthSpent||monthSpent)} spent
+          </p>
+          <div style={{display:"flex", alignItems:"baseline", gap:4, marginTop:5}}>
+            <p style={{margin:0, fontSize:9, color:"#94A3B8"}}>Daily limit</p>
+            <p style={{margin:0, fontSize:13, fontWeight:700, fontFamily:"Georgia,serif",
+              color: dailyLimit > 0 ? "#E2E8F0" : "#F87171"}}>
+              {dailyLimit > 0 ? fmt(dailyLimit) : "₹0"}
+            </p>
+            <p style={{margin:0, fontSize:9, color:"#64748B"}}>· {daysLeft} days left</p>
+          </div>
+        </div>
+        {/* Today panel */}
+        <div style={{
+          textAlign:"right", flexShrink:0,
+          ...(todaySpent > 0 ? {
+            background:"rgba(255,255,255,0.07)", borderRadius:9,
+            padding:"7px 11px", minWidth:80,
+          } : { minWidth:70 }),
+        }}>
+          <p style={{margin:0, fontSize:8, color:"#64748B", textTransform:"uppercase", letterSpacing:"0.8px"}}>Today</p>
+          {todaySpent > 0 ? (
+            <>
+              <p style={{margin:"2px 0 0", fontSize:16, fontWeight:700, fontFamily:"Georgia,serif",
+                color: todaySpent <= dailyLimit ? "#86EFAC" : "#F87171"}}>
+                {fmt(todaySpent)}
+              </p>
+              <p style={{margin:"1px 0 0", fontSize:8,
+                color: todaySpent <= dailyLimit ? "#86EFAC" : "#F87171", fontWeight:600}}>
+                {todaySpent <= dailyLimit ? "✓ on track" : "⚠ over limit"}
+              </p>
+            </>
+          ) : (
+            <p style={{margin:"2px 0 0", fontSize:11, color:"#475569"}}>₹0 logged</p>
+          )}
+        </div>
+      </div>
+
+      {/* Spend progress bar */}
+      <div>
+        <div style={{display:"flex", justifyContent:"space-between", marginBottom:4}}>
+          <p style={{margin:0, fontSize:8, color:"#64748B"}}>
+            Day {daysPassed} of {daysInMonth} · spent {spendPct2}% of budget
+          </p>
+          <p style={{margin:0, fontSize:8, fontWeight:600,
+            color: progressColor === "#86EFAC" ? "#86EFAC" : progressColor === "#FCD34D" ? "#FCD34D" : "#F87171"}}>
+            {spendPct2 <= dayPct + 5 ? "✓ On pace" : spendPct2 <= dayPct + 15 ? "⚡ Slightly fast" : "🔴 Overspending"}
+          </p>
+        </div>
+        <div style={{position:"relative", height:5, borderRadius:99, background:"rgba(255,255,255,0.08)"}}>
+          <div style={{
+            position:"absolute", left:0, top:0, height:"100%",
+            width:`${dayPct}%`, borderRadius:99,
+            background:"rgba(255,255,255,0.15)",
+          }}/>
+          <div style={{
+            position:"absolute", left:0, top:0, height:"100%",
+            width:`${spendPct2}%`, borderRadius:99,
+            background: progressColor, transition:"width 0.5s",
+          }}/>
+        </div>
+        <div style={{display:"flex", justifyContent:"space-between", marginTop:3}}>
+          <p style={{margin:0, fontSize:7, color:"#475569"}}>{fmt(monthSpent)} spent</p>
+          <p style={{margin:0, fontSize:7, color:"#475569"}}>{fmt(monthSpent + remaining)} budget</p>
+        </div>
+        {daysPassed >= 5 && monthSpent > 0 && (() => {
+          const dailyAvg  = monthSpent / daysPassed;
+          const projected = Math.round(dailyAvg * daysInMonth);
+          const budget    = monthSpent + Math.max(0, remaining);
+          const over      = projected > budget;
+          return (
+            <div style={{
+              marginTop:7, paddingTop:6,
+              borderTop:"1px solid rgba(255,255,255,0.08)",
+              display:"flex", alignItems:"center", justifyContent:"space-between",
+            }}>
+              <p style={{margin:0, fontSize:8, color:"#64748B"}}>🔮 Month-end forecast</p>
+              <p style={{margin:0, fontSize:11, fontWeight:700, fontFamily:"Georgia,serif",
+                color: over ? "#F87171" : "#86EFAC"}}>
+                {fmt(projected)}
+                <span style={{fontSize:8, fontWeight:400, marginLeft:4, color: over ? "#F87171" : "#86EFAC"}}>
+                  {over ? `▲ ${fmt(projected - budget)} over` : `▼ ${fmt(budget - projected)} under`}
+                </span>
+              </p>
+            </div>
+          );
+        })()}
+      </div>
+    </div>
+  );
+}
+
 export default function BudgetDashboard({
   totalIncome, totalFixed, totalSavings, totalReserve,
   remaining, dailyLimit,
-  thisMonthSpent=0, budgetForMonth=0,
   incomeSources, fixedExpenses, savingsPlans, futurePayments,
   currentExpenses, loans = [],
   categoryBudgets = {},
@@ -274,188 +398,6 @@ export default function BudgetDashboard({
   return (
     <div>
       <style>{DASH_CSS}</style>
-
-      {/* ══ 1. HERO CARD ══ */}
-      {(() => {
-        const daysInMonth  = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
-        const daysPassed   = now.getDate();
-        const dayPct       = Math.round((daysPassed / daysInMonth) * 100);
-        const spendPct2    = remaining > 0 ? Math.min(Math.round((monthSpent / (monthSpent + remaining)) * 100), 100) : 100;
-        const progressColor = spendPct2 > dayPct + 15 ? "#F87171" : spendPct2 > dayPct + 5 ? "#FCD34D" : "#86EFAC";
-        return (
-          <div style={{
-            background:"linear-gradient(135deg, #1E293B 0%, #334155 100%)", borderRadius:12, padding:"12px 14px",
-            marginBottom:10,
-          }}>
-            {/* Top row: balance + today */}
-            <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:12, marginBottom:10}}>
-              <div style={{flex:1, minWidth:0}}>
-                <p style={{margin:0, fontSize:8, color:"#64748B", textTransform:"uppercase", letterSpacing:"1.3px", fontWeight:700}}>
-                  Remaining Balance
-                </p>
-                <p style={{
-                  margin:"2px 0 0", lineHeight:1, fontWeight:700, fontFamily:"Georgia,serif",
-                  fontSize: remaining >= 1000000 ? 28 : remaining >= 100000 ? 32 : 34,
-                  color: remaining >= 0 ? "#fff" : "#F87171",
-                }}>
-                  {remaining >= 0 ? fmt(remaining) : `−${fmt(Math.abs(remaining))}`}
-                </p>
-                <p style={{margin:"3px 0 0", fontSize:9, color:"#64748B"}}>
-                  {fmt(totalIncome)} income − {fmt(thisMonthSpent||monthSpent)} spent
-                </p>
-                <div style={{display:"flex", alignItems:"baseline", gap:4, marginTop:5}}>
-                  <p style={{margin:0, fontSize:9, color:"#94A3B8"}}>Daily limit</p>
-                  <p style={{margin:0, fontSize:13, fontWeight:700, fontFamily:"Georgia,serif",
-                    color: dailyLimit > 0 ? "#E2E8F0" : "#F87171"}}>
-                    {dailyLimit > 0 ? fmt(dailyLimit) : "₹0"}
-                  </p>
-                  <p style={{margin:0, fontSize:9, color:"#64748B"}}>· {daysLeft} days left</p>
-                </div>
-              </div>
-              {/* Today panel — always shown */}
-              <div style={{
-                textAlign:"right", flexShrink:0,
-                ...(todaySpent > 0 ? {
-                  background:"rgba(255,255,255,0.07)", borderRadius:9,
-                  padding:"7px 11px", minWidth:80,
-                } : { minWidth:70 }),
-              }}>
-                <p style={{margin:0, fontSize:8, color:"#64748B", textTransform:"uppercase", letterSpacing:"0.8px"}}>Today</p>
-                {todaySpent > 0 ? (
-                  <>
-                    <p style={{margin:"2px 0 0", fontSize:16, fontWeight:700, fontFamily:"Georgia,serif",
-                      color: todaySpent <= dailyLimit ? "#86EFAC" : "#F87171"}}>
-                      {fmt(todaySpent)}
-                    </p>
-                    <p style={{margin:"1px 0 0", fontSize:8,
-                      color: todaySpent <= dailyLimit ? "#86EFAC" : "#F87171", fontWeight:600}}>
-                      {todaySpent <= dailyLimit ? "✓ on track" : "⚠ over limit"}
-                    </p>
-                  </>
-                ) : (
-                  <p style={{margin:"2px 0 0", fontSize:11, color:"#475569"}}>₹0 logged</p>
-                )}
-              </div>
-            </div>
-
-            {/* Spend progress bar */}
-            <div>
-              <div style={{display:"flex", justifyContent:"space-between", marginBottom:4}}>
-                <p style={{margin:0, fontSize:8, color:"#64748B"}}>
-                  Day {daysPassed} of {daysInMonth} · spent {spendPct2}% of budget
-                </p>
-                <p style={{margin:0, fontSize:8, color: progressColor === "#86EFAC" ? "#86EFAC" : progressColor === "#FCD34D" ? "#FCD34D" : "#F87171", fontWeight:600}}>
-                  {spendPct2 <= dayPct + 5 ? "✓ On pace" : spendPct2 <= dayPct + 15 ? "⚡ Slightly fast" : "🔴 Overspending"}
-                </p>
-              </div>
-              {/* Track: day progress (grey) behind spend (coloured) */}
-              <div style={{position:"relative", height:5, borderRadius:99, background:"rgba(255,255,255,0.08)"}}>
-                {/* Day marker */}
-                <div style={{
-                  position:"absolute", left:0, top:0, height:"100%",
-                  width:`${dayPct}%`, borderRadius:99,
-                  background:"rgba(255,255,255,0.15)",
-                }}/>
-                {/* Actual spend */}
-                <div style={{
-                  position:"absolute", left:0, top:0, height:"100%",
-                  width:`${spendPct2}%`, borderRadius:99,
-                  background: progressColor,
-                  transition:"width 0.5s",
-                }}/>
-              </div>
-              <div style={{display:"flex", justifyContent:"space-between", marginTop:3}}>
-                <p style={{margin:0, fontSize:7, color:"#475569"}}>{fmt(monthSpent)} spent</p>
-                <p style={{margin:0, fontSize:7, color:"#475569"}}>{fmt(monthSpent + remaining)} budget</p>
-              </div>
-              {/* Forecast line — only when 5+ days of data */}
-              {daysPassed >= 5 && monthSpent > 0 && (() => {
-                const dailyAvg  = monthSpent / daysPassed;
-                const projected = Math.round(dailyAvg * daysInMonth);
-                const budget    = monthSpent + Math.max(0, remaining);
-                const over      = projected > budget;
-                return (
-                  <div style={{
-                    marginTop:7, paddingTop:6,
-                    borderTop:"1px solid rgba(255,255,255,0.08)",
-                    display:"flex", alignItems:"center", justifyContent:"space-between",
-                  }}>
-                    <p style={{margin:0, fontSize:8, color:"#64748B"}}>🔮 Month-end forecast</p>
-                    <p style={{margin:0, fontSize:11, fontWeight:700, fontFamily:"Georgia,serif",
-                      color: over ? "#F87171" : "#86EFAC"}}>
-                      {fmt(projected)}
-                      <span style={{fontSize:8, fontWeight:400, marginLeft:4,
-                        color: over ? "#F87171" : "#86EFAC"}}>
-                        {over ? `▲ ${fmt(projected - budget)} over` : `▼ ${fmt(budget - projected)} under`}
-                      </span>
-                    </p>
-                  </div>
-                );
-              })()}
-
-              {/* Health Score inline — compact single row */}
-              {totalIncome > 0 && (() => {
-                const savingsRate = Math.round((totalSavings / totalIncome) * 100);
-                const idealSpent  = Math.round((daysPassed / daysInMonth) * (monthSpent + Math.max(0, remaining)));
-                const paceDiff    = idealSpent > 0 ? (monthSpent - idealSpent) / idealSpent : 0;
-                const daysWithSpend = new Set(currentExpenses.filter(e=>e.date).map(e=>e.date.split("T")[0])).size;
-                const noSpendDays = Math.max(0, daysPassed - daysWithSpend);
-                const budgetedCats = Object.entries(categoryBudgets).filter(([,b])=>b>0);
-                const onTrackCats  = budgetedCats.filter(([cat,b]) => (catSpend[cat]||0) <= b).length;
-                const budgetScore  = budgetedCats.length > 0 ? Math.round((onTrackCats/budgetedCats.length)*15) : 10;
-                const s1 = Math.round(Math.min(savingsRate/20,1)*25);
-                const s2 = Math.round(Math.max(0,1-Math.max(0,paceDiff))*25);
-                const s3 = Math.round(Math.max(0,1-(debtRatio/50))*20);
-                const s4 = budgetScore;
-                const s5 = Math.round(Math.min(noSpendDays/10,1)*15);
-                const score = Math.min(100, s1+s2+s3+s4+s5);
-                const grade =
-                  score >= 80 ? { label:"Excellent", emoji:"🏆", color:"#86EFAC" } :
-                  score >= 60 ? { label:"Good",       emoji:"✅", color:"#93C5FD" } :
-                  score >= 40 ? { label:"Fair",       emoji:"⚡", color:"#FCD34D" } :
-                                { label:"Needs Work", emoji:"📉", color:"#F87171" };
-                return (
-                  <div style={{
-                    marginTop:8, paddingTop:7,
-                    borderTop:"1px solid rgba(255,255,255,0.08)",
-                    display:"flex", alignItems:"center", justifyContent:"space-between",
-                  }}>
-                    <div style={{display:"flex", alignItems:"center", gap:6}}>
-                      <p style={{margin:0, fontSize:8, color:"#64748B", textTransform:"uppercase", letterSpacing:"0.8px", fontWeight:700}}>
-                        Health Score
-                      </p>
-                      {/* Mini 5-dot pillar indicators */}
-                      <div style={{display:"flex", gap:2, alignItems:"center"}}>
-                        {[s1/25, s2/25, s3/20, s4/15, s5/15].map((pct,i) => (
-                          <div key={i} style={{
-                            width:3, height: Math.max(4, Math.round(pct*12)),
-                            borderRadius:99,
-                            background: pct >= 0.8 ? "#86EFAC" : pct >= 0.5 ? "#93C5FD" : pct >= 0.3 ? "#FCD34D" : "#F87171",
-                          }}/>
-                        ))}
-                      </div>
-                    </div>
-                    <div style={{display:"flex", alignItems:"center", gap:5}}>
-                      <span style={{fontSize:9}}>{grade.emoji}</span>
-                      <p style={{margin:0, fontSize:16, fontWeight:700, fontFamily:"Georgia,serif", color:grade.color, lineHeight:1}}>
-                        {score}
-                      </p>
-                      <p style={{margin:0, fontSize:8, color:"#64748B"}}>/100</p>
-                      <span style={{
-                        fontSize:9, fontWeight:700, color:grade.color,
-                        background:"rgba(255,255,255,0.08)", borderRadius:99,
-                        padding:"2px 7px",
-                      }}>
-                        {grade.label}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
-        );
-      })()}
 
       {/* ══ 2. SUMMARY CARDS ══ */}
       <div className="mc-summary-row">

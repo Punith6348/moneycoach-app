@@ -7,10 +7,14 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
-    // FCM push tokens — any device can write its own token (guests included)
-    // Cloud Function (admin SDK) bypasses these rules for reads
+    // FCM push tokens — Cloud Function (admin SDK) bypasses these rules for reads.
+    // Authenticated users may only write their own UID doc.
+    // Unauthenticated (guest) devices may write any doc — they use a device UUID
+    // as the doc ID, so collisions with real UIDs are astronomically unlikely.
+    // This prevents an authenticated attacker from overwriting another user's token.
     match /fcmTokens/{tokenId} {
-      allow write: if true;
+      allow write: if request.auth == null
+                   || request.auth.uid == tokenId;
     }
   }
 }

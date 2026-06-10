@@ -4,7 +4,7 @@ import InsightCard      from "./InsightCard";
 import SpendingChart, { TrendChart, CategoryHistoryChart } from "./SpendingChart";
 import { useStreak }    from "./useStreak";
 import { useAppData, currentMonthKey, monthKeyToLabel, getActiveMonthKeys } from "./useAppData";
-import BudgetDashboard, { MonthCloseReport } from "./BudgetDashboard";
+import BudgetDashboard, { MonthCloseReport, RemainingBalanceHero } from "./BudgetDashboard";
 import { IncomeSources, FixedExpensesSection, SavingsSection, FuturePaymentsSection } from "./FinancialPlan";
 import LoansTab         from "./LoansTab";
 import CategoryBudgets, { BudgetAlertWidget } from "./CategoryBudgets";
@@ -1630,6 +1630,110 @@ function RecurringTab({
     </div>
   );
 }
+// ─── TOP PRIORITY CARD (compact white) ───────────────────────────────────
+function TopPriorityCard({ totalIncome, totalSavings, loans, onNavigate }) {
+  const fmtN = (n) => `₹${Math.abs(Math.round(n)).toLocaleString("en-IN")}`;
+  const activeLoans = (loans || []).filter(l => l.active !== false && (l.principal > 0 || l.emi > 0));
+
+  if (activeLoans.length > 0) {
+    const totals           = activeLoans.map(l => calcLoanTotals(l));
+    const totalOutstanding = totals.reduce((s, t) => s + (t.outstanding || 0), 0);
+    const totalPrincipal   = activeLoans.reduce((s, l) => s + (l.principal || 0), 0);
+    const totalEMI         = totals.reduce((s, t) => s + (t.emi || 0), 0);
+    const paidPct = totalPrincipal > 0
+      ? Math.min(100, Math.round(((totalPrincipal - totalOutstanding) / totalPrincipal) * 100))
+      : 0;
+    const maxMonthsLeft = Math.max(...totals.map(t => t.monthsLeft || 0));
+    let completionLabel = "";
+    if (maxMonthsLeft > 0) {
+      const d = new Date();
+      d.setMonth(d.getMonth() + maxMonthsLeft);
+      completionLabel = d.toLocaleDateString("en-IN", { month:"short", year:"numeric" });
+    }
+    const barColor = paidPct >= 75 ? "#16A34A" : paidPct >= 40 ? "#2563EB" : "#D97706";
+    return (
+      <div style={{background:"#fff", borderRadius:12, padding:"12px 14px", marginBottom:14,
+        border:"1px solid #E5E7EB", boxShadow:"0 1px 3px rgba(0,0,0,0.05)"}}>
+        <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8}}>
+          <div>
+            <p style={{margin:0, fontSize:9, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.8px", fontWeight:700}}>Top Priority</p>
+            <p style={{margin:"2px 0 0", fontSize:13, fontWeight:700, color:"#111827"}}>Become Debt Free 🎯</p>
+          </div>
+          <div style={{textAlign:"right"}}>
+            <p style={{margin:0, fontSize:9, color:"#6B7280"}}>Outstanding</p>
+            <p style={{margin:0, fontSize:14, fontWeight:700, color:"#DC2626", fontFamily:"Georgia,serif"}}>{fmtN(totalOutstanding)}</p>
+          </div>
+        </div>
+        <div style={{background:"#F1F5F9", borderRadius:99, height:5, marginBottom:6, overflow:"hidden"}}>
+          <div style={{height:"100%", width:`${paidPct}%`, borderRadius:99, background:barColor, transition:"width 0.6s"}}/>
+        </div>
+        <div style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+          <p style={{margin:0, fontSize:11, color:"#6B7280"}}>
+            <span style={{color:barColor, fontWeight:700}}>{paidPct}% repaid</span>
+            {totalEMI > 0 && <span> · {fmtN(totalEMI)}/mo</span>}
+          </p>
+          <div style={{display:"flex", alignItems:"center", gap:10}}>
+            {completionLabel && (
+              <p style={{margin:0, fontSize:11, color:"#6B7280"}}>
+                Free by <span style={{color:"#2563EB", fontWeight:700}}>{completionLabel}</span>
+              </p>
+            )}
+            <button onClick={() => onNavigate("loans")}
+              style={{padding:"4px 10px", borderRadius:7, border:"1px solid #E5E7EB",
+                background:"#F8FAFC", color:"#374151", fontFamily:"inherit", fontSize:11, fontWeight:600, cursor:"pointer"}}>
+              View Loans →
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const savingsRate = totalIncome > 0 ? (totalSavings / totalIncome) * 100 : 0;
+  const targetRate  = 20;
+  const pct         = Math.min(100, Math.round((savingsRate / targetRate) * 100));
+  const gapAmount   = Math.round((Math.max(0, targetRate - savingsRate) / 100) * totalIncome);
+  const barColor    = pct >= 100 ? "#16A34A" : pct >= 60 ? "#2563EB" : "#D97706";
+  const isOnTrack   = savingsRate >= targetRate;
+  return (
+    <div style={{background:"#fff", borderRadius:12, padding:"12px 14px", marginBottom:14,
+      border:"1px solid #E5E7EB", boxShadow:"0 1px 3px rgba(0,0,0,0.05)"}}>
+      <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8}}>
+        <div>
+          <p style={{margin:0, fontSize:9, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.8px", fontWeight:700}}>Top Priority</p>
+          <p style={{margin:"2px 0 0", fontSize:13, fontWeight:700, color:"#111827"}}>
+            {isOnTrack ? "Grow Your Wealth 📈" : "Reach 20% Savings Rate 💰"}
+          </p>
+        </div>
+        <div style={{textAlign:"right"}}>
+          <p style={{margin:0, fontSize:9, color:"#6B7280"}}>Monthly Savings</p>
+          <p style={{margin:0, fontSize:14, fontWeight:700, color:"#16A34A", fontFamily:"Georgia,serif"}}>{fmtN(totalSavings)}</p>
+        </div>
+      </div>
+      <div style={{background:"#F1F5F9", borderRadius:99, height:5, marginBottom:6, overflow:"hidden"}}>
+        <div style={{height:"100%", width:`${pct}%`, borderRadius:99, background:barColor, transition:"width 0.6s"}}/>
+      </div>
+      <div style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+        <p style={{margin:0, fontSize:11, color:"#6B7280"}}>
+          <span style={{color:barColor, fontWeight:700}}>{Math.round(savingsRate)}% of income</span> saved
+        </p>
+        <div style={{display:"flex", alignItems:"center", gap:10}}>
+          {!isOnTrack && gapAmount > 0 && (
+            <p style={{margin:0, fontSize:11, color:"#6B7280"}}>
+              +<span style={{color:"#2563EB", fontWeight:700}}>{fmtN(gapAmount)}</span> to hit 20%
+            </p>
+          )}
+          <button onClick={() => onNavigate("plan")}
+            style={{padding:"4px 10px", borderRadius:7, border:"1px solid #E5E7EB",
+              background:"#F8FAFC", color:"#374151", fontFamily:"inherit", fontSize:11, fontWeight:600, cursor:"pointer"}}>
+            Review Plan →
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── PRIMARY GOAL CARD ────────────────────────────────────────────────────
 function PrimaryGoalCard({ totalIncome, totalFixed, totalSavings, loans, onNavigate }) {
   const fmtN = (n) => `₹${Math.abs(Math.round(n)).toLocaleString("en-IN")}`;
@@ -2242,18 +2346,18 @@ function DashboardScreen(props) {
               {/* ══ BUDGET DASHBOARD ══ */}
                 {tab==="budget"&&(
                   <>
-                    {/* ── 1. PRIMARY GOAL ── */}
+                    {/* ── 1. REMAINING BALANCE HERO ── */}
                     {totalIncome > 0 && (
-                      <PrimaryGoalCard
+                      <RemainingBalanceHero
+                        remaining={remaining}
+                        dailyLimit={dailyLimit}
                         totalIncome={totalIncome}
-                        totalFixed={totalFixed}
-                        totalSavings={totalSavings}
-                        loans={loans}
-                        onNavigate={setTab}
+                        thisMonthSpent={thisMonthSpent}
+                        currentExpenses={currentExpenses}
                       />
                     )}
 
-                    {/* ── 2. FINANCIAL HEALTH SCORE (compact) ── */}
+                    {/* ── 2. FINANCIAL HEALTH SCORE (compact, single) ── */}
                     {totalIncome > 0 && (
                       <HealthScoreCompact
                         totalIncome={totalIncome}
@@ -2280,7 +2384,17 @@ function DashboardScreen(props) {
                       />
                     )}
 
-                    {/* ── 4. BUDGET & EXPENSES ── */}
+                    {/* ── 4. TOP PRIORITY (compact white card) ── */}
+                    {totalIncome > 0 && (
+                      <TopPriorityCard
+                        totalIncome={totalIncome}
+                        totalSavings={totalSavings}
+                        loans={loans}
+                        onNavigate={setTab}
+                      />
+                    )}
+
+                    {/* ── 5. BUDGET & EXPENSES ── */}
 
                     {/* ── SALARY DAY MODE ── */}
                     {(() => {
@@ -2357,7 +2471,6 @@ function DashboardScreen(props) {
                       totalIncome={totalIncome} totalFixed={totalFixed}
                       totalSavings={totalSavings} totalReserve={totalReserve}
                       remaining={remaining} dailyLimit={dailyLimit}
-                      thisMonthSpent={thisMonthSpent} budgetForMonth={budgetForMonth}
                       incomeSources={incomeSources} fixedExpenses={fixedExpenses}
                       savingsPlans={savingsPlans} futurePayments={futurePayments}
                       currentExpenses={currentExpenses}

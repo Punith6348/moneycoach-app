@@ -16,10 +16,16 @@ async function sendToAllUsers(title, body) {
   }
 
   const invalidTokens = [];
+  // Deduplicate by raw token value — a single APNs/FCM token may appear in
+  // multiple Firestore docs (e.g. native device-ID doc + user-ID doc on iOS).
+  // Sending to the same token twice delivers two notifications to one device.
+  const seenTokens = new Set();
 
   const sends = snapshot.docs.map(async (docSnap) => {
     const { token, platform } = docSnap.data();
     if (!token) return;
+    if (seenTokens.has(token)) return;
+    seenTokens.add(token);
 
     const message = {
       token,
@@ -38,24 +44,31 @@ async function sendToAllUsers(title, body) {
       await messaging.send(message);
       console.log(`✅ Sent to ${docSnap.id} (${platform})`);
     } catch (err) {
-      if (
+      // Only treat definitively-invalid tokens as stale.
+      // messaging/third-party-auth-error means our APNs key/cert failed —
+      // it is a server-side credential error, not a per-device token error.
+      // Deleting tokens on that code would silently unsubscribe all iOS users
+      // whenever APNs auth has a transient issue.
+      const staleToken =
         err.code === "messaging/invalid-registration-token" ||
-        err.code === "messaging/registration-token-not-registered"
-      ) {
-        invalidTokens.push(docSnap.id);
-      }
-      console.error(`❌ Failed for ${docSnap.id}:`, err.code);
+        err.code === "messaging/registration-token-not-registered";
+
+      if (staleToken) invalidTokens.push(docSnap.id);
+      console.error(`❌ Failed for ${docSnap.id} (${platform}):`, err.code);
     }
   });
 
   await Promise.all(sends);
 
   if (invalidTokens.length > 0) {
-    const batch = db.batch();
-    invalidTokens.forEach((uid) => {
-      batch.delete(db.collection("fcmTokens").doc(uid));
-    });
-    await batch.commit();
+    // Firestore batch writes are capped at 500 operations per commit.
+    const BATCH_SIZE = 500;
+    for (let i = 0; i < invalidTokens.length; i += BATCH_SIZE) {
+      const chunk = invalidTokens.slice(i, i + BATCH_SIZE);
+      const batch = db.batch();
+      chunk.forEach((id) => batch.delete(db.collection("fcmTokens").doc(id)));
+      await batch.commit();
+    }
     console.log(`🧹 Removed ${invalidTokens.length} invalid tokens`);
   }
 }

@@ -23,7 +23,15 @@ export const db   = getFirestore(app);
 let _resolveReady;
 export const persistenceReady = new Promise(resolve => { _resolveReady = resolve; });
 export function initPersistence() {
+  // On iOS, WKWebView sometimes blocks localStorage briefly after launch.
+  // If setPersistence fails, retry once after 1 s before giving up.
+  // Failing silently (old behaviour) left Firebase in in-memory mode —
+  // session was lost on every force-quit.
   return setPersistence(auth, browserLocalPersistence)
-    .catch(() => {})
+    .catch(() =>
+      new Promise(r => setTimeout(r, 1000))
+        .then(() => setPersistence(auth, browserLocalPersistence))
+        .catch(() => {}) // if both attempts fail, Firebase uses in-memory (graceful degradation)
+    )
     .then(() => _resolveReady());
 }

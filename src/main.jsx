@@ -68,18 +68,56 @@ function Root() {
   useEffect(() => {
     initPersistence(); // fire-and-forget — runs in parallel with onAuthStateChanged
 
-    // Only use a cold-start fallback for genuinely new sessions (no cached data).
-    // Returning users already have a non-undefined initial state, so no spinner needed.
-    const isNewSession = !readCachedUser();
-    const fallback = isNewSession
-      ? setTimeout(() => setUser(prev => prev === undefined ? null : prev), 4000)
+    // Three cases for the startup fallback:
+    //
+    // 1. Firebase cache present (readCachedUser returns user):
+    //    → user already initialised from cache, loading screen won't show, no fallback needed.
+    //
+    // 2. No Firebase cache, but moneyCoachUID present (returning user):
+    //    → Firebase is mid-refresh OR setPersistence hadn't resolved when user signed in
+    //      (common on iOS — Apple Sign-In completes before setPersistence resolves).
+    //    → Do NOT fall back to auth screen after 4 s. Give Firebase 15 s to restore.
+    //      The null handler's 20 s timer also runs; whichever fires first wins.
+    //
+    // 3. No cache, no moneyCoachUID (genuinely new user):
+    //    → Show auth screen quickly after 4 s.
+    const cachedUser  = readCachedUser();
+    const hadSession  = !!localStorage.getItem("moneyCoachUID");
+    const fallbackMs  = cachedUser ? null : hadSession ? 15000 : 4000;
+    const fallback    = fallbackMs !== null
+      ? setTimeout(() => {
+          // Last-chance check: Firebase may already have the user in memory even
+          // if onAuthStateChanged hasn't fired yet (e.g. slow Apple token validation).
+          if (auth.currentUser) { setUser(auth.currentUser); return; }
+          setUser(prev => prev === undefined ? null : prev);
+        }, fallbackMs)
       : null;
+
+    // Recovery poll: every 3 s for the first 18 s, grab auth.currentUser directly.
+    // Handles the case where onAuthStateChanged fires late (Apple Sign-In on iOS
+    // can take >5 s to validate with Apple's servers on second+ opens).
+    let pollCount = 0;
+    const poll = setInterval(() => {
+      pollCount++;
+      if (auth.currentUser) {
+        clearInterval(poll);
+        if (fallback) clearTimeout(fallback);
+        if (nullTimerRef.current) { clearTimeout(nullTimerRef.current); nullTimerRef.current = null; }
+        setUser(prev => {
+          // Only update if we don't already have the real Firebase user
+          if (prev && prev.uid === auth.currentUser.uid && prev.getIdToken) return prev;
+          return auth.currentUser;
+        });
+      }
+      if (pollCount >= 6) clearInterval(poll); // stop after 18 s
+    }, 3000);
 
     const unsub = onAuthStateChanged(auth, u => {
       if (fallback) clearTimeout(fallback);
+      clearInterval(poll);
 
       if (u) {
-        // Cancel any pending grace-period logout — token refresh succeeded
+        // Real user arrived — cancel any pending grace-period logout
         if (nullTimerRef.current) { clearTimeout(nullTimerRef.current); nullTimerRef.current = null; }
         try {
           const storedUid = localStorage.getItem("moneyCoachUID");
@@ -94,16 +132,27 @@ function Root() {
         registerUserProfile(u).catch(() => {});
         setUser(u);
       } else {
-        // Fix 2: Firebase fires null briefly on app resume during token refresh.
-        // If the localStorage cache is still present the session is just refreshing —
-        // wait 5 s before treating this as a real sign-out.
-        if (readCachedUser()) {
+        // Firebase fired null. Two causes:
+        // A) Token refresh in progress — Firebase deletes the auth key, makes a
+        //    network call, then re-writes it. readCachedUser() returns null during
+        //    this window even though the session is valid. This is why we can NOT
+        //    use readCachedUser() here — it fails precisely when we need it.
+        // B) Genuine sign-out — moneyCoachUID is also absent.
+        //
+        // We use moneyCoachUID (written by us on login, cleared only on explicit
+        // sign-out) as the reliable session signal.
+        const hadSession = !!localStorage.getItem("moneyCoachUID");
+        if (hadSession) {
+          // Firebase is refreshing — give it up to 20 s to fire the real user.
+          // The poll above also checks auth.currentUser every 3 s as a safety net.
           nullTimerRef.current = setTimeout(() => {
             nullTimerRef.current = null;
-            if (!readCachedUser()) setUser(null); // cache gone → genuine sign-out
-          }, 5000);
+            // Final check: if Firebase quietly has the user, use it instead of logging out.
+            if (auth.currentUser) { setUser(auth.currentUser); return; }
+            setUser(null); // 20 s elapsed, no user anywhere → genuine logout
+          }, 20000);
         } else {
-          setUser(null); // no cache → genuine sign-out
+          setUser(null); // never logged in → show auth screen immediately
         }
       }
     });
@@ -111,6 +160,7 @@ function Root() {
     return () => {
       if (fallback) clearTimeout(fallback);
       if (nullTimerRef.current) clearTimeout(nullTimerRef.current);
+      clearInterval(poll);
       unsub();
     };
   }, []);
@@ -148,6 +198,9 @@ function Root() {
       firebaseUser={user || null}
       isGuest={guestMode}
       onSignOut={async () => {
+        // Clear moneyCoachUID FIRST so the onAuthStateChanged null handler
+        // below knows this is an intentional sign-out, not a token refresh.
+        localStorage.removeItem("moneyCoachUID");
         clearSession();
         try { if (auth.currentUser) await signOut(auth); } catch(e) {}
         setGuestMode(false);
@@ -201,7 +254,8 @@ function Root() {
           try { await deleteAccountREST(idToken); } catch(e) { console.warn("Auth delete:", e); }
         }
 
-        // 4. Wipe all local storage
+        // 4. Wipe all local storage (clears moneyCoachUID so null handler
+        //    treats the subsequent Firebase null as genuine sign-out)
         localStorage.clear();
 
         // 5. Reset UI — fire-and-forget signOut, don't await it.

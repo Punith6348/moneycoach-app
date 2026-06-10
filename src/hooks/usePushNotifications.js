@@ -29,7 +29,11 @@ export function usePushNotifications(userId, onAction) {
 
     let listeners = [];
     let cancelled = false;
-    let fcmTokenListener = null;
+    // Assigned before any await so the cleanup function always holds a reference.
+    // removeEventListener is a no-op if the listener was never added to window.
+    const fcmTokenListener = (e) => {
+      if (!cancelled) saveToken(e.detail.token);
+    };
 
     async function saveToken(token) {
       if (cancelled) return;
@@ -73,10 +77,9 @@ export function usePushNotifications(userId, onAction) {
         // and provides a fallback if the native save somehow missed.
         if (window._fcmToken) {
           await saveToken(window._fcmToken);
-        } else {
-          fcmTokenListener = (e) => {
-            if (!cancelled) saveToken(e.detail.token);
-          };
+        } else if (!cancelled) {
+          // Guard: if effect was cleaned up while we were awaiting permissions above,
+          // don't add the listener — the cleanup already ran and won't remove it.
           window.addEventListener("fcmTokenReady", fcmTokenListener);
         }
       }
@@ -105,9 +108,7 @@ export function usePushNotifications(userId, onAction) {
     return () => {
       cancelled = true;
       listeners.forEach(l => l?.remove());
-      if (fcmTokenListener) {
-        window.removeEventListener("fcmTokenReady", fcmTokenListener);
-      }
+      window.removeEventListener("fcmTokenReady", fcmTokenListener);
     };
   }, [userId]);
 }

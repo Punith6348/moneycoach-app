@@ -9,6 +9,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, MessagingDelegate {
 
     var window: UIWindow?
     private var latestFCMToken: String?
+    private var pendingTokenDispatch: DispatchWorkItem?
 
     // Stable device ID shared with JS layer via window._nativeDeviceId
     private var nativeDeviceId: String {
@@ -35,9 +36,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, MessagingDelegate {
         saveTokenNative(token: token)
 
         // Also dispatch to JS after WebView loads (5s delay)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
-            self.dispatchFCMTokenToWebView(token: token)
-        }
+        scheduleTokenDispatch(token: token, delay: 5.0)
     }
 
     // Save FCM token to Firestore via REST API — result visible in Xcode logs
@@ -132,13 +131,23 @@ class AppDelegate: UIResponder, UIApplicationDelegate, MessagingDelegate {
     func applicationDidEnterBackground(_ application: UIApplication) {}
     func applicationWillEnterForeground(_ application: UIApplication) {}
     func applicationDidBecomeActive(_ application: UIApplication) {
-        // Retry dispatching stored token on every foreground (covers app re-opens)
+        // Retry dispatching stored token on every foreground (covers app re-opens).
+        // Cancel any pending dispatch first so rapid foreground/background cycles
+        // don't stack up multiple overlapping DispatchWorkItems.
         if let token = latestFCMToken {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                print("[FCM] Retrying dispatch on become active...")
-                self.dispatchFCMTokenToWebView(token: token)
-            }
+            scheduleTokenDispatch(token: token, delay: 3.0)
         }
+    }
+
+    private func scheduleTokenDispatch(token: String, delay: TimeInterval) {
+        pendingTokenDispatch?.cancel()
+        let item = DispatchWorkItem { [weak self] in
+            guard let self = self else { return }
+            print("[FCM] Dispatching token to WebView...")
+            self.dispatchFCMTokenToWebView(token: token)
+        }
+        pendingTokenDispatch = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: item)
     }
     func applicationWillTerminate(_ application: UIApplication) {}
 

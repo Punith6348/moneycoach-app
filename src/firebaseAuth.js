@@ -86,7 +86,7 @@ export function clearSession() {
 export async function signInWithAppleREST(identityToken, rawNonce) {
   let postBody = `id_token=${encodeURIComponent(identityToken)}&providerId=apple.com`;
   if (rawNonce) postBody += `&nonce=${encodeURIComponent(rawNonce)}`;
-  const res = await fetch(`${BASE}:signInWithIdp?key=${API_KEY}`, {
+  const res = await fetchWithTimeout(`${BASE}:signInWithIdp?key=${API_KEY}`, {
     method:  "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
