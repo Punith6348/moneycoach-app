@@ -150,9 +150,21 @@ android {
 
         
     }
+    signingConfigs {
+        release {
+            def props = new Properties()
+            def propsFile = rootProject.file("keystore.properties")
+            if (propsFile.exists()) props.load(new FileInputStream(propsFile))
+            storeFile file("../signing.keystore")
+            storePassword props["storePassword"]
+            keyAlias props["keyAlias"]
+            keyPassword props["keyPassword"]
+        }
+    }
     buildTypes {
         release {
             minifyEnabled true
+            signingConfig signingConfigs.release
         }
     }
     compileOptions {

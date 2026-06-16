@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# Signing secrets — never commit these
+keystore.properties
+signing.keystore
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
