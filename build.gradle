@@ -21,6 +21,8 @@ buildscript {
     repositories {
         google()
         mavenCentral()
+        // jcenter() is deprecated; keep as fallback for legacy artifacts
+
     }
     dependencies {
         classpath 'com.android.tools.build:gradle:8.9.1'
