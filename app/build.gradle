@@ -56,9 +56,9 @@ android {
     defaultConfig {
         applicationId "app.vercel.moneycoach_app.twa"
         minSdkVersion 21
-        targetSdkVersion 35
-        versionCode 15
-        versionName "1.0.6"
+        targetSdkVersion 36
+        versionCode 16
+        versionName "1.0.7"
 
         // The name for the application
         resValue "string", "appName", twaManifest.name
