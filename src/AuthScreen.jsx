@@ -14,7 +14,7 @@ function AppLogo({ size=80 }) {
     <div style={{ width:size, height:size, borderRadius:size*0.22,
       overflow:"hidden", margin:"0 auto", flexShrink:0,
       boxShadow:"0 8px 28px rgba(37,99,235,0.3)" }}>
-      <img src="/icon-512.png" alt="Money Coach"
+      <img src="/icon-512.png?v=2" alt="Money Coach"
         style={{ width:"100%", height:"100%", objectFit:"cover" }}
         onError={e=>{
           const p=e.target.parentNode;

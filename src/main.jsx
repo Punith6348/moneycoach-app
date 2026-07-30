@@ -43,7 +43,7 @@ function LoadingScreen() {
   return (
     <div className="auth-root" style={{ display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column", gap:16 }}>
       <div style={{ width:72, height:72, borderRadius:18, overflow:"hidden", boxShadow:"0 8px 24px rgba(37,99,235,0.4)" }}>
-        <img src="/icon-512.png" alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}
+        <img src="/icon-512.png?v=2" alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}
           onError={e=>{
             const p=e.target.parentNode;
             p.style.cssText="background:linear-gradient(135deg,#1E40AF,#06B6D4);display:flex;align-items:center;justify-content:center;width:72px;height:72px;border-radius:18px";

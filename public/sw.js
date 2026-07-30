@@ -1,6 +1,6 @@
 // ─── Money Coach Service Worker ──────────────────────────────────────────────
 // Caches the app shell for offline use. Data stays in localStorage (no fetch needed).
-const CACHE_NAME = "moneycoach-v3";
+const CACHE_NAME = "moneycoach-v4";
 
 // Core app shell assets to cache on install
 const PRECACHE = [

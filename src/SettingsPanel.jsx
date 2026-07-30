@@ -151,7 +151,7 @@ export default function SettingsPanel({
           </div>
 
           <p style={{ textAlign:"center", fontSize:11, color:"#D1D5DB", margin:"20px 0 0" }}>
-            Money Coach · v1.0.0
+            Money Coach · v1.0.10
           </p>
 
         </div>
