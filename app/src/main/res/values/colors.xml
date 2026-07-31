@@ -14,5 +14,6 @@
      limitations under the License.
 -->
 <resources>
+    <color name="icon_background">#1E293B</color>
     <color name="shortcut_background">#F5F5F5</color>
 </resources>

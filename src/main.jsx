@@ -76,14 +76,13 @@ function Root() {
     // 2. No Firebase cache, but moneyCoachUID present (returning user):
     //    → Firebase is mid-refresh OR setPersistence hadn't resolved when user signed in
     //      (common on iOS — Apple Sign-In completes before setPersistence resolves).
-    //    → Do NOT fall back to auth screen after 4 s. Give Firebase 15 s to restore.
-    //      The null handler's 20 s timer also runs; whichever fires first wins.
+    //    → Give Firebase a brief chance to restore, then show the sign-in screen.
     //
     // 3. No cache, no moneyCoachUID (genuinely new user):
-    //    → Show auth screen quickly after 4 s.
+    //    → Show auth screen quickly.
     const cachedUser  = readCachedUser();
     const hadSession  = !!localStorage.getItem("moneyCoachUID");
-    const fallbackMs  = cachedUser ? null : hadSession ? 15000 : 4000;
+    const fallbackMs  = cachedUser ? null : hadSession ? 3000 : 1500;
     const fallback    = fallbackMs !== null
       ? setTimeout(() => {
           // Last-chance check: Firebase may already have the user in memory even
@@ -93,7 +92,7 @@ function Root() {
         }, fallbackMs)
       : null;
 
-    // Recovery poll: every 3 s for the first 18 s, grab auth.currentUser directly.
+    // Recovery poll: every second for the first 5 s, grab auth.currentUser directly.
     // Handles the case where onAuthStateChanged fires late (Apple Sign-In on iOS
     // can take >5 s to validate with Apple's servers on second+ opens).
     let pollCount = 0;
@@ -109,8 +108,8 @@ function Root() {
           return auth.currentUser;
         });
       }
-      if (pollCount >= 6) clearInterval(poll); // stop after 18 s
-    }, 3000);
+      if (pollCount >= 5) clearInterval(poll); // stop after 5 s
+    }, 1000);
 
     const unsub = onAuthStateChanged(auth, u => {
       if (fallback) clearTimeout(fallback);
@@ -143,14 +142,14 @@ function Root() {
         // sign-out) as the reliable session signal.
         const hadSession = !!localStorage.getItem("moneyCoachUID");
         if (hadSession) {
-          // Firebase is refreshing — give it up to 20 s to fire the real user.
+          // Firebase is refreshing — give it a short grace period to restore.
           // The poll above also checks auth.currentUser every 3 s as a safety net.
           nullTimerRef.current = setTimeout(() => {
             nullTimerRef.current = null;
             // Final check: if Firebase quietly has the user, use it instead of logging out.
             if (auth.currentUser) { setUser(auth.currentUser); return; }
             setUser(null); // 20 s elapsed, no user anywhere → genuine logout
-          }, 20000);
+          }, 5000);
         } else {
           setUser(null); // never logged in → show auth screen immediately
         }
